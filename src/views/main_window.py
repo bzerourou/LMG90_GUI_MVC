@@ -252,7 +252,12 @@ class MainWindow(QMainWindow):
         self.material_tab.material_created.connect(self._refresh_all)
         self.model_tab.model_created.connect(self._refresh_all)
         self.avatar_tab.avatar_created.connect(self._refresh_all)
+        self.empty_avatar_tab.avatar_created.connect(self._refresh_all)
+        self.loop_tab.loop_generated.connect(self._refresh_all)
+        self.granulo_tab.granulo_generated.connect(self._refresh_all)
+        self.dof_tab.operation_applied.connect(self._refresh_all)
         self.contact_tab.law_created.connect(self._refresh_all)
+        
     
     # ========== SLOTS MENU ==========
     
