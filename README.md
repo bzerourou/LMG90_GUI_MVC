@@ -7,7 +7,7 @@
 
 **LMGC90_GUI** est une interface graphique moderne en architecture **MVC** (Model-View-Controller) pour le préprocesseur `pre` de [LMGC90](https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/-/wikis/home).
 
-
+![](docs/captures/interface.JPG)
 
 ## 🎯 Points Clés de la Refactorisation
 
@@ -74,7 +74,7 @@ LMGC90_GUI/
 
 ```bash
 # Cloner le projet
-git clone https://github.com/bzerourou/LMGC90_GUI_MVC.git
+git clone https://github.com/bzerourou/LMG90_GUI_MVC.git
 cd LMGC90_GUI_MVC
 
 # Créer un environnement virtuel
@@ -174,6 +174,4 @@ result = evaluator.eval_expression("2 * math.pi * 0.5")
 - ✅ `eval()` remplacé par AST sécurisé
 - ✅ Gestion des avatars vides corrigée
 
-### Améliorations
-- ✅ Marqueurs d'origine unifiés (`__origin`)
-- 
+
