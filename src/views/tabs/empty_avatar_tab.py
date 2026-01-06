@@ -177,16 +177,22 @@ class EmptyAvatarTab(QWidget):
                 color = row.color_input.text().strip()
                 params_text = row.params_input.text().strip()
                 
-                # Parser les paramètres
-                from ...utils.safe_eval import SafeEvaluator
-                evaluator = SafeEvaluator()
-                params = evaluator.eval_dict(params_text) if params_text else {}
+                # Parser les paramètres manuellement
+                params = {}
+                if params_text:
+                    try:
+                        params = self._parse_params(params_text)
+                    except ValueError as e:
+                        raise ValueError(f"Erreur dans les paramètres du contacteur : {e}")
                 
                 contactors.append({
                     'shape': shape,
                     'color': color or self.color_input.text(),
                     'params': params
                 })
+            
+            if not contactors:
+                raise ValueError("Ajoutez au moins un contacteur")
             
             # Créer l'avatar
             avatar = Avatar(
@@ -204,12 +210,81 @@ class EmptyAvatarTab(QWidget):
             
             # Succès
             self.avatar_created.emit()
-            QMessageBox.information(self, "Succès", f"Avatar vide #{idx} créé")
+            QMessageBox.information(self, "Succès", f"Avatar vide #{idx} créé avec {len(contactors)} contacteur(s)")
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
+        except ValueError as e:
+            QMessageBox.critical(self, "Erreur de Valeur", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+
+    def _parse_params(self, params_text: str) -> dict:
+        """
+        Parse les paramètres de contacteur de manière sécurisée.
+        
+        Format accepté : key=value, key2=value2
+        Valeurs acceptées : nombres (int/float) ou listes de nombres
+        
+        Exemples:
+            "byrd=0.3" → {'byrd': 0.3}
+            "axe1=1.0, axe2=0.1" → {'axe1': 1.0, 'axe2': 0.1}
+            "vertices=[[-1,-1],[1,-1]]" → {'vertices': [[-1,-1],[1,-1]]}
+        """
+        import re
+        import ast
+        
+        params = {}
+        
+        # Pattern pour capturer : nom = (nombre | liste)
+        pattern = r'(\w+)\s*=\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?|\[(?:[^\[\]]|\[[^\]]*\])*\])'
+        
+        matches = re.findall(pattern, params_text)
+        
+        if not matches:
+            # Essayer un format plus simple
+            for pair in params_text.split(','):
+                if '=' in pair:
+                    key, val = pair.split('=', 1)
+                    key = key.strip()
+                    val = val.strip()
+                    
+                    try:
+                        # Essayer nombre
+                        if '.' in val or 'e' in val.lower():
+                            params[key] = float(val)
+                        else:
+                            params[key] = int(val)
+                    except ValueError:
+                        # Garder comme string en dernier recours
+                        params[key] = val
+            
+            return params
+        
+        for key, value_str in matches:
+            key = key.strip()
+            value_str = value_str.strip()
+            
+            if value_str.startswith('['):
+                # Liste
+                try:
+                    value = ast.literal_eval(value_str)
+                    if not isinstance(value, list):
+                        raise ValueError(f"{key} : attendu une liste")
+                    params[key] = value
+                except Exception as e:
+                    raise ValueError(f"Format de liste invalide pour '{key}': {value_str}")
+            else:
+                # Nombre
+                try:
+                    if '.' in value_str or 'e' in value_str.lower():
+                        params[key] = float(value_str)
+                    else:
+                        params[key] = int(value_str)
+                except ValueError:
+                    raise ValueError(f"Valeur numérique invalide pour '{key}': {value_str}")
+        
+        return params
     
     def refresh(self):
         """Rafraîchit les combos"""
