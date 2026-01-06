@@ -6,7 +6,7 @@ Onglet de création d'avatars standards.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-    QComboBox, QPushButton, QMessageBox, QCheckBox, QLabel
+    QComboBox, QPushButton, QMessageBox, QCheckBox, QLabel, QTreeWidgetItem
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -313,3 +313,45 @@ class AvatarTab(QWidget):
         
         # Types d'avatars
         self._update_avatar_types()
+        if hasattr(self, 'tree'):
+                self._refresh_tree()
+
+    def _refresh_tree(self):
+        """Rafraîchit l'arbre des avatars"""
+        if not hasattr(self, 'tree'):
+            return
+        self.tree.clear()
+
+        avatars = self.controller.state.avatars
+    
+        from ...core.models import AvatarOrigin
+        from PyQt6.QtCore import Qt
+        
+        for i, avatar in enumerate(avatars):
+            # Marquer l'origine
+            origin_str = ""
+            if avatar.origin == AvatarOrigin.LOOP:
+                origin_str = " [Boucle]"
+            elif avatar.origin == AvatarOrigin.GRANULO:
+                origin_str = " [Granulo]"
+            
+            # Créer l'item
+            center_str = ', '.join(f"{x:.2f}" for x in avatar.center)
+            
+            item = QTreeWidgetItem([
+                f"#{i}",
+                avatar.avatar_type.value,
+                avatar.color,
+                f"({center_str})",
+                origin_str
+            ])
+            
+            # Stocker l'index réel
+            item.setData(0, Qt.ItemDataRole.UserRole, i)
+            
+            # Colorer selon origine
+            if avatar.origin != AvatarOrigin.MANUAL:
+                from PyQt6.QtGui import QBrush, QColor
+                item.setForeground(0, QBrush(QColor(100, 100, 100)))  # Gris
+            
+            self.tree.addTopLevelItem(item)

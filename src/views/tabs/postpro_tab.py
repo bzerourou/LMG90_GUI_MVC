@@ -175,9 +175,15 @@ class PostProTab(QWidget):
         self.target_combo.clear()
         
         # Avatars
-        avatars = self.controller.get_avatars(include_generated=True)
+        avatars = self.controller.state.avatars
         for i, avatar in enumerate(avatars):
-            label = f"Avatar #{i} ({avatar.color})"
+            from ...core.models import AvatarOrigin
+            origin_mark = ""
+            if avatar.origin == AvatarOrigin.LOOP:
+                origin_mark = " [L]"
+            elif avatar.origin == AvatarOrigin.GRANULO:
+                origin_mark = " [G]"
+            label = f"Avatar #{i} - {avatar.avatar_type.value} {origin_mark}"
             self.target_combo.addItem(label, ('avatar', i))
         
         # Groupes

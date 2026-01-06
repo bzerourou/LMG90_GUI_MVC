@@ -186,9 +186,21 @@ class LoopTab(QWidget):
     def refresh(self):
         """Rafraîchit le combo des avatars"""
         self.avatar_combo.clear()
-        avatars = self.controller.get_avatars(include_generated=False)
         
-        for i, avatar in enumerate(avatars):
-            label = f"{avatar.avatar_type.value} - {avatar.color}"
-            self.avatar_combo.addItem(label, i)
+        # Obtenir TOUS les avatars (sans filtrage)
+        all_avatars = self.controller.state.avatars
+        
+        # Filtrer seulement les avatars manuels
+        from ...core.models import AvatarOrigin
+        
+        for real_index, avatar in enumerate(all_avatars):
+            if avatar.origin == AvatarOrigin.MANUAL:
+                # Créer un label descriptif
+                label = f"#{real_index} - {avatar.avatar_type.value} ({avatar.color})"
+                
+                # Stocker l'index RÉEL comme data
+                self.avatar_combo.addItem(label, real_index)
+        
+        if self.avatar_combo.count() == 0:
+            self.avatar_combo.addItem("(Aucun avatar manuel)", None)
 

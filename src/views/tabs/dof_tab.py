@@ -212,9 +212,15 @@ class DOFTab(QWidget):
         self.target_combo.clear()
         
         # Avatars individuels
-        avatars = self.controller.get_avatars(include_generated=True)
+        avatars = self.controller.state.avatars
         for i, avatar in enumerate(avatars):
-            label = f"Avatar #{i} ({avatar.color})"
+            from ...core.models import AvatarOrigin
+            origin_mark = ""
+            if avatar.origin == AvatarOrigin.LOOP:
+                origin_mark = " [Boucle]"
+            elif avatar.origin == AvatarOrigin.GRANULO:
+                origin_mark = " [Granulo]"
+            label = f"Avatar #{i}-{avatar.avatar_type.value} ({avatar.color}){origin_mark}"
             self.target_combo.addItem(label, ('avatar', i))
         
         # Groupes
@@ -222,5 +228,8 @@ class DOFTab(QWidget):
             label = f"🔷 GROUPE: {group_name} ({len(indices)} avatars)"
             self.target_combo.addItem(label, ('group', group_name))
         
+        if self.target_combo.count() == 0:
+            self.target_combo.addItem("(Aucun avatar)", None)
         # Trigger l'affichage de l'aide
-        self._on_action_changed(self.action_combo.currentText())
+        if hasattr(self, 'action_combo'):
+            self._on_action_changed(self.action_combo.currentText())
