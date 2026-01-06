@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: PyQt6 Debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "QT_DEBUG_PLUGINS": "1",
+                "PYQTGRAPH_QT_LIB": "PyQt6"
+            },
+            "subProcess": true,
+            "stopOnEntry": false
+        }
+    ]
+}
