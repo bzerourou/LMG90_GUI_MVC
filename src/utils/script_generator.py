@@ -139,7 +139,47 @@ class ScriptGenerator:
         mod = avatar.model_name
         color = avatar.color
         
-        # Construire les arguments
+        # emptyAvatar
+        if atype == "emptyAvatar":
+            f.write(f"# Avatar vide avec contacteurs personnalisés\n")
+            f.write(f"body = pre.avatar(dimension={len(center)})\n")
+            
+            # Bulk
+            if len(center) == 2:
+                f.write(f"body.addBulk(pre.rigid2d())\n")
+            else:
+                f.write(f"body.addBulk(pre.rigid3d())\n")
+            
+            # Node principal
+            f.write(f"body.addNode(pre.node(coor=np.array({center}), number=1))\n")
+            
+            # Configuration
+            f.write(f"body.defineGroups()\n")
+            f.write(f"body.defineModel(model=mods['{mod}'])\n")
+            f.write(f"body.defineMaterial(material=mats['{mat}'])\n")
+            
+            # Contacteurs
+            for cont in avatar.contactors:
+                shape = cont['shape']
+                color_c = cont.get('color', color)
+                params = cont.get('params', {})
+                
+                # Construire les paramètres
+                params_str = ", ".join(f"{k}={repr(v)}" for k, v in params.items())
+                
+                f.write(f"body.addContactors(shape='{shape}', color='{color_c}'")
+                if params_str:
+                    f.write(f", {params_str}")
+                f.write(f")\n")
+            
+            # Calcul des propriétés rigides
+            f.write(f"body.computeRigidProperties()\n")
+            f.write(f"{container}.addAvatar(body)\n")
+            f.write("bodies_list.append(body)\n\n")
+            return
+        
+        # avatars standards
+        # construire les arguments
         args = [
             f"center={center}",
             f"model=mods['{mod}']",
@@ -241,6 +281,37 @@ class ScriptGenerator:
         """Écrit la création d'un avatar dans une boucle"""
         atype = avatar.avatar_type.value
         
+        if atype == "emptyAvatar":
+            f.write(f"    # Avatar vide\n")
+            f.write(f"    body = pre.avatar(dimension={len(avatar.center)})\n")
+            
+            if len(avatar.center) == 2:
+                f.write(f"    body.addBulk(pre.rigid2d())\n")
+            else:
+                f.write(f"    body.addBulk(pre.rigid3d())\n")
+            
+            f.write(f"    body.addNode(pre.node(coor=np.array(center), number=1))\n")
+            f.write(f"    body.defineGroups()\n")
+            f.write(f"    body.defineModel(model=mods['{avatar.model_name}'])\n")
+            f.write(f"    body.defineMaterial(material=mats['{avatar.material_name}'])\n")
+            
+            for cont in avatar.contactors:
+                shape = cont['shape']
+                color_c = cont.get('color', avatar.color)
+                params = cont.get('params', {})
+                params_str = ", ".join(f"{k}={repr(v)}" for k, v in params.items())
+                
+                f.write(f"    body.addContactors(shape='{shape}', color='{color_c}'")
+                if params_str:
+                    f.write(f", {params_str}")
+                f.write(f")\n")
+            
+            f.write(f"    body.computeRigidProperties()\n")
+            f.write("    bodies.addAvatar(body)\n")
+            f.write("    bodies_list.append(body)\n\n")
+            return
+        
+        # avatars standards
         f.write(f"    body = pre.{atype}(center=center, ")
         f.write(f"model=mods['{avatar.model_name}'], ")
         f.write(f"material=mats['{avatar.material_name}'], ")
