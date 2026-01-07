@@ -6,7 +6,7 @@ Onglet pour créer des tables de visibilité (règles de détection).
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox
+    QPushButton, QHBoxLayout, QMessageBox
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -70,8 +70,16 @@ class VisibilityTab(QWidget):
         
         # Bouton créer
         create_btn = QPushButton("Créer Règle de Visibilité")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
         create_btn.clicked.connect(self._on_create)
-        layout.addWidget(create_btn)
+        edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(create_btn)
+        button_layout.addWidget(edit_btn)
+        button_layout.addWidget(delete_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -102,6 +110,13 @@ class VisibilityTab(QWidget):
             QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+    
+    def _on_edit(self):
+        pass    
+
+    def _on_delete(self):
+        pass
+
     
     def refresh(self):
         """Rafraîchit le combo des lois"""

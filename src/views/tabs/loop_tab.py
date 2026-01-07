@@ -6,7 +6,7 @@ Onglet pour générer des avatars en boucle.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QCheckBox, QLabel
+    QPushButton, QMessageBox, QCheckBox, QLabel, QHBoxLayout
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -82,8 +82,16 @@ class LoopTab(QWidget):
         
         # Bouton générer
         gen_btn = QPushButton("Générer la Boucle")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
         gen_btn.clicked.connect(self._on_generate)
-        layout.addWidget(gen_btn)
+        edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(gen_btn)
+        button_layout.addWidget(edit_btn)
+        button_layout.addWidget(delete_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -182,6 +190,12 @@ class LoopTab(QWidget):
             QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
+    
+    def _on_edit(self):
+        pass
+
+    def _on_delete(self):
+        pass    
     
     def refresh(self):
         """Rafraîchit le combo des avatars"""

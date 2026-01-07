@@ -6,7 +6,7 @@ Onglet de création d'avatars standards.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-    QComboBox, QPushButton, QMessageBox, QCheckBox, QLabel, QTreeWidgetItem
+    QComboBox, QPushButton, QMessageBox, QCheckBox, QLabel, QTreeWidgetItem, QHBoxLayout
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -111,9 +111,17 @@ class AvatarTab(QWidget):
         layout.addLayout(form)
         
         # Bouton créer
-        create_btn = QPushButton("Créer Avatar")
+        create_btn = QPushButton("Créer")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
         create_btn.clicked.connect(self._on_create)
-        layout.addWidget(create_btn)
+        edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(create_btn)
+        button_layout.addWidget(edit_btn)
+        button_layout.addWidget(delete_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -298,6 +306,13 @@ class AvatarTab(QWidget):
             QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+    
+    def _on_edit(self): 
+        pass    
+
+    def _on_delete(self):
+        pass
+    
     
     def refresh(self):
         """Rafraîchit les combos"""

@@ -6,7 +6,7 @@ Onglet de création/édition de matériaux.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-    QComboBox, QPushButton, QMessageBox
+    QComboBox, QPushButton, QHBoxLayout, QMessageBox
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -52,8 +52,16 @@ class MaterialTab(QWidget):
         
         # Boutons
         create_btn = QPushButton("Créer")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
         create_btn.clicked.connect(self._on_create)
-        layout.addWidget(create_btn)
+        edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(create_btn)
+        button_layout.addWidget(edit_btn)
+        button_layout.addWidget(delete_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -100,6 +108,10 @@ class MaterialTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
+    def _on_edit(self):
+        pass
+    def _on_delete(self):
+        pass
     def _parse_properties(self, text: str) -> dict:
         """Parse la chaîne de propriétés"""
         if not text.strip():

@@ -6,7 +6,7 @@ Onglet pour générer des distributions granulométriques.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox
+    QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox, QHBoxLayout
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -108,9 +108,16 @@ class GranuloTab(QWidget):
         
         # Bouton générer
         gen_btn = QPushButton("Générer le Dépôt")
-        gen_btn.setStyleSheet("font-weight: bold; padding: 10px;")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
         gen_btn.clicked.connect(self._on_generate)
-        layout.addWidget(gen_btn)
+        edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(gen_btn)
+        button_layout.addWidget(edit_btn)
+        button_layout.addWidget(delete_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -201,6 +208,13 @@ class GranuloTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
+    def _on_edit(self):
+        pass
+
+    def _on_delete(self):
+        pass
+
+
     def refresh(self):
         """Rafraîchit les combos"""
         # Matériaux

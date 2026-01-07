@@ -7,7 +7,7 @@ Onglet pour appliquer des conditions aux limites.
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QLabel
+    QPushButton, QMessageBox, QLabel, QHBoxLayout
 )
 from PyQt6.QtCore import pyqtSignal
 
@@ -56,10 +56,17 @@ class DOFTab(QWidget):
         layout.addLayout(form)
         
         # Bouton appliquer
-        apply_btn = QPushButton("✅ Appliquer l'Opération")
-        apply_btn.setStyleSheet("font-weight: bold; padding: 8px;")
+        apply_btn = QPushButton("Appliquer DOF")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
         apply_btn.clicked.connect(self._on_apply)
-        layout.addWidget(apply_btn)
+        edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(apply_btn)
+        button_layout.addWidget(edit_btn)
+        button_layout.addWidget(delete_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         self.setLayout(layout)
@@ -135,6 +142,12 @@ class DOFTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Application échouée :\n{e}")
     
+    def _on_edit(self):
+        pass
+
+    def _on_delete(self):
+        pass
+
     def _parse_dof_params(self, params_text: str) -> dict:
         """
         Parse les paramètres DOF de manière sécurisée.
