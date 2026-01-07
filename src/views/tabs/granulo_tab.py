@@ -6,9 +6,10 @@ Onglet pour générer des distributions granulométriques.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox, QHBoxLayout
+    QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox, QHBoxLayout, 
+    QScrollArea
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt,pyqtSignal
 
 from ...core.models import GranuloGeneration
 from ...controllers.project_controller import ProjectController
@@ -28,7 +29,6 @@ class GranuloTab(QWidget):
     def _setup_ui(self):
         """Configure l'interface"""
         layout = QVBoxLayout()
-        
         # === Groupe 1 : Distribution ===
         dist_group = QGroupBox("1. Distribution des Particules")
         dist_form = QFormLayout()
@@ -119,8 +119,17 @@ class GranuloTab(QWidget):
         button_layout.addWidget(delete_btn)
         layout.addLayout(button_layout)
         
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True) 
+        container = QWidget()
+        container.setLayout(layout)
+        scroll.setWidget(container)
+        
+        final_layout = QVBoxLayout()
+        final_layout.addWidget(scroll)
+
         layout.addStretch()
-        self.setLayout(layout)
+        self.setLayout(final_layout)
         
         # Initialiser les paramètres du conteneur
         self._update_container_params("Box2D")
