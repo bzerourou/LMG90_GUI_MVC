@@ -15,10 +15,10 @@ from ..controllers.project_controller import ProjectController
 from ..core.models import ValidationError
 from .tabs import (
     MaterialTab, ModelTab, AvatarTab, EmptyAvatarTab, LoopTab,
-    GranuloTab, DOFTab, ContactTab, VisibilityTab, PostProTab
+    GranuloTab, DOFTab, ContactTab, VisibilityTab, PostProTab, 
 )
 from .tree_view import ModelTreeView
-
+from ..core.models import UnitSystem
 
 class MainWindow(QMainWindow):
     """Fenêtre principale de l'application"""
@@ -94,10 +94,22 @@ class MainWindow(QMainWindow):
         
         # Menu Outils
         tools_menu = menubar.addMenu("Outils")
-        
+        #Préférences
+        prefs_action = QAction("⚙️ Préférences...", self)
+        prefs_action.setShortcut(QKeySequence("Ctrl+,"))  # Raccourci standard
+        prefs_action.triggered.connect(self._on_preferences)
+        tools_menu.addAction(prefs_action)
+        tools_menu.addSeparator()
+
         datbox_action = QAction("Générer DATBOX", self)
         datbox_action.triggered.connect(self._on_generate_datbox)
         tools_menu.addAction(datbox_action)
+
+        script_action = QAction("Générer Script Python", self)
+        script_action.triggered.connect(self._on_generate_script)
+        tools_menu.addAction(script_action)
+        
+        tools_menu.addSeparator()
         
         vars_action = QAction("Variables dynamiques", self)
         vars_action.triggered.connect(self._on_dynamic_vars)
@@ -280,6 +292,9 @@ class MainWindow(QMainWindow):
     
     def _on_open_project(self):
         """Ouvre un projet existant"""
+        start_dir = ""
+        if self.controller.state.preferences.default_project_path:
+            start_dir = str(self.controller.state.preferences.default_project_path)
         filepath, _ = QFileDialog.getOpenFileName(
             self, "Ouvrir projet", "",
             "Projet LMGC90 (*.lmgc90)"
@@ -290,6 +305,7 @@ class MainWindow(QMainWindow):
                 self.controller.load_project(Path(filepath))
                 self.setWindowTitle(f"LMGC90_GUI v0.2.5 - {self.controller.state.name}")
                 self.project_loaded.emit()
+                self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
                     warnings = '\n'.join(self.controller.state.load_warnings)
                     QMessageBox.warning(self, "Avertissements", 
@@ -312,7 +328,12 @@ class MainWindow(QMainWindow):
     
     def _on_save_project_as(self):
         """Sauvegarde sous..."""
-        dirpath = QFileDialog.getExistingDirectory(self, "Choisir le dossier")
+        # Utiliser le chemin par défaut si défini
+        start_dir = ""
+        if self.controller.state.preferences.default_project_path:
+            start_dir = str(self.controller.state.preferences.default_project_path)
+        
+        dirpath = QFileDialog.getExistingDirectory(self, "Choisir le dossier", start_dir)
         
         if dirpath:
             filename = f"{self.controller.state.name}.lmgc90"
@@ -322,6 +343,10 @@ class MainWindow(QMainWindow):
                 self.controller.save_project(filepath)
                 self.project_saved.emit()
                 self.statusBar().showMessage(f"Sauvegardé", 5000)
+                
+                #Ajouter à l'historique
+                self._add_to_recent(filepath)
+                
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Sauvegarde échouée :\n{e}")
     
@@ -457,6 +482,115 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur ParaView :\n{e}")
+    
+    
+    
+    def _on_preferences(self):
+        """Ouvre le dialogue de préférences"""
+        from .dialogs import PreferencesDialog
+        
+        dialog = PreferencesDialog(
+            preferences=self.controller.state.preferences,
+            parent=self
+        )
+        
+        if dialog.exec():
+            # Récupérer les nouvelles préférences
+            new_prefs = dialog.get_preferences()
+            self.controller.state.preferences = new_prefs
+            
+            # Appliquer les changements
+            self._apply_preferences()
+            
+            QMessageBox.information(
+                self, "Préférences",
+                "✅ Préférences sauvegardées.\n\n"
+                "Certains changements prendront effet au prochain démarrage."
+        )
+
+    def _apply_preferences(self):
+        """Applique les préférences"""
+        prefs = self.controller.state.preferences
+        
+        # Mettre à jour les labels d'unités dans l'interface
+        unit_labels = prefs.get_unit_labels()
+        
+        # TODO: Mettre à jour les placeholders des inputs avec les nouvelles unités
+        # Par exemple dans material_tab, model_tab, etc.
+        
+        # Mettre à jour la barre de statut
+        unit_system_name = "SI" if prefs.unit_system == UnitSystem.SI else "CGS"
+        self.statusBar().showMessage(f"Système d'unités : {unit_system_name}", 5000)
+
+    def _update_recent_menu(self):
+        """Met à jour le menu des projets récents"""
+        self.recent_menu.clear()
+        
+        recent_projects = self.controller.state.preferences.recent_projects
+        
+        if not recent_projects:
+            no_recent = self.recent_menu.addAction("(Aucun projet récent)")
+            no_recent.setEnabled(False)
+            return
+        
+        for project_path in recent_projects[:10]:  # Limiter à 10
+            if project_path.exists():
+                action = self.recent_menu.addAction(f"📄 {project_path.name}")
+                action.triggered.connect(lambda checked, p=project_path: self._open_recent_project(p))
+            else:
+                # Projet introuvable
+                action = self.recent_menu.addAction(f"❌ {project_path.name} (introuvable)")
+                action.setEnabled(False)
+        
+        self.recent_menu.addSeparator()
+        
+        clear_action = self.recent_menu.addAction("🗑️ Effacer l'historique")
+        clear_action.triggered.connect(self._clear_recent_projects)
+
+    def _open_recent_project(self, filepath: Path):
+        """Ouvre un projet récent"""
+        try:
+            self.controller.load_project(filepath)
+            self.setWindowTitle(f"LMGC90_GUI v0.2.5 - {self.controller.state.name}")
+            self.project_loaded.emit()
+            self.statusBar().showMessage(f"Projet chargé", 5000)
+            
+            # Mettre à jour l'historique
+            self._add_to_recent(filepath)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de charger :\n{e}")
+
+    def _add_to_recent(self, filepath: Path):
+        """Ajoute un projet à l'historique"""
+        prefs = self.controller.state.preferences
+        
+        # Retirer si déjà présent
+        if filepath in prefs.recent_projects:
+            prefs.recent_projects.remove(filepath)
+        
+        # Ajouter en tête
+        prefs.recent_projects.insert(0, filepath)
+        
+        # Limiter la taille
+        max_recent = prefs.max_recent_projects
+        prefs.recent_projects = prefs.recent_projects[:max_recent]
+        
+        # Mettre à jour le menu
+        self._update_recent_menu()
+
+    def _clear_recent_projects(self):
+        """Efface l'historique des projets récents"""
+        reply = QMessageBox.question(
+            self, "Confirmer",
+            "Effacer l'historique des projets récents ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.controller.state.preferences.recent_projects.clear()
+            self._update_recent_menu()
+    
     
     # ========== RAFRAÎCHISSEMENT ==========
     

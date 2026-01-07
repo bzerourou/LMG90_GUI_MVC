@@ -305,7 +305,7 @@ class AvatarTab(QWidget):
         self.material_combo.clear()
         materials = self.controller.get_materials()
         self.material_combo.addItems([m.name for m in materials])
-        
+         
         # Modèles
         self.model_combo.clear()
         models = self.controller.get_models()

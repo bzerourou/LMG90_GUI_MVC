@@ -5,6 +5,8 @@ Représentation pure des objets sans logique UI (Model dans MVC).
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 from enum import Enum
+from pathlib import Path
+
 
 
 # ============================================================================
@@ -63,6 +65,11 @@ class AvatarOrigin(Enum):
     LOOP = "loop"          # Généré par une boucle
     GRANULO = "granulo"    # Généré par granulométrie
 
+
+class UnitSystem(Enum):
+    """Système d'unités"""
+    SI = "SI"      # International System (m, kg, s, N, Pa, J)
+    CGS = "CGS"    # Centimeter-Gram-Second (cm, g, s, dyn, Ba, erg)
 
 # ============================================================================
 # DATACLASSES - Modèles de données
@@ -476,6 +483,68 @@ class PostProCommand:
             target_value=target_info['value'] if target_info else None
         )
 
+@dataclass
+class ProjectPreferences:
+    """Préférences du projet"""
+    default_project_path: Optional[Path] = None
+    unit_system: UnitSystem = UnitSystem.SI
+    auto_save: bool = True
+    auto_save_interval: int = 300  # secondes
+    backup_enabled: bool = True
+    recent_projects: List[Path] = field(default_factory=list)
+    max_recent_projects: int = 10
+    
+    def to_dict(self) -> Dict:
+        """Convertit en dictionnaire"""
+        return {
+            'default_project_path': str(self.default_project_path) if self.default_project_path else None,
+            'unit_system': self.unit_system.value,
+            'auto_save': self.auto_save,
+            'auto_save_interval': self.auto_save_interval,
+            'backup_enabled': self.backup_enabled,
+            'recent_projects': [str(p) for p in self.recent_projects],
+            'max_recent_projects': self.max_recent_projects
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'ProjectPreferences':
+        """Crée depuis un dictionnaire"""
+        return cls(
+            default_project_path=Path(data['default_project_path']) if data.get('default_project_path') else None,
+            unit_system=UnitSystem(data.get('unit_system', 'SI')),
+            auto_save=data.get('auto_save', True),
+            auto_save_interval=data.get('auto_save_interval', 300),
+            backup_enabled=data.get('backup_enabled', True),
+            recent_projects=[Path(p) for p in data.get('recent_projects', [])],
+            max_recent_projects=data.get('max_recent_projects', 10)
+        )
+    
+    def get_unit_labels(self) -> Dict[str, str]:
+        """Retourne les labels d'unités selon le système"""
+        if self.unit_system == UnitSystem.SI:
+            return {
+                'length': 'm',
+                'mass': 'kg',
+                'time': 's',
+                'force': 'N',
+                'pressure': 'Pa',
+                'energy': 'J',
+                'density': 'kg/m³',
+                'velocity': 'm/s',
+                'acceleration': 'm/s²',
+            }
+        else:  # CGS
+            return {
+                'length': 'cm',
+                'mass': 'g',
+                'time': 's',
+                'force': 'dyn',
+                'pressure': 'Ba',
+                'energy': 'erg',
+                'density': 'g/cm³',
+                'velocity': 'cm/s',
+                'acceleration': 'cm/s²',
+            }
 
 @dataclass
 class ProjectState:
@@ -486,6 +555,7 @@ class ProjectState:
     name: str
     dimension: int = 2
     units: Dict[str, str] = field(default_factory=dict)
+    preferences: ProjectPreferences = field(default_factory= ProjectPreferences)   
     materials: List[Material] = field(default_factory=list)
     models: List[Model] = field(default_factory=list)
     avatars: List[Avatar] = field(default_factory=list)
@@ -507,6 +577,7 @@ class ProjectState:
             'project_name': self.name,
             'dimension': self.dimension,
             'units': self.units,
+            'preferences': self.preferences.to_dict(),
             'materials': [m.to_dict() for m in self.materials],
             'models': [m.to_dict() for m in self.models],
             'avatars': [a.to_dict() for a in manual_avatars],
@@ -523,10 +594,13 @@ class ProjectState:
     @classmethod
     def from_dict(cls, data: Dict) -> 'ProjectState':
         """Crée un état complet depuis un dictionnaire"""
+        prefs_data = data.get('preferences', {})
+        preferences = ProjectPreferences.from_dict(prefs_data) if prefs_data else ProjectPreferences()
         return cls(
             name=data.get('project_name', 'Projet'),
             dimension=data.get('dimension', 2),
             units=data.get('units', {}),
+            preferences=preferences,
             materials=[Material.from_dict(m) for m in data.get('materials', [])],
             models=[Model.from_dict(m) for m in data.get('models', [])],
             avatars=[Avatar.from_dict(a) for a in data.get('avatars', [])],
@@ -539,3 +613,4 @@ class ProjectState:
             avatar_groups=data.get('avatar_groups', {}),
             dynamic_vars=data.get('dynamic_vars', {})
         )
+    
