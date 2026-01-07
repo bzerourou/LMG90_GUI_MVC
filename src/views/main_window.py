@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
         # Interface
         self._setup_ui()
         self._connect_signals()
+        self._update_recent_menu()
         
         # État initial
         self.statusBar().showMessage("Prêt", 3000)
@@ -74,6 +75,10 @@ class MainWindow(QMainWindow):
         open_action.setShortcut(QKeySequence("Ctrl+O"))
         open_action.triggered.connect(self._on_open_project)
         file_menu.addAction(open_action)
+
+        self.recent_menu = file_menu.addMenu("📂 Projets récents")
+
+        file_menu.addSeparator()
         
         save_action = QAction("Sauvegarder", self)
         save_action.setShortcut(QKeySequence("Ctrl+S"))
@@ -132,6 +137,8 @@ class MainWindow(QMainWindow):
             ("Ouvrir", self.style().StandardPixmap.SP_DirOpenIcon, self._on_open_project),
             ("Sauvegarder", self.style().StandardPixmap.SP_DriveHDIcon, self._on_save_project),
             ("DATBOX", self.style().StandardPixmap.SP_FileDialogStart, self._on_generate_datbox),
+            ("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
+            ("▶ Exécuter Script", self.style().StandardPixmap.SP_MediaPlay, self._on_run_script),
         ]
         
         for text, icon, slot in actions:
@@ -364,6 +371,187 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
+    def _on_run_script(self):
+        """Génère et exécute le script Python"""
+        if not self.controller.project_path:
+            QMessageBox.warning(self, "Attention", "Enregistrez d'abord le projet")
+            return self._on_save_project_as()
+        
+        script_path = self.controller.project_path.parent / f"{self.controller.state.name}.py"
+        
+        try:
+            # 1. Générer le script
+            self.statusBar().showMessage("Génération du script...", 2000)
+            QApplication.processEvents()
+            
+            from ..utils.script_generator import ScriptGenerator
+            generator = ScriptGenerator(self.controller)
+            generator.generate(script_path)
+            
+            # 2. Demander confirmation
+            reply = QMessageBox.question(
+                self, "Exécuter le Script",
+                f"Script généré :\n{script_path}\n\n"
+                f"⚠️ Cela va exécuter le script et générer le DATBOX.\n\n"
+                f"Continuer ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+            
+            # 3. Exécuter le script
+            self.statusBar().showMessage("Exécution du script...", 0)
+            QApplication.processEvents()
+            
+            import subprocess
+            import sys
+            
+            # Exécuter dans le même environnement Python
+            result = subprocess.run(
+                [sys.executable, str(script_path)],
+                cwd=str(script_path.parent),
+                capture_output=True,
+                text=True,
+                timeout=60  # Timeout de 60 secondes
+            )
+            
+            # 4. Afficher les résultats
+            if result.returncode == 0:
+                QMessageBox.information(
+                    self, "✅ Succès",
+                    f"Script exécuté avec succès !\n\n"
+                    f"DATBOX généré dans :\n{script_path.parent / 'DATBOX'}\n\n"
+                    f"--- Sortie ---\n{result.stdout[:500]}"
+                )
+                self.statusBar().showMessage("Script exécuté avec succès", 5000)
+            else:
+                QMessageBox.critical(
+                    self, "❌ Erreur d'Exécution",
+                    f"Le script a échoué (code {result.returncode})\n\n"
+                    f"--- Erreur ---\n{result.stderr[:1000]}"
+                )
+                self.statusBar().showMessage("Échec de l'exécution", 5000)
+        
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(
+                self, "Timeout",
+                "Le script a pris trop de temps (> 60s).\n"
+                "Exécutez-le manuellement."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'exécution :\n{e}")
+            self.statusBar().showMessage("Erreur", 5000)
+    
+    def _on_run_script(self):
+        """Génère et exécute le script Python avec fenêtre de sortie"""
+        if not self.controller.project_path:
+            QMessageBox.warning(self, "Attention", "Enregistrez d'abord le projet")
+            return self._on_save_project_as()
+        
+        script_path = self.controller.project_path.parent / f"{self.controller.state.name}.py"
+        
+        try:
+            # Générer le script
+            self.statusBar().showMessage("Génération du script...", 2000)
+            QApplication.processEvents()
+            
+            from ..utils.script_generator import ScriptGenerator
+            generator = ScriptGenerator(self.controller)
+            generator.generate(script_path)
+            
+            # Dialogue de confirmation avec options
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Exécuter le Script")
+            msg.setText(f"Script généré : {script_path.name}\n\n"
+                    f"⚠️ Cela va exécuter le script et générer le DATBOX.")
+            msg.setIcon(QMessageBox.Icon.Question)
+            
+            run_btn = msg.addButton("▶ Exécuter", QMessageBox.ButtonRole.AcceptRole)
+            view_btn = msg.addButton("👁 Voir le Script", QMessageBox.ButtonRole.ActionRole)
+            cancel_btn = msg.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
+            
+            msg.exec()
+            
+            clicked = msg.clickedButton()
+            
+            if clicked == view_btn:
+                # Ouvrir le script dans l'éditeur
+                import subprocess
+                import sys
+                if sys.platform == 'win32':
+                    subprocess.Popen(['notepad', str(script_path)])
+                else:
+                    subprocess.Popen(['xdg-open', str(script_path)])
+                return
+            
+            if clicked != run_btn:
+                return
+            
+            # Exécuter
+            self._execute_script(script_path)
+        
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur :\n{e}")
+
+    def _execute_script(self, script_path):
+        """Exécute le script dans un processus séparé"""
+        import subprocess
+        import sys
+        
+        # Créer une fenêtre de dialogue pour la sortie
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Exécution du Script")
+        dialog.resize(700, 500)
+        
+        layout = QVBoxLayout()
+        
+        output_text = QTextEdit()
+        output_text.setReadOnly(True)
+        output_text.setStyleSheet("font-family: monospace; background-color: #1e1e1e; color: #d4d4d4;")
+        layout.addWidget(output_text)
+        
+        close_btn = QPushButton("Fermer")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        dialog.setLayout(layout)
+        
+        # Lancer le processus
+        output_text.append(f">>> Exécution de {script_path.name}...\n")
+        QApplication.processEvents()
+        
+        try:
+            process = subprocess.Popen(
+                [sys.executable, str(script_path)],
+                cwd=str(script_path.parent),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            
+            # Lire la sortie ligne par ligne
+            for line in process.stdout:
+                output_text.append(line.rstrip())
+                QApplication.processEvents()
+            
+            process.wait()
+            
+            if process.returncode == 0:
+                output_text.append("\n✅ SUCCÈS - DATBOX généré !")
+                self.statusBar().showMessage("Script exécuté avec succès", 5000)
+            else:
+                output_text.append(f"\n❌ ERREUR - Code de sortie : {process.returncode}")
+                self.statusBar().showMessage("Échec de l'exécution", 5000)
+        
+        except Exception as e:
+            output_text.append(f"\n❌ EXCEPTION : {e}")
+        
+        dialog.exec()
+    
     def _on_dynamic_vars(self):
         """Ouvre le dialogue des variables dynamiques"""
         from .dialogs import DynamicVarsDialog
@@ -488,7 +676,10 @@ class MainWindow(QMainWindow):
     def _on_preferences(self):
         """Ouvre le dialogue de préférences"""
         from .dialogs import PreferencesDialog
-        
+       
+        if not hasattr(self.controller.state, 'preferences'):
+            from ..core.models import ProjectPreferences
+            self.controller.state.preferences = ProjectPreferences()
         dialog = PreferencesDialog(
             preferences=self.controller.state.preferences,
             parent=self
@@ -507,16 +698,17 @@ class MainWindow(QMainWindow):
                 "✅ Préférences sauvegardées.\n\n"
                 "Certains changements prendront effet au prochain démarrage."
         )
+            self._update_recent_menu()
 
     def _apply_preferences(self):
         """Applique les préférences"""
+        if not hasattr(self.controller.state, 'preferences'):
+            return
+        
         prefs = self.controller.state.preferences
         
         # Mettre à jour les labels d'unités dans l'interface
         unit_labels = prefs.get_unit_labels()
-        
-        # TODO: Mettre à jour les placeholders des inputs avec les nouvelles unités
-        # Par exemple dans material_tab, model_tab, etc.
         
         # Mettre à jour la barre de statut
         unit_system_name = "SI" if prefs.unit_system == UnitSystem.SI else "CGS"
@@ -524,8 +716,15 @@ class MainWindow(QMainWindow):
 
     def _update_recent_menu(self):
         """Met à jour le menu des projets récents"""
+        if not hasattr(self, 'recent_menu'):
+            return
         self.recent_menu.clear()
         
+        # Vérifier que preferences existe
+        if not hasattr(self.controller.state, 'preferences'):
+            no_recent = self.recent_menu.addAction("(Aucun projet récent)")
+            no_recent.setEnabled(False)
+            return
         recent_projects = self.controller.state.preferences.recent_projects
         
         if not recent_projects:
