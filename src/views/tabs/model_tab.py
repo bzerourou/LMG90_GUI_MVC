@@ -191,6 +191,34 @@ class ModelTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
+    def load_for_edit(self, model: Model):
+        """Charge un modèle pour édition"""
+        self.name_input.setText(model.name)
+        self.physics_combo.setCurrentText(model.physics)
+        self.dimension_combo.setCurrentText(str(model.dimension))
+        
+        # Trigger l'update des éléments selon la dimension
+        self._update_elements()
+        
+        # Définir l'élément
+        self.element_combo.setCurrentText(model.element)
+        
+        # Trigger l'update des options selon l'élément
+        self._on_element_changed(model.element)
+        
+        # kCharger les options dans les combos
+        if model.options:
+            for opt_name, opt_value in model.options.items():
+                if opt_name in self.option_combos:
+                    combo = self.option_combos[opt_name]
+                    # Trouver l'index de la valeur
+                    index = combo.findText(opt_value)
+                    if index >= 0:
+                        combo.setCurrentIndex(index)
+        
+        self.name_input.setFocus()
+        self.name_input.selectAll()
+    
     def _on_edit(self):
         pass
 

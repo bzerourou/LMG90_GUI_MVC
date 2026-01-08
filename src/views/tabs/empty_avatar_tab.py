@@ -226,6 +226,39 @@ class EmptyAvatarTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
 
+    def load_for_edit(self, index: int, avatar: Avatar):
+        """Charge un avatar vide pour édition"""
+        self.current_edit_index = index
+        
+        self.dim_combo.setCurrentText(str(len(avatar.center)))
+        
+        center_str = ", ".join(str(x) for x in avatar.center)
+        self.center_input.setText(center_str)
+        
+        self.material_combo.setCurrentText(avatar.material_name)
+        self.model_combo.setCurrentText(avatar.model_name)
+        self.color_input.setText(avatar.color)
+        
+        # Supprimer les contacteurs existants dans l'UI
+        for i in reversed(range(self.contactors_layout.count())):
+            widget = self.contactors_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        
+        # Charger les contacteurs
+        for cont in avatar.contactors:
+            self._add_contactor_row()
+            widget = self.contactors_layout.itemAt(self.contactors_layout.count() - 1).widget()
+            row = widget.layout()
+            
+            row.shape_combo.setCurrentText(cont['shape'])
+            row.color_input.setText(cont.get('color', avatar.color))
+            
+            params = cont.get('params', {})
+            if params:
+                params_str = ", ".join(f"{k}={v}" for k, v in params.items())
+                row.params_input.setText(params_str)
+    
     def _on_edit(self): 
         pass            
 

@@ -19,10 +19,13 @@ class MaterialTab(QWidget):
     """Onglet de gestion des matériaux"""
     
     material_created = pyqtSignal()
-    
+    material_updated = pyqtSignal()
+    material_deleted = pyqtSignal()
+
     def __init__(self, controller: ProjectController):
         super().__init__()
         self.controller = controller
+        self.current_edit_index = None
         self._setup_ui()
         self._connect_signals()
     
@@ -112,6 +115,24 @@ class MaterialTab(QWidget):
         pass
     def _on_delete(self):
         pass
+
+    def load_for_edit(self, material: Material):
+        """Charge un matériau pour édition"""
+        # Remplir le formulaire
+        self.name_input.setText(material.name)
+        self.type_combo.setCurrentText(material.material_type.value)
+        self.density_input.setText(str(material.density))
+        
+        if material.properties:
+            props_str = ", ".join(f"{k}={v}" for k, v in material.properties.items())
+            self.props_input.setText(props_str)
+        else:
+            self.props_input.clear()
+        
+        # Highlight visuel
+        self.name_input.setFocus()
+        self.name_input.selectAll()
+
     def _parse_properties(self, text: str) -> dict:
         """Parse la chaîne de propriétés"""
         if not text.strip():

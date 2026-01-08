@@ -111,6 +111,21 @@ class VisibilityTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
+    def load_for_edit(self, index: int, rule: VisibilityRule):
+        """Charge une règle pour édition"""
+        self.current_edit_index = index
+        
+        self.candidate_body_combo.setCurrentText(rule.candidate_body)
+        self.candidate_contactor_combo.setCurrentText(rule.candidate_contactor)
+        self.candidate_color_input.setText(rule.candidate_color)
+        
+        self.antagonist_body_combo.setCurrentText(rule.antagonist_body)
+        self.antagonist_contactor_combo.setCurrentText(rule.antagonist_contactor)
+        self.antagonist_color_input.setText(rule.antagonist_color)
+        
+        self.behavior_combo.setCurrentText(rule.behavior_name)
+        self.alert_input.setText(str(rule.alert))
+    
     def _on_edit(self):
         pass    
 
