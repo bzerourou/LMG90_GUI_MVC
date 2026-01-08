@@ -161,6 +161,20 @@ class ContactTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
+    def load_for_edit(self, law: ContactLaw):
+        """Charge une loi pour édition"""
+        self.name_input.setText(law.name)
+        self.type_combo.setCurrentText(law.law_type.value)
+        
+        if law.friction is not None:
+            self.friction_input.setText(str(law.friction))
+        
+        if law.properties:
+            props_str = ", ".join(f"{k}={v}" for k, v in law.properties.items())
+            self.props_input.setText(props_str)
+        
+        self.name_input.setFocus()
+    
     def _on_edit(self):
         pass
 

@@ -111,14 +111,14 @@ class AvatarTab(QWidget):
         layout.addLayout(form)
         
         # Bouton créer
-        create_btn = QPushButton("Créer")
+        self.create_btn = QPushButton("Créer")
         edit_btn = QPushButton("Modifier")
         delete_btn = QPushButton("Supprimer")
-        create_btn.clicked.connect(self._on_create)
+        self.create_btn.clicked.connect(self._on_create)
         edit_btn.clicked.connect(self._on_edit)
         delete_btn.clicked.connect(self._on_delete)
         button_layout = QHBoxLayout()
-        button_layout.addWidget(create_btn)
+        button_layout.addWidget(self.create_btn)
         button_layout.addWidget(edit_btn)
         button_layout.addWidget(delete_btn)
         layout.addLayout(button_layout)
@@ -306,6 +306,58 @@ class AvatarTab(QWidget):
             QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+    
+    def load_for_edit(self, index: int, avatar: Avatar):
+        """Charge un avatar pour édition"""
+        self.current_edit_index = index  # Stocker l'index
+        
+        # Type
+        self.type_combo.setCurrentText(avatar.avatar_type.value)
+        
+        # Centre
+        center_str = ", ".join(str(x) for x in avatar.center)
+        self.center_input.setText(center_str)
+        
+        # Matériau et Modèle
+        self.material_combo.setCurrentText(avatar.material_name)
+        self.model_combo.setCurrentText(avatar.model_name)
+        
+        # Couleur
+        self.color_input.setText(avatar.color)
+        
+        # Champs spécifiques
+        if avatar.radius:
+            self.radius_input.setText(str(avatar.radius))
+        if avatar.axis:
+            self.axes_input.setText(f"{avatar.axis['axe1']}, {avatar.axis['axe2']}")
+        
+        # Changer le bouton "Créer" en "Modifier"
+        if not hasattr(self, 'edit_mode_btn'):
+            self.edit_mode_btn = QPushButton("✏️ Modifier Avatar")
+            self.edit_mode_btn.clicked.connect(self._on_update)
+            self.layout().insertWidget(self.layout().count() - 1, self.edit_mode_btn)
+        
+        self.edit_mode_btn.setVisible(True)
+        self.create_btn.setVisible(False)
+    
+    def _on_update(self):
+        """Met à jour l'avatar existant"""
+        try:
+            # Créer le nouvel avatar avec les données du formulaire
+            # ... (même code que _on_create)
+            
+            # Mettre à jour via le contrôleur
+            self.controller.update_avatar(self.current_edit_index, new_avatar)
+            
+            self.avatar_updated.emit()
+            QMessageBox.information(self, "Succès", "Avatar modifié")
+            
+            # Réinitialiser le mode
+            self.edit_mode_btn.setVisible(False)
+            self.create_btn.setVisible(True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", str(e))
     
     def _on_edit(self): 
         pass    
