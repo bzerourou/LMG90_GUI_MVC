@@ -29,9 +29,11 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        
         # Contrôleur
         self.controller = ProjectController()
+        if not hasattr(self.controller.state, 'preferences'):
+            from ..core.models import ProjectPreferences
+            self.controller.state.preferences = ProjectPreferences()
         
         # Configuration fenêtre
         self.setWindowTitle(f"LMGC90_GUI v0.2.5 - {self.controller.state.name}")
@@ -155,6 +157,47 @@ class MainWindow(QMainWindow):
         self.tree_view = ModelTreeView(self.controller)
         dock.setWidget(self.tree_view.tree)
         dock.setMinimumWidth(400)
+        #connect le signal
+        self.tree_view.item_selected.connect(self._on_tree_item_selected)
+        print("🟢 Signal tree_view.item_selected connecté")
+    def  _on_tree_item_selected(self, item_type: str, item_data):
+        """Quand un élément est sélectionné dans l'arbre"""
+        print(f"🟢 Signal reçu dans MainWindow: {item_type}, {item_data}")
+        if item_type == "material":
+            # Charger le matériau et switcher vers l'onglet
+            material = self.controller.get_material(item_data)
+            if material:
+                self.tabs.setCurrentWidget(self.material_tab)
+                if hasattr(self.material_tab, 'load_for_edit') : 
+                    self.material_tab.load_for_edit(material)
+        elif item_type == "model":
+            model = self.controller.get_model(item_data)
+            if model:
+                self.tabs.setCurrentWidget(self.model_tab)
+                self.model_tab.load_for_edit(model)
+        
+        elif item_type == "avatar":
+            avatar = self.controller.get_avatar(item_data)
+            if avatar:
+                from ..core.models import AvatarType
+                if avatar.avatar_type == AvatarType.EMPTY_AVATAR:
+                    self.tabs.setCurrentWidget(self.empty_avatar_tab)
+                    self.empty_avatar_tab.load_for_edit(item_data, avatar)
+                else:
+                    self.tabs.setCurrentWidget(self.avatar_tab)
+                    self.avatar_tab.load_for_edit(item_data, avatar)
+        
+        elif item_type == "contact_law":
+            law = self.controller.get_contact_law(item_data)
+            if law:
+                self.tabs.setCurrentWidget(self.contact_tab)
+                self.contact_tab.load_for_edit(law)
+        
+        elif item_type == "visibility":
+            rule = self.controller.get_visibility_rule(item_data)
+            if rule:
+                self.tabs.setCurrentWidget(self.visibility_tab)
+                self.visibility_tab.load_for_edit(item_data, rule)
     
     def _create_central_area(self):
         """Crée la zone centrale avec splitter vertical"""

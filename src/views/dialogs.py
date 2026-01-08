@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
 from pathlib import Path
-from ..core.models import ProjectPreferences, UnitSystem
+from typing import Optional
+from ..core.models import Material, MaterialType, ProjectPreferences, UnitSystem
 
 
 class DynamicVarsDialog(QDialog):
