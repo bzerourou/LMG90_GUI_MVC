@@ -312,6 +312,9 @@ class MainWindow(QMainWindow):
         self.project_saved.connect(self._refresh_all)
         
         self.material_tab.material_created.connect(self._refresh_all)
+        self.material_tab.material_created.connect(self._refresh_all)
+        self.material_tab.material_updated.connect(self._refresh_all)
+        self.material_tab.material_deleted.connect(self._refresh_all)
         self.model_tab.model_created.connect(self._refresh_all)
         self.avatar_tab.avatar_created.connect(self._refresh_all)
         self.empty_avatar_tab.avatar_created.connect(self._refresh_all)
