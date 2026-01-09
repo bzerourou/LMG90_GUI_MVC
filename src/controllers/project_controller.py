@@ -582,6 +582,23 @@ class ProjectController:
         """Retourne toutes les opérations DOF"""
         return self.state.operations.copy()
     
+    def get_dof_operation(self, index: int) -> DOFOperation:
+        """Retourne une opération DOF spécifique par index"""
+        if index < 0 or index >= len(self.state.operations):
+            raise IndexError(f"Index DOF invalide: {index}")
+        return self.state.operations[index]
+    
+    def update_dof_operation(self, index: int, operation: DOFOperation):
+        """Met à jour une opération DOF existante"""
+        # Validation si nécessaire
+        self.state.operations[index] = operation
+        # Réappliquer l'opération via pylmgc si besoin
+        self.apply_dof_operation(operation)
+
+    def remove_dof_operation(self, index: int):
+        """Supprime une opération DOF"""
+        del self.state.operations[index]
+
     # ========== BOUCLES ==========
     def generate_loop(self, loop: Loop) -> List[int]:
         """
