@@ -198,6 +198,30 @@ class MainWindow(QMainWindow):
             if rule:
                 self.tabs.setCurrentWidget(self.visibility_tab)
                 self.visibility_tab.load_for_edit(item_data, rule)
+
+        elif item_type == "dof_operation":
+            operation = self.controller.get_dof_operation(item_data)
+            if operation:
+                self.tabs.setCurrentWidget(self.dof_tab)
+                self.dof_tab.load_for_edit(item_data, operation)
+
+        elif item_type == "loop":   
+            loop = self.controller.get_loop(item_data)
+            if loop:
+                self.tabs.setCurrentWidget(self.loop_tab)
+                self.loop_tab.load_for_edit(item_data, loop)
+
+        elif item_type == "granulo":
+            granulo = self.controller.get_granulo(item_data)
+            if granulo:
+                self.tabs.setCurrentWidget(self.granulo_tab)
+                self.granulo_tab.load_for_edit(item_data, granulo)
+
+        elif item_type == "postpro":
+            postpro = self.controller.get_postpro_command(item_data)
+            if postpro:
+                self.tabs.setCurrentWidget(self.postpro_tab)
+                self.postpro_tab.load_for_edit(item_data, postpro)
     
     def _create_central_area(self):
         """Crée la zone centrale avec splitter vertical"""
