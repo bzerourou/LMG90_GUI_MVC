@@ -1,15 +1,16 @@
-
 # ============================================================================
-# Onglet Modèle
+# ModèleTab
 # ============================================================================
 """
-Onglet de création/édition de modèles.
+Onglet de gestion des modèles avec création, modification et suppression.
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QLineEdit, 
-    QComboBox, QPushButton, QMessageBox, QGroupBox, QHBoxLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, 
+    QComboBox, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem,
+    QMenu, QLabel, QGroupBox
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import Model
 from ...core.validators import ValidationError
@@ -20,12 +21,12 @@ class ModelTab(QWidget):
     """Onglet de gestion des modèles"""
     
     model_created = pyqtSignal()
+    model_updated = pyqtSignal()
+    model_deleted = pyqtSignal()
     
-    # Éléments par dimension
     ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
     ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
     
-    # Options pour éléments finis
     ELEMENT_OPTIONS = {
         "T3xxx": ["kinematic", "formulation", "mass_storage"],
         "Q4xxx": ["kinematic", "formulation", "mass_storage"],
@@ -47,6 +48,7 @@ class ModelTab(QWidget):
     def __init__(self, controller: ProjectController):
         super().__init__()
         self.controller = controller
+        self.current_edit_name = None
         self.option_combos = {}
         self._setup_ui()
         self._connect_signals()
@@ -55,11 +57,41 @@ class ModelTab(QWidget):
         """Configure l'interface"""
         layout = QVBoxLayout()
         
-        # Formulaire de base
+        # === ARBRE ===
+        tree_label = QLabel("<b>📋 Liste des Modèles</b>")
+        layout.addWidget(tree_label)
+        
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["Nom", "Type", "Élément", "Dimension"])
+        self.tree.setColumnWidth(0, 100)
+        self.tree.setColumnWidth(1, 100)
+        self.tree.setColumnWidth(2, 100)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._show_context_menu)
+        self.tree.setMaximumHeight(200)
+        layout.addWidget(self.tree)
+        
+        tree_btn_layout = QHBoxLayout()
+        edit_tree_btn = QPushButton("✏️ Modifier Sélection")
+        edit_tree_btn.clicked.connect(self._on_edit_from_tree)
+        tree_btn_layout.addWidget(edit_tree_btn)
+        
+        delete_tree_btn = QPushButton("🗑️ Supprimer Sélection")
+        delete_tree_btn.clicked.connect(self._on_delete)
+        tree_btn_layout.addWidget(delete_tree_btn)
+        
+        tree_btn_layout.addStretch()
+        layout.addLayout(tree_btn_layout)
+        
+        # === FORMULAIRE ===
+        form_label = QLabel("<b>📝 Formulaire</b>")
+        layout.addWidget(form_label)
+        
         form = QFormLayout()
         
-        self.name_input = QLineEdit("rigid")
+        self.name_input = QLineEdit()
         self.name_input.setMaxLength(5)
+        self.name_input.setPlaceholderText("Ex: rigid")
         form.addRow("Nom (max 5 car.) :", self.name_input)
         
         self.physics_combo = QComboBox()
@@ -75,34 +107,47 @@ class ModelTab(QWidget):
         
         layout.addLayout(form)
         
-        # Groupe options (masqué par défaut)
+        # === OPTIONS ===
         self.options_group = QGroupBox("Options du modèle")
         self.options_layout = QFormLayout()
         self.options_group.setLayout(self.options_layout)
         self.options_group.setVisible(False)
         layout.addWidget(self.options_group)
         
-        # Boutons
-        create_btn = QPushButton("Créer")
-        edit_btn = QPushButton("Modifier")
-        delete_btn = QPushButton("Supprimer")
-        create_btn.clicked.connect(self._on_create)
-        edit_btn.clicked.connect(self._on_edit)
-        delete_btn.clicked.connect(self._on_delete)
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(create_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(delete_btn)
-        layout.addLayout(button_layout)
+        # === BOUTONS ===
+        btn_layout = QHBoxLayout()
+        
+        self.create_btn = QPushButton("✅ Créer Modèle")
+        self.create_btn.setStyleSheet("font-weight: bold;")
+        self.create_btn.clicked.connect(self._on_create)
+        btn_layout.addWidget(self.create_btn)
+        
+        self.update_btn = QPushButton("💾 Enregistrer Modifications")
+        self.update_btn.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white;")
+        self.update_btn.clicked.connect(self._on_update)
+        self.update_btn.setVisible(False)
+        btn_layout.addWidget(self.update_btn)
+        
+        self.cancel_btn = QPushButton("❌ Annuler")
+        self.cancel_btn.clicked.connect(self._on_cancel_edit)
+        self.cancel_btn.setVisible(False)
+        btn_layout.addWidget(self.cancel_btn)
+        
+        clear_btn = QPushButton("🔄 Réinitialiser")
+        clear_btn.clicked.connect(self._clear_form)
+        btn_layout.addWidget(clear_btn)
+        
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
         
         layout.addStretch()
         self.setLayout(layout)
         
-        # Initialiser les éléments
         self._update_elements()
     
     def _connect_signals(self):
         """Connecte les signaux"""
+        self.tree.itemDoubleClicked.connect(self._on_edit_from_tree)
         self.dimension_combo.currentTextChanged.connect(self._on_dimension_changed)
         self.element_combo.currentTextChanged.connect(self._on_element_changed)
     
@@ -121,7 +166,6 @@ class ModelTab(QWidget):
         self.element_combo.clear()
         self.element_combo.addItems(elements)
         
-        # Restaurer sélection si possible
         if current in elements:
             self.element_combo.setCurrentText(current)
         
@@ -129,23 +173,20 @@ class ModelTab(QWidget):
         self._on_element_changed(self.element_combo.currentText())
     
     def _on_element_changed(self, element):
-        """Quand l'élément change, afficher les options"""
-        # Nettoyer les anciennes options
+        """Quand l'élément change"""
         for i in reversed(range(self.options_layout.count())):
             item = self.options_layout.takeAt(i)
             if item.widget():
                 item.widget().deleteLater()
+        
         self.option_combos.clear()
         
-        # Éléments rigides → pas d'options
         if element in ["Rxx2D", "Rxx3D"]:
             self.options_group.setVisible(False)
             return
         
-        # Afficher les options
         self.options_group.setVisible(True)
         
-        # Options spécifiques à l'élément
         specific_options = self.ELEMENT_OPTIONS.get(element, [])
         for opt_name in specific_options:
             combo = QComboBox()
@@ -153,24 +194,36 @@ class ModelTab(QWidget):
             self.options_layout.addRow(f"{opt_name} :", combo)
             self.option_combos[opt_name] = combo
         
-        # Options globales (toujours disponibles pour éléments finis)
         for opt_name in ["material", "anisotropy", "external_model"]:
             combo = QComboBox()
             combo.addItems(self.OPTION_VALUES[opt_name])
             self.options_layout.addRow(f"{opt_name} :", combo)
             self.option_combos[opt_name] = combo
     
+    def _show_context_menu(self, position):
+        """Menu contextuel"""
+        item = self.tree.itemAt(position)
+        if not item:
+            return
+        
+        menu = QMenu()
+        edit_action = menu.addAction("✏️ Modifier")
+        edit_action.triggered.connect(self._on_edit_from_tree)
+        
+        delete_action = menu.addAction("🗑️ Supprimer")
+        delete_action.triggered.connect(self._on_delete)
+        
+        menu.addSeparator()
+        info_action = menu.addAction("ℹ️ Informations")
+        info_action.triggered.connect(self._show_info)
+        
+        menu.exec(self.tree.viewport().mapToGlobal(position))
+    
     def _on_create(self):
-        """Crée le modèle"""
+        """Crée un modèle"""
         try:
-            # Récupérer les options
-            options = {}
-            for opt_name, combo in self.option_combos.items():
-                selected = combo.currentText()
-                if selected:
-                    options[opt_name] = selected
+            options = {k: v.currentText() for k, v in self.option_combos.items() if v.currentText()}
             
-            # Créer le modèle
             model = Model(
                 name=self.name_input.text().strip(),
                 physics=self.physics_combo.currentText(),
@@ -179,52 +232,184 @@ class ModelTab(QWidget):
                 options=options
             )
             
-            # Ajouter via le contrôleur
             self.controller.add_model(model)
-            
-            # Succès
             self.model_created.emit()
-            QMessageBox.information(self, "Succès", f"Modèle '{model.name}' créé")
+            self.refresh()
+            QMessageBox.information(self, "Succès", f"✅ Modèle '{model.name}' créé")
+            self._clear_form()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
+    def _on_edit_from_tree(self):
+        """Charge pour édition"""
+        selected = self.tree.currentItem()
+        if not selected:
+            QMessageBox.warning(self, "Sélection", "Sélectionnez un modèle")
+            return
+        
+        mod_name = selected.text(0)
+        model = self.controller.get_model(mod_name)
+        
+        if model:
+            self.load_for_edit(model)
+    
+    def _on_update(self):
+        """Met à jour"""
+        try:
+            options = {k: v.currentText() for k, v in self.option_combos.items() if v.currentText()}
+            
+            model = Model(
+                name=self.name_input.text().strip(),
+                physics=self.physics_combo.currentText(),
+                element=self.element_combo.currentText(),
+                dimension=int(self.dimension_combo.currentText()),
+                options=options
+            )
+            
+            self.controller.update_model(self.current_edit_name, model)
+            self.model_updated.emit()
+            self.refresh()
+            QMessageBox.information(self, "Succès", f"✅ Modèle '{model.name}' modifié")
+            self._on_cancel_edit()
+            
+        except ValidationError as e:
+            QMessageBox.warning(self, "Validation", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Modification échouée :\n{e}")
+    
+    def _on_delete(self):
+        """Supprime"""
+        selected = self.tree.currentItem()
+        if not selected:
+            QMessageBox.warning(self, "Sélection", "Sélectionnez un modèle")
+            return
+        
+        mod_name = selected.text(0)
+        is_used, refs = self.controller.is_model_used(mod_name)
+        
+        if is_used:
+            refs_text = "\n• ".join(refs[:10])
+            if len(refs) > 10:
+                refs_text += f"\n... et {len(refs) - 10} autre(s)"
+            
+            reply = QMessageBox.question(
+                self, "⚠️ Modèle Utilisé",
+                f"Le modèle '{mod_name}' est utilisé par :\n\n• {refs_text}\n\n"
+                f"Continuer ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        else:
+            reply = QMessageBox.question(
+                self, "Confirmer",
+                f"Supprimer le modèle '{mod_name}' ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        
+        try:
+            if self.controller.remove_model(mod_name):
+                self.model_deleted.emit()
+                self.refresh()
+                QMessageBox.information(self, "Succès", f"✅ Modèle '{mod_name}' supprimé")
+                if self.current_edit_name == mod_name:
+                    self._on_cancel_edit()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Suppression échouée :\n{e}")
+    
+    def _show_info(self):
+        """Affiche infos"""
+        selected = self.tree.currentItem()
+        if not selected:
+            return
+        
+        mod_name = selected.text(0)
+        model = self.controller.get_model(mod_name)
+        if not model:
+            return
+        
+        is_used, refs = self.controller.is_model_used(mod_name)
+        
+        info = f"<h3>Modèle : {model.name}</h3>"
+        info += f"<b>Physique :</b> {model.physics}<br>"
+        info += f"<b>Élément :</b> {model.element}<br>"
+        info += f"<b>Dimension :</b> {model.dimension}<br>"
+        
+        if model.options:
+            info += "<br><b>Options :</b><br>"
+            for key, value in model.options.items():
+                info += f"  • {key} = {value}<br>"
+        
+        if is_used:
+            info += f"<br><b>✅ Utilisé par :</b> {len(refs)} avatar(s)"
+        else:
+            info += "<br><i>❌ Non utilisé</i>"
+        
+        QMessageBox.information(self, f"Infos : {mod_name}", info)
+    
+    def _on_cancel_edit(self):
+        """Annule édition"""
+        self.current_edit_name = None
+        self.create_btn.setVisible(True)
+        self.update_btn.setVisible(False)
+        self.cancel_btn.setVisible(False)
+        self._clear_form()
+    
+    def _clear_form(self):
+        """Réinitialise"""
+        self.name_input.clear()
+        self.physics_combo.setCurrentIndex(0)
+        self.dimension_combo.setCurrentIndex(0)
+        self.name_input.setFocus()
+    
     def load_for_edit(self, model: Model):
-        """Charge un modèle pour édition"""
+        """Charge pour édition"""
+        self.current_edit_name = model.name
+        
         self.name_input.setText(model.name)
         self.physics_combo.setCurrentText(model.physics)
         self.dimension_combo.setCurrentText(str(model.dimension))
         
-        # Trigger l'update des éléments selon la dimension
         self._update_elements()
-        
-        # Définir l'élément
         self.element_combo.setCurrentText(model.element)
-        
-        # Trigger l'update des options selon l'élément
         self._on_element_changed(model.element)
         
-        # kCharger les options dans les combos
         if model.options:
             for opt_name, opt_value in model.options.items():
                 if opt_name in self.option_combos:
                     combo = self.option_combos[opt_name]
-                    # Trouver l'index de la valeur
                     index = combo.findText(opt_value)
                     if index >= 0:
                         combo.setCurrentIndex(index)
         
+        self.create_btn.setVisible(False)
+        self.update_btn.setVisible(True)
+        self.cancel_btn.setVisible(True)
+        
         self.name_input.setFocus()
         self.name_input.selectAll()
     
-    def _on_edit(self):
-        pass
-
-    def _on_delete(self):
-        pass
-    
     def refresh(self):
-        """Rafraîchit l'onglet"""
-        pass
+        """Rafraîchit"""
+        self.tree.clear()
+        models = self.controller.get_models()
+        
+        for mod in models:
+            item = QTreeWidgetItem([
+                mod.name,
+                mod.physics,
+                mod.element,
+                str(mod.dimension)
+            ])
+            
+            is_used, _ = self.controller.is_model_used(mod.name)
+            if is_used:
+                item.setForeground(0, QBrush(QColor(0, 100, 0)))
+            
+            self.tree.addTopLevelItem(item)
