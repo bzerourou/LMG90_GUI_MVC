@@ -1,14 +1,17 @@
 # ============================================================================
-# Onglet Lois de Contact
+# ContactTab 
 # ============================================================================
 """
-Onglet pour créer des lois de contact.
+Onglet de gestion des lois de contact avec création, modification et suppression.
+Style identique aux autres onglets (MaterialTab, LoopTab, DOFTab...).
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QLabel, QHBoxLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
+    QComboBox, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem,
+    QMenu, QLabel
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import ContactLaw, ContactLawType
 from ...core.validators import ValidationError
@@ -19,227 +22,305 @@ class ContactTab(QWidget):
     """Onglet lois de contact"""
     
     law_created = pyqtSignal()
-    
+    law_updated = pyqtSignal()
+    law_deleted = pyqtSignal()
+
     def __init__(self, controller: ProjectController):
         super().__init__()
         self.controller = controller
+        self.current_edit_index = None
         self._setup_ui()
         self._connect_signals()
-    
+
     def _setup_ui(self):
-        """Configure l'interface"""
         layout = QVBoxLayout()
+
+        # === SECTION 1: ARBRE DES LOIS DE CONTACT ===
+        tree_label = QLabel("<b>📋 Liste des Lois de Contact</b>")
+        layout.addWidget(tree_label)
+
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["Nom", "Type", "Friction (µ)", "Autres propriétés"])
+        self.tree.setColumnWidth(0, 150)
+        self.tree.setColumnWidth(1, 150)
+        self.tree.setColumnWidth(2, 100)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._show_context_menu)
+        self.tree.setMaximumHeight(180)
+        layout.addWidget(self.tree)
+
+        # === BOUTONS SOUS L'ARBRE : Modifier et Supprimer ===
+        actions_layout = QHBoxLayout()
         
+        self.edit_btn = QPushButton("✏️ Modifier sélection")
+        self.edit_btn.setToolTip("Charge la loi sélectionnée dans le formulaire pour modification")
+        
+        self.delete_btn = QPushButton("🗑️ Supprimer sélection")
+        self.delete_btn.setToolTip("Supprime la loi de contact sélectionnée")
+
+        actions_layout.addWidget(self.edit_btn)
+        actions_layout.addWidget(self.delete_btn)
+        actions_layout.addStretch()
+        layout.addLayout(actions_layout)
+
+        # === SECTION 2: FORMULAIRE ===
+        form_label = QLabel("<b>📝 Paramètres de la Loi de Contact</b>")
+        layout.addWidget(form_label)
+
         form = QFormLayout()
-        
+
         # Nom
         self.name_input = QLineEdit("iqsc0")
+        self.name_input.setMaxLength(10)
         form.addRow("Nom :", self.name_input)
-        
-        # Type
+
+        # Type de loi
         self.type_combo = QComboBox()
         self.type_combo.addItems([lt.value for lt in ContactLawType])
+        self.type_combo.currentTextChanged.connect(self._on_type_changed)
         form.addRow("Type :", self.type_combo)
-        
-        # Friction (séparé pour plus de clarté)
-        self.friction_input = QLineEdit("0.3")
+
+        # Friction (visible selon le type)
         self.friction_label = QLabel("Friction (µ) :")
+        self.friction_input = QLineEdit("0.3")
         form.addRow(self.friction_label, self.friction_input)
-        
+
         # Propriétés supplémentaires
         self.props_input = QLineEdit()
-        self.props_input.setPlaceholderText("Autres propriétés (ex: prop1=val1, prop2=val2)")
-        form.addRow("Propriétés :", self.props_input)
-        
-        # Aide
-        self.help_label = QLabel()
+        self.props_input.setPlaceholderText("ex: alert=0.01, pressure=1e5")
+        form.addRow("Autres propriétés :", self.props_input)
+
+        layout.addLayout(form)
+
+        # Aide contextuelle
+        self.help_label = QLabel("Sélectionnez un type de loi pour voir les paramètres adaptés.")
         self.help_label.setWordWrap(True)
         self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
-        form.addRow("", self.help_label)
+        layout.addWidget(self.help_label)
+
+        # === BOUTONS PRINCIPAUX EN BAS ===
+        btn_layout = QHBoxLayout()
         
-        layout.addLayout(form)
+        self.create_btn = QPushButton("✅ Créer loi")
+        self.update_btn = QPushButton("✏️ Modifier loi")
+        self.update_btn.setVisible(False)
         
-        # Bouton créer
-        create_btn = QPushButton("Créer Loi de Contact")
-        edit_btn = QPushButton("Modifier")
-        delete_btn = QPushButton("Supprimer")
-        create_btn.clicked.connect(self._on_create)
-        edit_btn.clicked.connect(self._on_edit)
-        delete_btn.clicked.connect(self._on_delete)
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(create_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(delete_btn)
-        layout.addLayout(button_layout)
-        
+        self.reset_btn = QPushButton("🔄 Réinitialiser")
+
+        btn_layout.addWidget(self.create_btn)
+        btn_layout.addWidget(self.update_btn)
+        btn_layout.addWidget(self.reset_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
         layout.addStretch()
         self.setLayout(layout)
-    
+
+        self._on_type_changed(self.type_combo.currentText())
+
     def _connect_signals(self):
-        """Connecte les signaux"""
-        self.type_combo.currentTextChanged.connect(self._on_type_changed)
-    
-    def _on_type_changed(self, law_type):
-        """Suggère des propriétés selon le type"""
-        help_texts = {
-            "IQS_CLB": "Loi de contact Signorini-Coulomb avec friction. Friction requise.",
-            "IQS_CLB_g0": "Loi de contact Signorini-Coulomb avec gap initial. Friction requise.",
-            "COUPLED_DOF": "Couplage de degrés de liberté. Pas de friction."
-        }
+        self.create_btn.clicked.connect(self._on_create)
+        self.update_btn.clicked.connect(self._on_edit)
+        self.reset_btn.clicked.connect(self._clear_form)
+        self.edit_btn.clicked.connect(self._on_edit_selected)
+        self.delete_btn.clicked.connect(self._on_delete_selected)
+        self.tree.itemClicked.connect(self._on_tree_item_clicked)
+
+    def _on_type_changed(self, law_type: str):
+        """Affiche/masque le champ friction selon le type"""
+        needs_friction = law_type in ["IQS_CLB", "IQS_CLB_G0"]
         
-        if law_type in ["IQS_CLB", "IQS_CLB_g0"]:
-            self.friction_label.setVisible(True)
-            self.friction_input.setVisible(True)
-            self.friction_input.setEnabled(True)
-            if not self.friction_input.text():
-                self.friction_input.setText("0.3")
+        self.friction_label.setVisible(needs_friction)
+        self.friction_input.setVisible(needs_friction)
+        
+        if needs_friction:
+            self.help_label.setText("Ce type de loi nécessite un coefficient de friction > 0.")
         else:
-            self.friction_label.setVisible(True)
-            self.friction_input.setVisible(True)
-            self.friction_input.setEnabled(False)
-            self.friction_input.setText("")
-        
-        self.help_label.setText(f"ℹ️ {help_texts.get(law_type, '')}")
-    
-    def _on_create(self):
-        """Crée la loi de contact"""
-        try:
-            # Récupérer le nom
-            name = self.name_input.text().strip()
-            if not name:
-                raise ValueError("Le nom ne peut pas être vide")
-            
-            # Récupérer le type
-            law_type = ContactLawType(self.type_combo.currentText())
-            
-            # Récupérer la friction
-            friction = None
-            friction_text = self.friction_input.text().strip()
-            if friction_text:
+            self.help_label.setText("Propriétés optionnelles sous forme clé=valeur (ex: alert=0.01).")
+
+    def _show_context_menu(self, position):
+        item = self.tree.itemAt(position)
+        if not item:
+            return
+        index = self.tree.indexOfTopLevelItem(item)
+        menu = QMenu()
+        menu.addAction("✏️ Modifier", lambda idx=index: self.load_for_edit(idx))
+        menu.addSeparator()
+        menu.addAction("🗑️ Supprimer", lambda idx=index: self._on_delete(idx))
+
+        menu.exec(self.tree.viewport().mapToGlobal(position))
+
+    def _on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
+        index = self.tree.indexOfTopLevelItem(item)
+        self.load_for_edit(index)
+
+    def _on_edit_selected(self):
+        if self.current_edit_index is not None:
+            self.load_for_edit(self.current_edit_index)
+        else:
+            QMessageBox.information(self, "Sélection", "Veuillez d'abord sélectionner une loi dans la liste.")
+
+    def _on_delete_selected(self):
+        if self.current_edit_index is not None:
+            self._on_delete(self.current_edit_index)
+        else:
+            QMessageBox.information(self, "Sélection", "Veuillez d'abord sélectionner une loi à supprimer.")
+
+    def _parse_properties(self, text: str) -> dict:
+        if not text.strip():
+            return {}
+        props = {}
+        for pair in text.split(','):
+            pair = pair.strip()
+            if '=' in pair:
+                key, value = pair.split('=', 1)
+                key = key.strip()
+                value = value.strip().strip("'\"")
                 try:
-                    friction = float(friction_text)
-                    if friction < 0:
-                        raise ValueError("La friction doit être positive ou nulle")
-                except ValueError as e:
-                    if "could not convert" in str(e):
-                        raise ValueError(f"Friction invalide : '{friction_text}' n'est pas un nombre")
-                    raise
-            
-            # Vérifier que friction est fournie si requise
-            if law_type in [ContactLawType.IQS_CLB, ContactLawType.IQS_CLB_G0]:
-                if friction is None:
-                    raise ValueError(f"La friction est requise pour {law_type.value}")
-            
-            # Parser les propriétés supplémentaires
-            props_text = self.props_input.text().strip()
-            props = self._parse_properties(props_text) if props_text else {}
-            
-            # Créer la loi
+                    if '.' in value or 'e' in value.lower():
+                        props[key] = float(value)
+                    else:
+                        props[key] = int(value)
+                except ValueError:
+                    props[key] = value
+        return props
+
+    def _on_create(self):
+        try:
+            friction = None
+            if self.friction_input.isVisible():
+                friction = float(self.friction_input.text())
+                if friction < 0:
+                    raise ValueError("Le coefficient de friction doit être positif")
+
             law = ContactLaw(
-                name=name,
-                law_type=law_type,
+                name=self.name_input.text().strip(),
+                law_type=ContactLawType(self.type_combo.currentText()),
                 friction=friction,
-                properties=props
+                properties=self._parse_properties(self.props_input.text())
             )
-            
-            # Ajouter via le contrôleur
+
             self.controller.add_contact_law(law)
-            
-            # Succès
             self.law_created.emit()
-            QMessageBox.information(self, "Succès", f"✅ Loi '{law.name}' créée")
-            
-            # Réinitialiser le formulaire
-            self.name_input.clear()
-            self.friction_input.setText("0.3")
-            self.props_input.clear()
-            
+            QMessageBox.information(self, "Succès", f"Loi de contact '{law.name}' créée avec succès.")
+            self._clear_form()
+            self.refresh()
+
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
         except ValueError as e:
-            QMessageBox.critical(self, "Erreur de Valeur", str(e))
+            QMessageBox.critical(self, "Erreur de saisie", str(e))
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
-    
-    def load_for_edit(self, law: ContactLaw):
-        """Charge une loi pour édition"""
+            QMessageBox.critical(self, "Erreur", f"Échec de la création :\n{e}")
+
+    def _on_edit(self):
+        if self.current_edit_index is None:
+            return
+
+        try:
+            friction = None
+            if self.friction_input.isVisible():
+                friction = float(self.friction_input.text())
+                if friction < 0:
+                    raise ValueError("Le coefficient de friction doit être positif")
+
+            updated_law = ContactLaw(
+                name=self.name_input.text().strip(),
+                law_type=ContactLawType(self.type_combo.currentText()),
+                friction=friction,
+                properties=self._parse_properties(self.props_input.text())
+            )
+
+            self.controller.update_contact_law(self.current_edit_index, updated_law)
+            self.law_updated.emit()
+            QMessageBox.information(self, "Succès", f"Loi de contact modifiée avec succès.")
+            self._clear_form()
+            self.refresh()
+
+        except ValidationError as e:
+            QMessageBox.warning(self, "Validation", str(e))
+        except ValueError as e:
+            QMessageBox.critical(self, "Erreur de saisie", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Échec de la modification :\n{e}")
+
+    def _on_delete(self, index: int):
+        law = self.controller.state.contact_laws[index]
+        
+        reply = QMessageBox.question(
+            self,
+            "Confirmer la suppression",
+            f"Supprimer la loi de contact '{law.name}' ({law.law_type.value}) ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.controller.remove_contact_law(index)
+            self.law_deleted.emit()
+            self._clear_form()
+            self.refresh()
+
+    def load_for_edit(self, index: int):
+        """Charge une loi existante dans le formulaire"""
+        if not isinstance(index, int):
+            print(f"ERREUR : index reçu n'est pas un int : {type(index)} -> {index}")
+            return
+        if index < 0 or index >= len(self.controller.state.contact_laws):
+            print(f"ERREUR : index hors limites : {index}")
+            return
+        law = self.controller.state.contact_laws[index]
+        self.current_edit_index = index
+
         self.name_input.setText(law.name)
         self.type_combo.setCurrentText(law.law_type.value)
         
         if law.friction is not None:
             self.friction_input.setText(str(law.friction))
-        
+
         if law.properties:
             props_str = ", ".join(f"{k}={v}" for k, v in law.properties.items())
             self.props_input.setText(props_str)
-        
-        self.name_input.setFocus()
-    
-    def _on_edit(self):
-        pass
 
-    def _on_delete(self):
-        pass
+        # Passage en mode édition
+        self.create_btn.setVisible(False)
+        self.update_btn.setVisible(True)
 
-    
-    def _parse_properties(self, text: str) -> dict:
-        """
-        Parse les propriétés de contact de manière sécurisée.
-        
-        Format accepté : "key1=value1, key2=value2"
-        Valeurs acceptées : nombres (int/float) ou chaînes
-        
-        Args:
-            text: Chaîne de propriétés
-        
-        Returns:
-            Dictionnaire de propriétés
-        
-        Raises:
-            ValueError: Si format invalide
-        
-        Example:
-            >>> _parse_properties("prop1=1.5, prop2=test")
-            {'prop1': 1.5, 'prop2': 'test'}
-        """
-        if not text.strip():
-            return {}
-        
-        props = {}
-        
-        # Séparer par virgules
-        for pair in text.split(','):
-            pair = pair.strip()
-            
-            if not pair:
-                continue
-            
-            if '=' not in pair:
-                raise ValueError(f"Format invalide : '{pair}' (attendu 'clé=valeur')")
-            
-            key, value = pair.split('=', 1)
-            key = key.strip()
-            value = value.strip()
-            
-            if not key:
-                raise ValueError(f"Clé vide dans : '{pair}'")
-            
-            if not value:
-                raise ValueError(f"Valeur vide pour la clé '{key}'")
-            
-            # Essayer de convertir en nombre
-            try:
-                if '.' in value or 'e' in value.lower():
-                    props[key] = float(value)
-                else:
-                    props[key] = int(value)
-            except ValueError:
-                # Garder comme string si ce n'est pas un nombre
-                props[key] = value
-        
-        return props
-    
+        self.help_label.setText(f"🔧 Mode édition — Loi '{law.name}'")
+        self.help_label.setStyleSheet("color: #FF9800; font-weight: bold; padding: 5px;")
+
+    def _clear_form(self):
+        """Réinitialise le formulaire et repasse en mode création"""
+        self.name_input.setText("iqsc0")
+        self.type_combo.setCurrentIndex(0)
+        self.friction_input.setText("0.3")
+        self.props_input.clear()
+        self.current_edit_index = None
+        self.create_btn.setVisible(True)
+        self.update_btn.setVisible(False)
+        self.help_label.setText("Sélectionnez un type de loi pour voir les paramètres adaptés.")
+        self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
+
     def refresh(self):
-        """Rafraîchit l'onglet"""
-        # Trigger l'affichage de l'aide
-        self._on_type_changed(self.type_combo.currentText())
+        """Rafraîchit l'arbre des lois de contact"""
+        self.tree.clear()
+        for law in self.controller.state.contact_laws:
+            friction_str = f"{law.friction:.3f}" if law.friction is not None else "-"
+            props_str = ", ".join(f"{k}={v}" for k, v in list(law.properties.items())[:3])
+            if len(law.properties) > 3:
+                props_str += "..."
+
+            item = QTreeWidgetItem([
+                law.name,
+                law.law_type.value,
+                friction_str,
+                props_str or "-"
+            ])
+            
+            # Colorer si utilisée dans une visibilité
+            is_used, _ = self.controller.is_contact_law_used(law.name)
+            if is_used:
+                item.setForeground(0, QBrush(QColor(0, 100, 0)))  # Vert foncé
+
+            self.tree.addTopLevelItem(item)
+
+        self._clear_form()
