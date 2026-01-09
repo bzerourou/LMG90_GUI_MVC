@@ -6,10 +6,11 @@ Onglet pour générer des distributions granulométriques.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox, QHBoxLayout, 
-    QScrollArea
+    QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox,
+    QTreeWidget, QTreeWidgetItem, QMenu, QHBoxLayout, QScrollArea
 )
-from PyQt6.QtCore import Qt,pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import GranuloGeneration
 from ...controllers.project_controller import ProjectController
@@ -19,6 +20,7 @@ class GranuloTab(QWidget):
     """Onglet granulométrie"""
     
     granulo_generated = pyqtSignal()
+    granulo_deleted = pyqtSignal()
     
     def __init__(self, controller: ProjectController):
         super().__init__()
@@ -28,7 +30,39 @@ class GranuloTab(QWidget):
     
     def _setup_ui(self):
         """Configure l'interface"""
+        # ✅ AJOUTER UN SCROLL AREA PRINCIPAL
+        main_layout = QVBoxLayout()
+        
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        scroll_widget = QWidget()
         layout = QVBoxLayout()
+        scroll_widget.setLayout(layout)
+        
+        # === ARBRE ===
+        tree_label = QLabel("<b>📋 Dépôts Granulométriques Existants</b>")
+        layout.addWidget(tree_label)
+        
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["#", "Type", "Nb Part.", "Rayons", "Groupe"])
+        self.tree.setColumnWidth(0, 40)
+        self.tree.setColumnWidth(1, 100)
+        self.tree.setColumnWidth(2, 80)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._show_context_menu)
+        self.tree.setMaximumHeight(150)
+        layout.addWidget(self.tree)
+        
+        tree_btn_layout = QHBoxLayout()
+        delete_tree_btn = QPushButton("🗑️ Supprimer Sélection")
+        delete_tree_btn.clicked.connect(self._on_delete)
+        tree_btn_layout.addWidget(delete_tree_btn)
+        tree_btn_layout.addStretch()
+        layout.addLayout(tree_btn_layout)
+        
         # === Groupe 1 : Distribution ===
         dist_group = QGroupBox("1. Distribution des Particules")
         dist_form = QFormLayout()
@@ -61,13 +95,11 @@ class GranuloTab(QWidget):
         
         container_layout.addLayout(container_form)
         
-        # Paramètres dynamiques du conteneur
         self.params_widget = QWidget()
         self.params_layout = QFormLayout()
         self.params_widget.setLayout(self.params_layout)
         container_layout.addWidget(self.params_widget)
         
-        # Champs stockés
         self.lx_input = QLineEdit("4.0")
         self.ly_input = QLineEdit("4.0")
         self.r_input = QLineEdit("2.0")
@@ -106,47 +138,41 @@ class GranuloTab(QWidget):
         group_form.addRow("Nom du groupe :", self.group_name_input)
         layout.addLayout(group_form)
         
-        # Bouton générer
-        gen_btn = QPushButton("Générer le Dépôt")
-        edit_btn = QPushButton("Modifier")
-        delete_btn = QPushButton("Supprimer")
+        # === BOUTONS ===
+        btn_layout = QHBoxLayout()
+        
+        gen_btn = QPushButton("✅ Générer le Dépôt")
+        gen_btn.setStyleSheet("font-weight: bold; padding: 10px;")
         gen_btn.clicked.connect(self._on_generate)
-        edit_btn.clicked.connect(self._on_edit)
-        delete_btn.clicked.connect(self._on_delete)
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(gen_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(delete_btn)
-        layout.addLayout(button_layout)
+        btn_layout.addWidget(gen_btn)
         
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True) 
-        container = QWidget()
-        container.setLayout(layout)
-        scroll.setWidget(container)
+        clear_btn = QPushButton("🔄 Réinitialiser")
+        clear_btn.clicked.connect(self._clear_form)
+        btn_layout.addWidget(clear_btn)
         
-        final_layout = QVBoxLayout()
-        final_layout.addWidget(scroll)
-
-        layout.addStretch()
-        self.setLayout(final_layout)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
         
-        # Initialiser les paramètres du conteneur
+        # ✅ FIN DU LAYOUT SCROLLABLE
+        scroll.setWidget(scroll_widget)
+        main_layout.addWidget(scroll)
+        
+        self.setLayout(main_layout)
+        
         self._update_container_params("Box2D")
     
     def _connect_signals(self):
         """Connecte les signaux"""
         self.shape_combo.currentTextChanged.connect(self._update_container_params)
+        self.tree.itemDoubleClicked.connect(self._show_info)
     
     def _update_container_params(self, shape):
         """Met à jour les paramètres selon le conteneur"""
-        # Nettoyer
         while self.params_layout.count() > 0:
             item = self.params_layout.takeAt(0)
             if item.widget():
                 item.widget().hide()
         
-        # Ajouter selon le type
         if shape == "Box2D":
             self.params_layout.addRow("Largeur (lx) :", self.lx_input)
             self.params_layout.addRow("Hauteur (ly) :", self.ly_input)
@@ -163,10 +189,27 @@ class GranuloTab(QWidget):
             self.rint_input.show()
             self.rext_input.show()
     
+    def _show_context_menu(self, position):
+        """Menu contextuel"""
+        item = self.tree.itemAt(position)
+        if not item:
+            return
+        
+        menu = QMenu()
+        
+        delete_action = menu.addAction("🗑️ Supprimer")
+        delete_action.triggered.connect(self._on_delete)
+        
+        menu.addSeparator()
+        
+        info_action = menu.addAction("ℹ️ Informations")
+        info_action.triggered.connect(self._show_info)
+        
+        menu.exec(self.tree.viewport().mapToGlobal(position))
+    
     def _on_generate(self):
         """Génère la granulométrie"""
         try:
-            # Paramètres du conteneur
             container_params = {}
             shape = self.shape_combo.currentText()
             
@@ -183,11 +226,9 @@ class GranuloTab(QWidget):
                     'rext': float(self.rext_input.text())
                 }
             
-            # Seed
             seed_text = self.seed_input.text().strip()
             seed = int(seed_text) if seed_text else None
             
-            # Créer la configuration
             config = GranuloGeneration(
                 nb_particles=int(self.nb_input.text()),
                 radius_min=float(self.rmin_input.text()),
@@ -196,18 +237,18 @@ class GranuloTab(QWidget):
                 container_params=container_params,
                 model_name=self.model_combo.currentText(),
                 material_name=self.material_combo.currentText(),
-                avatar_type=self.avatar_combo.currentText(),
+                avatar_type=self.avatar_combo.currentData(),
                 color=self.color_input.text().strip(),
                 seed=seed,
                 group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None
             )
             
-            # Générer via le contrôleur
             indices = self.controller.generate_granulo(config)
             
-            # Succès
             self.granulo_generated.emit()
-            msg = f"{len(indices)} particules générées"
+            self.refresh()
+            
+            msg = f"✅ {len(indices)} particules générées"
             if config.group_name:
                 msg += f"\nGroupe : {config.group_name}"
             QMessageBox.information(self, "Succès", msg)
@@ -217,29 +258,111 @@ class GranuloTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
-    def _on_edit(self):
-        pass
-
     def _on_delete(self):
-        pass
-
-
+        """Supprime le dépôt sélectionné"""
+        selected = self.tree.currentItem()
+        if not selected:
+            QMessageBox.warning(self, "Sélection", "Sélectionnez un dépôt")
+            return
+        
+        granulo_idx = selected.data(0, Qt.ItemDataRole.UserRole)
+        granulo = self.controller.get_granulo(granulo_idx)
+        
+        if not granulo:
+            return
+        
+        nb_avatars = len(granulo.generated_indices)
+        
+        reply = QMessageBox.question(
+            self, "Confirmer",
+            f"Supprimer le dépôt #{granulo_idx + 1} ?\n\n"
+            f"⚠️ Cela supprimera également {nb_avatars} avatar(s) généré(s).",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.controller.remove_granulo(granulo_idx):
+                self.granulo_deleted.emit()
+                self.refresh()
+                QMessageBox.information(self, "Succès", "✅ Dépôt et avatars supprimés")
+    
+    def _show_info(self):
+        """Affiche infos"""
+        selected = self.tree.currentItem()
+        if not selected:
+            return
+        
+        granulo_idx = selected.data(0, Qt.ItemDataRole.UserRole)
+        granulo = self.controller.get_granulo(granulo_idx)
+        
+        if not granulo:
+            return
+        
+        info = f"<h3>Dépôt Granulométrique #{granulo_idx + 1}</h3>"
+        info += f"<b>Conteneur :</b> {granulo.container_type}<br>"
+        info += f"<b>Particules demandées :</b> {granulo.nb_particles}<br>"
+        info += f"<b>Particules générées :</b> {len(granulo.generated_indices)}<br>"
+        info += f"<b>Rayons :</b> [{granulo.radius_min}, {granulo.radius_max}]<br>"
+        info += f"<b>Type d'avatar :</b> {granulo.avatar_type}<br>"
+        info += f"<b>Matériau :</b> {granulo.material_name}<br>"
+        info += f"<b>Modèle :</b> {granulo.model_name}<br>"
+        info += f"<b>Couleur :</b> {granulo.color}<br>"
+        
+        if granulo.seed:
+            info += f"<b>Seed :</b> {granulo.seed}<br>"
+        
+        if granulo.group_name:
+            info += f"<b>Groupe :</b> {granulo.group_name}<br>"
+        
+        info += f"<br><b>Paramètres conteneur :</b><br>"
+        for key, value in granulo.container_params.items():
+            info += f"  • {key} = {value}<br>"
+        
+        QMessageBox.information(self, f"Infos : Dépôt #{granulo_idx + 1}", info)
+    
+    def _clear_form(self):
+        """Réinitialise"""
+        self.nb_input.setText("200")
+        self.rmin_input.setText("0.05")
+        self.rmax_input.setText("0.15")
+        self.seed_input.clear()
+        self.color_input.setText("BLUEx")
+        self.group_name_input.setText("depot_granulo")
+        self.store_check.setChecked(True)
+    
     def refresh(self):
-        """Rafraîchit les combos"""
-        # Matériaux
+        """Rafraîchit"""
+        self.tree.clear()
+        
         self.material_combo.clear()
         materials = self.controller.get_materials()
         self.material_combo.addItems([m.name for m in materials])
         
-        # Modèles
         self.model_combo.clear()
         models = self.controller.get_models()
         self.model_combo.addItems([m.name for m in models])
         
-        # Avatars manuels
         self.avatar_combo.clear()
-        avatars = self.controller.get_avatars(include_generated=False)
-        for i, avatar in enumerate(avatars):
-            label = f"{avatar.avatar_type.value}"
-            self.avatar_combo.addItem(label, avatar.avatar_type.value)
-
+        avatar_types = ["rigidDisk", "rigidSphere"]
+        for avatar_type in avatar_types:
+            self.avatar_combo.addItem(avatar_type, avatar_type)
+        
+        granulos = self.controller.state.granulo_generations
+        
+        for i, gen in enumerate(granulos):
+            nb_generated = len(gen.generated_indices)
+            
+            item = QTreeWidgetItem([
+                str(i + 1),
+                gen.container_type,
+                f"{nb_generated}/{gen.nb_particles}",
+                f"[{gen.radius_min:.3f}, {gen.radius_max:.3f}]",
+                gen.group_name or "N/A"
+            ])
+            
+            item.setData(0, Qt.ItemDataRole.UserRole, i)
+            
+            if nb_generated < gen.nb_particles:
+                item.setForeground(2, QBrush(QColor(255, 100, 0)))
+            
+            self.tree.addTopLevelItem(item)

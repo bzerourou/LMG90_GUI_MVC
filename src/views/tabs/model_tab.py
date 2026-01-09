@@ -7,7 +7,7 @@ Onglet de gestion des modèles avec création, modification et suppression.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, 
     QComboBox, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem,
-    QMenu, QLabel, QGroupBox
+    QMenu, QLabel, QGroupBox, QScrollArea
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
@@ -55,7 +55,17 @@ class ModelTab(QWidget):
     
     def _setup_ui(self):
         """Configure l'interface"""
+        # ✅ AJOUTER UN SCROLL AREA PRINCIPAL
+        main_layout = QVBoxLayout()
+        
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        scroll_widget = QWidget()
         layout = QVBoxLayout()
+        scroll_widget.setLayout(layout)
         
         # === ARBRE ===
         tree_label = QLabel("<b>📋 Liste des Modèles</b>")
@@ -140,8 +150,11 @@ class ModelTab(QWidget):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
         
-        layout.addStretch()
-        self.setLayout(layout)
+        # ✅ FIN DU LAYOUT SCROLLABLE
+        scroll.setWidget(scroll_widget)
+        main_layout.addWidget(scroll)
+        
+        self.setLayout(main_layout)
         
         self._update_elements()
     
