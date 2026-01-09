@@ -7,7 +7,7 @@
 
 **LMGC90_GUI** est une interface graphique moderne en architecture **MVC** (Model-View-Controller) pour le préprocesseur `pre` de [LMGC90](https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/-/wikis/home).
 
-![](docs/captures/interface.JPG)
+![](docs/captures/interface2.JPG)
 
 ## 🎯 Points Clés de la Refactorisation
 
