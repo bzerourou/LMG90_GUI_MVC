@@ -248,7 +248,7 @@ class DOFTab(QWidget):
             self._clear_form()
             self.refresh()
 
-    def load_for_edit(self, index: int):
+    def load_for_edit(self, index: int, option = None):
         operation = self.controller.state.operations[index]
         self.current_edit_index = index
 
