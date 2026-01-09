@@ -29,8 +29,6 @@
 ### ✅ Maintenabilité
 - 📝 Docstrings complètes
 - 🏗️ Fonctions < 50 lignes
-- 🎨 Code formaté avec Black
-- 🔍 Type hints complets
 
 ## 📁 Structure du Projet
 
@@ -166,12 +164,6 @@ result = evaluator.eval_expression("2 * math.pi * 0.5")
 # → 3.141592653589793
 ```
 
-## 🐛 Bugs Corrigés
 
-### Critiques
-- ✅ Bug granulométrie (ligne 518) : `gran_dict` non ajouté
-- ✅ Références circulaires dans script_gen.py
-- ✅ `eval()` remplacé par AST sécurisé
-- ✅ Gestion des avatars vides corrigée
 
 
