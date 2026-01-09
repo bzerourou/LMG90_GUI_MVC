@@ -1,6 +1,5 @@
 # ============================================================================
-# FICHIER: src/views/tabs/material_tab.py
-# Onglet Matériau - VERSION COMPLÈTE
+#♀MaterialTab
 # ============================================================================
 """
 Onglet de gestion des matériaux avec création, modification et suppression.
