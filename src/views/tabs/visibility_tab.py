@@ -83,7 +83,7 @@ class VisibilityTab(QWidget):
         candidate_form.addRow("Corps :", self.candidate_body_combo)
         
         self.candidate_contactor_combo = QComboBox()
-        self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        #self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
         candidate_form.addRow("Contacteur :", self.candidate_contactor_combo)
         
         self.candidate_color_input = QLineEdit("BLUEx")
@@ -101,7 +101,7 @@ class VisibilityTab(QWidget):
         antagonist_form.addRow("Corps :", self.antagonist_body_combo)
         
         self.antagonist_contactor_combo = QComboBox()
-        self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        #self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
         antagonist_form.addRow("Contacteur :", self.antagonist_contactor_combo)
         
         self.antagonist_color_input = QLineEdit("VERTx")
@@ -164,7 +164,25 @@ class VisibilityTab(QWidget):
     def _connect_signals(self):
         """Connecte les signaux"""
         self.tree.itemDoubleClicked.connect(self._on_edit_from_tree)
+        self.candidate_body_combo.currentTextChanged.connect(self._update_candidate_contactors)
+        self.antagonist_body_combo.currentTextChanged.connect(self._update_antagonist_contactors)
     
+    def _update_candidate_contactors(self, body_type):
+        """Met à jour les contacteurs candidats selon le type de corps"""
+        self.candidate_contactor_combo.clear()
+        if body_type == "RBDY2":
+            self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        else:  # RBDY3
+            self.candidate_contactor_combo.addItems(["SPHER",  "PLANx", "CYLND", "POLYR", "PT3Dx"])
+
+    def _update_antagonist_contactors(self, body_type):
+        """Met à jour les contacteurs antagonistes selon le type de corps"""
+        self.antagonist_contactor_combo.clear()
+        if body_type == "RBDY2":
+            self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        else:  # RBDY3
+            self.antagonist_contactor_combo.addItems(["SPHER",  "PLANx", "CYLND", "POLYR", "PT3Dx"])
+
     def _show_context_menu(self, position):
         """Menu contextuel"""
         item = self.tree.itemAt(position)
@@ -367,3 +385,6 @@ class VisibilityTab(QWidget):
             item.setData(0, Qt.ItemDataRole.UserRole, idx)
             
             self.tree.addTopLevelItem(item)
+        
+        self._update_antagonist_contactors(self.antagonist_body_combo.currentText())
+        self._update_candidate_contactors(self.candidate_body_combo.currentText())

@@ -343,7 +343,11 @@ class GranuloTab(QWidget):
         self.model_combo.addItems([m.name for m in models])
         
         self.avatar_combo.clear()
-        avatar_types = ["rigidDisk", "rigidSphere"]
+        dim = self.controller.state.dimension
+        if dim == 2:
+            avatar_types = ["rigidDisk"]
+        else:
+            avatar_types = ["rigidSphere", "rigidCylinder"]
         for avatar_type in avatar_types:
             self.avatar_combo.addItem(avatar_type, avatar_type)
         

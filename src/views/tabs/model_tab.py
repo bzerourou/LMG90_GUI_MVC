@@ -19,7 +19,7 @@ from ...controllers.project_controller import ProjectController
 
 class ModelTab(QWidget):
     """Onglet de gestion des modèles"""
-    
+    dimension_changed = pyqtSignal(int)
     model_created = pyqtSignal()
     model_updated = pyqtSignal()
     model_deleted = pyqtSignal()
@@ -163,12 +163,17 @@ class ModelTab(QWidget):
         self.tree.itemDoubleClicked.connect(self._on_edit_from_tree)
         self.dimension_combo.currentTextChanged.connect(self._on_dimension_changed)
         self.element_combo.currentTextChanged.connect(self._on_element_changed)
+        #self.dimension_changed.connect(lambda dim : self.on_dimension_combo_changed(dim))
+
     
     def _on_dimension_changed(self, dim_text):
         """Quand la dimension change"""
+        dim = int(dim_text)
         self._update_elements()
-        self.controller.state.dimension = int(dim_text)
-    
+        self.controller.state.dimension = int(dim_text)    
+        self.dimension_changed.emit(int(dim_text))
+        
+
     def _update_elements(self):
         """Met à jour la liste des éléments selon dimension"""
         dim = int(self.dimension_combo.currentText())

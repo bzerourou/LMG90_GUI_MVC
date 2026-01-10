@@ -346,9 +346,9 @@ class MainWindow(QMainWindow):
         self.granulo_tab.granulo_generated.connect(self._refresh_all)
         self.dof_tab.operation_applied.connect(self._refresh_all)
         self.contact_tab.law_created.connect(self._refresh_all)
+        self.model_tab.dimension_changed.connect( self.avatar_tab._update_avatar_types)
         
-    
-    # ========== SLOTS MENU ==========
+        # ========== SLOTS MENU ==========
     
     def _on_new_project(self):
         """Crée un nouveau projet"""

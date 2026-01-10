@@ -30,7 +30,10 @@ class AvatarTab(QWidget):
         "roughWall", "fineWall", "smoothWall", "granuloRoughWall"
     ]
     
-    AVATAR_TYPES_3D = ["rigidSphere"]
+    AVATAR_TYPES_3D = [
+        "rigidSphere", "rigidPlan", "rigidCylinder", 
+        "rigidPolyhedron", "roughWall3D", "granuloRoughWall3D"
+    ]
     
     def __init__(self, controller: ProjectController):
         super().__init__()
@@ -174,6 +177,7 @@ class AvatarTab(QWidget):
     def _update_avatar_types(self):
         """Met à jour les types selon dimension"""
         dim = self.controller.state.dimension
+        print(dim)
         types = self.AVATAR_TYPES_2D if dim == 2 else self.AVATAR_TYPES_3D
         
         self.type_combo.blockSignals(True)

@@ -139,6 +139,11 @@ class EmptyAvatarTab(QWidget):
         center_default = "0.0, 0.0" if dim == 2 else "0.0, 0.0, 0.0"
         self.center_input.setText(center_default)
         self.center_label.setText(f"Centre ({'x,y' if dim == 2 else 'x,y,z'}) :")
+        for i in reversed(range(self.contactors_layout.count())):
+            widget = self.contactors_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        self._add_contactor_row()
     
     def _add_contactor_row(self):
         """Ajoute une ligne de contacteur"""
@@ -147,7 +152,12 @@ class EmptyAvatarTab(QWidget):
         row.addWidget(QLabel("Forme :"))
         
         shape_combo = QComboBox()
-        shape_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        dim = int(self.dim_combo.currentText())
+        if dim == 2:
+            shape_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        else:
+            shape_combo.addItems(["SPHER",  "PLANx", "CYLND", "POLYR", "PT3Dx"])
+
         shape_combo.currentTextChanged.connect(
             lambda: self._on_contactor_type_changed(row)
         )
