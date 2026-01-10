@@ -49,9 +49,15 @@ class AvatarType(Enum):
     SMOOTH_WALL = "smoothWall"
     GRANULO_WALL = "granuloRoughWall"
     EMPTY_AVATAR = "emptyAvatar"
-    RIGID_SPHERE = "rigidSphere"  # 3D
+    # 3D
 
-
+    RIGID_SPHERE = "rigidSphere"
+    RIGID_PLAN = "rigidPlan"
+    RIGID_CYLINDER = "rigidCylinder"
+    RIGID_POLYHEDRON = "rigidPolyhedron"
+    ROUGH_WALL_3D = "roughWall3D"
+    GRANULO_ROUGH_WALL_3D = "granuloRoughWall3D"
+    
 class ContactLawType(Enum):
     """Types de lois de contact"""
     IQS_CLB = "IQS_CLB"

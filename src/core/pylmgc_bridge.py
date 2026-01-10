@@ -71,6 +71,7 @@ class LMGC90Bridge:
         color = avatar.color
         
         # Création selon le type
+        # 2D avatars
         if atype == AvatarType.RIGID_DISK:
             kwargs = {
                 'r': avatar.radius,
@@ -224,6 +225,65 @@ class LMGC90Bridge:
             body.computeRigidProperties()
             
             return body
+        
+        # Avatars 3D
+        elif atype == AvatarType.RIGID_SPHERE:
+            return pre.rigidSphere(
+                r=avatar.radius,
+                center=center,
+                model=model_obj,
+                material=material_obj,
+                color=color
+            )
+    
+        elif atype == AvatarType.RIGID_PLAN:
+            return pre.rigidPlan(
+                center=center,
+                model=model_obj,
+                material=material_obj,
+                color=color
+            )
+        
+        elif atype == AvatarType.RIGID_CYLINDER:
+            return pre.rigidCylinder(
+                r=avatar.radius,
+                h=avatar.wall_params.get('h', 1.0) if avatar.wall_params else 1.0,
+                center=center,
+                model=model_obj,
+                material=material_obj,
+                color=color
+            )
+        
+        elif atype == AvatarType.RIGID_POLYHEDRON:
+            return pre.rigidPolyhedron(
+                vertices=np.array(avatar.vertices) if avatar.vertices else np.array([]),
+                center=center,
+                model=model_obj,
+                material=material_obj,
+                color=color
+            )
+        
+        elif atype == AvatarType.ROUGH_WALL_3D:
+            return pre.roughWall3D(
+                l=avatar.wall_params['l'],
+                r=avatar.wall_params['r'],
+                center=center,
+                model=model_obj,
+                material=material_obj,
+                color=color
+            )
+        
+        elif atype == AvatarType.GRANULO_ROUGH_WALL_3D:
+            return pre.granuloRoughWall3D(
+                l=avatar.wall_params['l'],
+                rmin=avatar.wall_params['rmin'],
+                rmax=avatar.wall_params['rmax'],
+                center=center,
+                model=model_obj,
+                material=material_obj,
+                color=color
+            )
+
         
         else:
             raise ValueError(f"Type d'avatar non supporté: {atype}")
