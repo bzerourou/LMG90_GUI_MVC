@@ -251,6 +251,48 @@ class AvatarTab(QWidget):
             else:
                 self.wall_height_label.setText("Rayon (r) :")
                 self.wall_nb_label.setText("Nb vertices :")
+        elif avatar_type == "rigidSphere" :
+            self.radius_label.setVisible(True)
+            self.radius_input.setVisible(True) 
+        elif avatar_type == "rigidPlan":
+            self.axes_label.setVisible(True)
+            self.axes_input.setVisible(True)  
+        elif avatar_type == "rigidCylinder":
+            self.radius_label.setVisible(True)
+            self.radius_input.setVisible(True)  
+            self.wall_height_label.setVisible(True)
+            self.wall_height_input.setVisible(True)  
+        elif avatar_type == "rigidPolyhedron":
+            self.radius_label.setVisible(True)
+            self.radius_input.setVisible(True)  
+            self.nb_vertices_label.setText("Nb vertices :")
+            self.nb_vertices_label.setVisible(True)
+            self.nb_vertices_input.setVisible(True)  
+            self.gen_type_label.setVisible(True)
+            self.gen_type_combo.setVisible(True)
+            self._on_gen_type_changed(self.gen_type_combo.currentText())
+        elif avatar_type == "roughWall3D":
+            self.wall_length_label.setVisible(True)
+            self.wall_length_input.setVisible(True)
+            self.wall_length_label.setText("Longueur  :")
+            self.wall_height_label.setVisible(True)
+            self.wall_height_input.setVisible(True)
+            self.wall_height_label.setText("Largeur :")
+            self.wall_nb_label.setVisible(True)
+            self.wall_nb_input.setVisible(True)
+            self.wall_nb_label.setText(" Rayon (r) :")
+        elif avatar_type == "granuloRoughWall3D":
+            self.wall_length_label.setVisible(True)
+            self.wall_length_input.setVisible(True)
+            self.wall_height_label.setText("Longueur  :")
+            self.wall_height_label.setVisible(True)
+            self.wall_height_input.setVisible(True)
+            self.wall_height_label.setText("Largeur :")
+            self.wall_nb_label.setVisible(True)
+            self.wall_nb_input.setVisible(True)
+            self.wall_nb_label.setText("Rmin et Rmax :")
+           
+        
     
     def _on_gen_type_changed(self, gen_type):
         """Affiche vertices ou nb_vertices"""
@@ -300,7 +342,7 @@ class AvatarTab(QWidget):
             self.avatar_created.emit()
             self.refresh()
             QMessageBox.information(self, "Succès", f"✅ Avatar #{idx} créé")
-            self._clear_form()
+            #self._clear_form()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
@@ -491,6 +533,36 @@ class AvatarTab(QWidget):
                 wall_params['nb_vertex'] = int(self.wall_nb_input.text())
             
             avatar.wall_params = wall_params
+        elif avatar_type == AvatarType.RIGID_SPHERE:
+            avatar.radius = float(self.radius_input.text())
+
+        elif avatar_type == AvatarType.RIGID_PLAN:
+            axes = [float(x.strip()) for x in self.axes_input.text().split(',')]
+            avatar.axis = {'axe1': axes[0], 'axe2': axes[1], 'axe3': axes[2]}
+
+        elif avatar_type == AvatarType.RIGID_CYLINDER:
+            avatar.radius = float(self.radius_input.text())
+            avatar.wall_params = {'height': float(self.wall_height_input.text())}
+        
+        elif avatar_type == AvatarType.RIGID_POLYHEDRON:
+            avatar.radius = float(self.radius_input.text())
+            avatar.nb_vertices = int(self.nb_vertices_input.text())
+            avatar.generation_type = self.gen_type_combo.currentText()
+        elif avatar_type == AvatarType.ROUGH_WALL_3D:
+            avatar.radius = float(self.wall_nb_input.text())
+            avatar.wall_params = {
+                'lx': float(self.wall_length_input.text()),
+                'ly': float(self.wall_height_input.text())
+            }
+
+        elif avatar_type == AvatarType.GRANULO_ROUGH_WALL_3D:
+            avatar.wall_params = {
+                'lx': float(self.wall_length_input.text()),
+                'ly': float(self.wall_height_input.text()),
+                'rmin': float(self.wall_nb_input.text().split(',')[0].strip()),
+                'rmax': float(self.wall_nb_input.text().split(',')[1].strip())
+            }
+
         
         return avatar
     

@@ -13,6 +13,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import GranuloGeneration
+from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 
 
@@ -189,6 +190,17 @@ class GranuloTab(QWidget):
             self.rint_input.show()
             self.rext_input.show()
     
+    def _update_avatar_types(self, dimension):
+        """Met à jour les types d'avatars selon la dimension"""
+        self.avatar_combo.clear()
+        if dimension == 2:
+            avatar_types = ["rigidDisk"]
+        else:  # dimension == 3
+            avatar_types = ["rigidSphere", "rigidCylinder"]
+        
+        for avatar_type in avatar_types:
+            self.avatar_combo.addItem(avatar_type, avatar_type)
+    
     def _show_context_menu(self, position):
         """Menu contextuel"""
         item = self.tree.itemAt(position)
@@ -210,6 +222,28 @@ class GranuloTab(QWidget):
     def _on_generate(self):
         """Génère la granulométrie"""
         try:
+            nb = int(self.nb_input.text())
+            if nb <= 0 :
+                raise ValidationError("Le nombre de particules doit être > 0")
+            if nb > 10000:
+                raise ValidationError("Maximum 50000 particules (performance)")
+            rmin = float(self.rmin_input.text())
+            rmax = float(self.rmax_input.text())
+            if rmin <= 0:
+                raise ValidationError("Le rayon minimum doit être > 0")
+            
+            if rmax <= rmin:
+                raise ValidationError("Le rayon maximum doit être > rayon minimum")
+            
+            if rmax / rmin > 100:
+                raise ValidationError("Le ratio Rmax/Rmin dépasse 100 (trop élevé)")
+            material = self.material_combo.currentText()
+            model = self.avatar_combo.currentData()
+            if not self.material_combo.currentText():
+                raise ValidationError("Sélectionnez un matériau")
+            
+            if not self.model_combo.currentText():
+                raise ValidationError("Sélectionnez un modèle")
             container_params = {}
             shape = self.shape_combo.currentText()
             
@@ -230,14 +264,14 @@ class GranuloTab(QWidget):
             seed = int(seed_text) if seed_text else None
             
             config = GranuloGeneration(
-                nb_particles=int(self.nb_input.text()),
-                radius_min=float(self.rmin_input.text()),
-                radius_max=float(self.rmax_input.text()),
+                nb_particles= nb,
+                radius_min=rmin,
+                radius_max=rmax,
                 container_type=shape,
                 container_params=container_params,
                 model_name=self.model_combo.currentText(),
-                material_name=self.material_combo.currentText(),
-                avatar_type=self.avatar_combo.currentData(),
+                material_name=material,
+                avatar_type=model,
                 color=self.color_input.text().strip(),
                 seed=seed,
                 group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None

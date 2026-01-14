@@ -14,6 +14,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import DOFOperation, AvatarOrigin
+from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 
 
@@ -189,11 +190,15 @@ class DOFTab(QWidget):
             if target_value is None:
                 raise ValueError("Aucune cible valide sélectionnée")
 
+            params = self._parse_params(self.params_input.text())
+            if not params:
+                raise ValidationError("Aucun paramètre valide détecté")
+            
             operation = DOFOperation(
                 target_type=target_type,
                 target_value=target_value,
                 operation_type=self.action_combo.currentText(),
-                parameters=self._parse_params(self.params_input.text())
+                parameters=params
             )
 
             self.controller.apply_dof_operation(operation)

@@ -13,6 +13,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import VisibilityRule
+from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 
 
@@ -207,15 +208,25 @@ class VisibilityTab(QWidget):
     def _on_create(self):
         """Crée la règle de visibilité"""
         try:
+            alert = float(self.alert_input.text())
+            if alert <= 0:
+                raise ValidationError("L'alerte doit être > 0")
+            cand_color = self.candidate_color_input.text().strip()
+            if not cand_color:
+                raise ValidationError("La couleur candidat est requise")
+            ant_color = self.antagonist_color_input.text().strip()
+            if not ant_color:
+                raise ValidationError("La couleur antagoniste est requise")
+ 
             rule = VisibilityRule(
                 candidate_body=self.candidate_body_combo.currentText(),
                 candidate_contactor=self.candidate_contactor_combo.currentText(),
-                candidate_color=self.candidate_color_input.text().strip(),
+                candidate_color=cand_color,
                 antagonist_body=self.antagonist_body_combo.currentText(),
                 antagonist_contactor=self.antagonist_contactor_combo.currentText(),
-                antagonist_color=self.antagonist_color_input.text().strip(),
+                antagonist_color=ant_color,
                 behavior_name=self.behavior_combo.currentText(),
-                alert=float(self.alert_input.text())
+                alert=alert
             )
             
             self.controller.add_visibility_rule(rule)

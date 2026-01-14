@@ -50,7 +50,6 @@ class AvatarType(Enum):
     GRANULO_WALL = "granuloRoughWall"
     EMPTY_AVATAR = "emptyAvatar"
     # 3D
-
     RIGID_SPHERE = "rigidSphere"
     RIGID_PLAN = "rigidPlan"
     RIGID_CYLINDER = "rigidCylinder"
@@ -158,6 +157,7 @@ class Avatar:
     model_name: str
     color: str = "BLUEx"
     origin: AvatarOrigin = AvatarOrigin.MANUAL
+    controller: Any = field(repr=False, default=None)  # Référence au contrôleur (non sérialisé)
     
     # Champs spécifiques selon le type
     radius: Optional[float] = None
@@ -187,6 +187,8 @@ class Avatar:
         if self.axis:
             data['axe1'] = self.axis['axe1']
             data['axe2'] = self.axis['axe2']
+            if self.controller.state.dimension == 3 and 'axe3' in self.axis:
+                data['axe3'] = self.axis['axe3']
         
         if self.vertices:
             data['vertices'] = self.vertices
@@ -565,6 +567,7 @@ class ProjectState:
     materials: List[Material] = field(default_factory=list)
     models: List[Model] = field(default_factory=list)
     avatars: List[Avatar] = field(default_factory=list)
+    custom_templates: Dict[int, Dict[str, Dict[str, Any]]] = field(default_factory=dict)
     contact_laws: List[ContactLaw] = field(default_factory=list)
     visibility_rules: List[VisibilityRule] = field(default_factory=list)
     operations: List[DOFOperation] = field(default_factory=list)

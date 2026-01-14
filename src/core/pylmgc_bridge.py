@@ -241,7 +241,10 @@ class LMGC90Bridge:
                 center=center,
                 model=model_obj,
                 material=material_obj,
-                color=color
+                color=color,
+                axe1=avatar.axis['axe1'],
+                axe2=avatar.axis['axe2'],
+                axe3=avatar.axis['axe3']
             )
         
         elif atype == AvatarType.RIGID_CYLINDER:
@@ -255,18 +258,36 @@ class LMGC90Bridge:
             )
         
         elif atype == AvatarType.RIGID_POLYHEDRON:
-            return pre.rigidPolyhedron(
-                vertices=np.array(avatar.vertices) if avatar.vertices else np.array([]),
-                center=center,
-                model=model_obj,
-                material=material_obj,
-                color=color
+            if avatar.generation_type == "regular":
+                return pre.rigidPolyhedron(
+                    nb_vertices=avatar.nb_vertices,
+                    vertices=None,
+                    radius=avatar.radius,
+                    generation_type=avatar.generation_type,
+                    center=center,
+                    model=model_obj,
+                    material=material_obj,
+                    color=color,
+                    faces=None)
+                
+            else : 
+                return pre.rigidPolyhedron(
+                    nb_vertices=avatar.nb_vertices,
+                    vertices=np.array(avatar.vertices) if avatar.vertices else np.array([]),
+                    generation_type=avatar.generation_type,
+                    center=center,
+                    model=model_obj,
+                    material=material_obj,
+                    color=color,
+                    radius=avatar.radius,
+                    faces=avatar.wall_params.get('faces', [])
             )
         
         elif atype == AvatarType.ROUGH_WALL_3D:
             return pre.roughWall3D(
-                l=avatar.wall_params['l'],
-                r=avatar.wall_params['r'],
+                lx=avatar.wall_params['lx'],
+                ly=avatar.wall_params['ly'],
+                r=avatar.radius,
                 center=center,
                 model=model_obj,
                 material=material_obj,
@@ -275,7 +296,8 @@ class LMGC90Bridge:
         
         elif atype == AvatarType.GRANULO_ROUGH_WALL_3D:
             return pre.granuloRoughWall3D(
-                l=avatar.wall_params['l'],
+                lx=avatar.wall_params['ly'],
+                ly=avatar.wall_params['ly'],
                 rmin=avatar.wall_params['rmin'],
                 rmax=avatar.wall_params['rmax'],
                 center=center,

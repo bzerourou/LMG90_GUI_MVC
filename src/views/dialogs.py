@@ -8,8 +8,9 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, 
     QTreeWidgetItem, QPushButton, QDialogButtonBox, 
     QInputDialog, QLabel, QLineEdit, QFormLayout,
-    QGroupBox, QFileDialog, QSpinBox, QCheckBox, QComboBox
+    QGroupBox, QFileDialog, QSpinBox, QCheckBox, QComboBox, QMessageBox
 )
+
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
 from pathlib import Path
@@ -18,13 +19,14 @@ from ..core.models import Material, MaterialType, ProjectPreferences, UnitSystem
 
 
 class DynamicVarsDialog(QDialog):
-    """Dialogue pour gérer les variables dynamiques"""
+    """Dialogue pour gérer les variables dynamiques avec support des références internes"""
     
-    def __init__(self, current_vars: Dict[str, Any], parent=None):
+    def __init__(self, current_vars: Dict[str, Any], controller, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Variables dynamiques")
-        self.resize(500, 400)
+        self.resize(800, 600)
         self.current_vars = current_vars.copy()
+        self.controller = controller
         
         self._setup_ui()
     
@@ -32,23 +34,87 @@ class DynamicVarsDialog(QDialog):
         """Configure l'interface"""
         layout = QVBoxLayout()
         
+        # Info en haut
+        info = QLabel(
+            "<b>💡 Variables Dynamiques Avancées</b><br>"
+            "Définissez des variables réutilisables dans tout le projet.<br><br>"
+            "<b>Types supportés :</b><br>"
+            "• <b>Constantes</b> : thickness = 0.5<br>"
+            "• <b>Expressions</b> : radius = thickness * 2<br>"
+            "• <b>Références avatars</b> : x_pos = avatar[0].nodes[1].coor[0]<br>"
+            "• <b>Propriétés matériaux</b> : dens = material['MAT1'].density"
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("background-color: #e3f2fd; padding: 10px; border-radius: 5px;")
+        layout.addWidget(info)
+        
         # Tableau des variables
         self.table = QTreeWidget()
-        self.table.setHeaderLabels(["Nom", "Valeur"])
+        self.table.setHeaderLabels(["Nom", "Expression", "Valeur Évaluée", "Type"])
         self.table.setColumnWidth(0, 150)
+        self.table.setColumnWidth(1, 250)
+        self.table.setColumnWidth(2, 150)
         self._populate_table()
         layout.addWidget(self.table)
         
-        # Boutons ajouter/supprimer
+        # Formulaire d'ajout
+        form_group = QGroupBox("➕ Ajouter/Modifier une Variable")
+        form = QFormLayout()
+        
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Ex: thickness, radius, x_wall")
+        form.addRow("Nom de variable :", self.name_input)
+        
+        self.expr_input = QLineEdit()
+        self.expr_input.setPlaceholderText("Ex: 0.5 ou avatar[0].center[0] + 1.0")
+        self.expr_input.textChanged.connect(self._on_expr_changed)
+        form.addRow("Expression :", self.expr_input)
+        
+        self.preview_label = QLabel("<i>Entrez une expression pour voir le résultat</i>")
+        self.preview_label.setWordWrap(True)
+        self.preview_label.setStyleSheet("color: #666; font-style: italic;")
+        form.addRow("Aperçu :", self.preview_label)
+        
+        form_group.setLayout(form)
+        layout.addWidget(form_group)
+        
+        # Exemples
+        examples_group = QGroupBox("📋 Exemples d'Expressions")
+        examples_layout = QVBoxLayout()
+        
+        examples = [
+            ("Constante simple", "thickness = 0.5"),
+            ("Expression mathématique", "radius = thickness * 2 + 0.1"),
+            ("Centre X du 1er avatar", "x0 = avatar[0].center[0]"),
+            ("Rayon du 3ème avatar", "r3 = avatar[2].radius"),
+            ("Densité d'un matériau", "dens = material['MAT1'].density"),
+            ("Nombre total d'avatars", "nb_avatars = len(avatar)"),
+            ("Distance entre 2 avatars", "dist = sqrt((avatar[1].center[0] - avatar[0].center[0])**2)"),
+        ]
+        
+        for title, example in examples:
+            btn = QPushButton(f"{title}: {example}")
+            btn.setStyleSheet("text-align: left; padding: 5px;")
+            btn.clicked.connect(lambda checked, e=example: self._load_example(e))
+            examples_layout.addWidget(btn)
+        
+        examples_group.setLayout(examples_layout)
+        layout.addWidget(examples_group)
+        
+        # Boutons actions
         btn_layout = QHBoxLayout()
         
-        add_btn = QPushButton("Ajouter")
+        add_btn = QPushButton("➕ Ajouter/Modifier")
         add_btn.clicked.connect(self._on_add)
         btn_layout.addWidget(add_btn)
         
-        del_btn = QPushButton("Supprimer")
+        del_btn = QPushButton("🗑️ Supprimer")
         del_btn.clicked.connect(self._on_delete)
         btn_layout.addWidget(del_btn)
+        
+        refresh_btn = QPushButton("🔄 Rafraîchir Tout")
+        refresh_btn.clicked.connect(self._refresh_all_values)
+        btn_layout.addWidget(refresh_btn)
         
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
@@ -64,50 +130,269 @@ class DynamicVarsDialog(QDialog):
         
         self.setLayout(layout)
     
+    def _load_example(self, example: str):
+        """Charge un exemple dans le formulaire"""
+        if '=' in example:
+            name, expr = example.split('=', 1)
+            self.name_input.setText(name.strip())
+            self.expr_input.setText(expr.strip())
+    
+    def _on_expr_changed(self):
+        """Quand l'expression change, évaluer en temps réel"""
+        expr = self.expr_input.text().strip()
+        if not expr:
+            self.preview_label.setText("<i>Entrez une expression</i>")
+            self.preview_label.setStyleSheet("color: #666;")
+            return
+        
+        try:
+            value = self._evaluate_expression(expr)
+            self.preview_label.setText(f"✅ Résultat : {value} (type: {type(value).__name__})")
+            self.preview_label.setStyleSheet("color: green;")
+        except Exception as e:
+            self.preview_label.setText(f"❌ Erreur : {str(e)}")
+            self.preview_label.setStyleSheet("color: red;")
+    
+    def _evaluate_expression(self, expr: str) -> Any:
+        """Évalue une expression avec accès aux avatars et matériaux"""
+        import math
+        import numpy as np
+        
+        evaluated_vars = {}
+        for var_name, var_expr in self.current_vars.items():
+            try:
+                if isinstance(var_expr, str):
+                    # Évaluer récursivement
+                    evaluated_vars[var_name] = self._evaluate_single(var_expr, evaluated_vars)
+                else:
+                    evaluated_vars[var_name] = var_expr
+            except:
+                evaluated_vars[var_name] = var_expr
+        # Créer le contexte d'évaluation
+        context = {
+            'math': math,
+            'np': np,
+            'sqrt': math.sqrt,
+            'pi': math.pi,
+            'e': math.e,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'len': len,
+            'avatar': self._create_avatar_proxy(),
+            'material': self._create_material_proxy(),
+            'model': self._create_model_proxy(),
+        }
+        
+        # Ajouter les variables déjà définies
+        context.update(evaluated_vars)
+        
+        # Évaluer de manière sécurisée
+        try:
+            result = eval(expr, {"__builtins__": {}}, context)
+            return result
+        except Exception as e:
+            raise ValueError(f"Expression invalide : {e}")
+    
+    def _evaluate_single(self, expr: str, existing_vars: dict) -> Any:
+        """Évalue une seule expression avec variables existantes"""
+        import math
+        import numpy as np
+        
+        context = {
+            'math': math,
+            'np': np,
+            'sqrt': math.sqrt,
+            'pi': math.pi,
+            'e': math.e,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'len': len,
+            'avatar': self._create_avatar_proxy(),
+            'material': self._create_material_proxy(),
+            'model': self._create_model_proxy(),
+        }
+        
+        context.update(existing_vars)
+        
+        return eval(expr, {"__builtins__": {}}, context)    
+    
+    def _create_avatar_proxy(self):
+        """Crée un proxy pour accéder aux avatars comme avatar[i].center[0]"""
+        class AvatarProxy:
+            def __init__(self, controller):
+                self.controller = controller
+            
+            def __getitem__(self, index):
+                avatars = self.controller.state.avatars
+                if not isinstance(index, int) or index < 0 or index >= len(avatars):
+                    raise IndexError(f"Avatar index {index} invalide (0-{len(avatars)-1})")
+                return self._avatar_to_dict(avatars[index])
+            
+            def __len__(self):
+                return len(self.controller.state.avatars)
+            
+            def _avatar_to_dict(self, avatar):
+                """Convertit un avatar en dict accessible"""
+                class AvatarDict(dict):
+                    def __init__(self, av):
+                        super().__init__()
+                        self['center'] = av.center
+                        self['radius'] = av.radius
+                        self['color'] = av.color
+                        self['material_name'] = av.material_name
+                        self['model_name'] = av.model_name
+                        self['avatar_type'] = av.avatar_type.value
+                        # Simuler nodes (pour compatibilité)
+                        self['nodes'] = [{'coor': av.center}]
+                    
+                    def __getattr__(self, name):
+                        return self.get(name)
+                
+                return AvatarDict(avatar)
+        
+        return AvatarProxy(self.controller)
+    
+    def _create_material_proxy(self):
+        """Crée un proxy pour accéder aux matériaux comme material['MAT1'].density"""
+        class MaterialProxy:
+            def __init__(self, controller):
+                self.controller = controller
+            
+            def __getitem__(self, name):
+                mat = self.controller.get_material(name)
+                if not mat:
+                    raise KeyError(f"Matériau '{name}' introuvable")
+                
+                class MaterialDict(dict):
+                    def __init__(self, m):
+                        super().__init__()
+                        self['name'] = m.name
+                        self['density'] = m.density
+                        self['material_type'] = m.material_type.value
+                        self.update(m.properties)
+                    
+                    def __getattr__(self, name):
+                        return self.get(name)
+                
+                return MaterialDict(mat)
+        
+        return MaterialProxy(self.controller)
+    
+    def _create_model_proxy(self):
+        """Crée un proxy pour accéder aux modèles"""
+        class ModelProxy:
+            def __init__(self, controller):
+                self.controller = controller
+            
+            def __getitem__(self, name):
+                mod = self.controller.get_model(name)
+                if not mod:
+                    raise KeyError(f"Modèle '{name}' introuvable")
+                
+                class ModelDict(dict):
+                    def __init__(self, m):
+                        super().__init__()
+                        self['name'] = m.name
+                        self['physics'] = m.physics
+                        self['element'] = m.element
+                        self['dimension'] = m.dimension
+                        self.update(m.options)
+                    
+                    def __getattr__(self, name):
+                        return self.get(name)
+                
+                return ModelDict(mod)
+        
+        return ModelProxy(self.controller)
+    
     def _populate_table(self):
         """Remplit le tableau"""
         self.table.clear()
-        for name, value in self.current_vars.items():
-            item = QTreeWidgetItem([name, str(value)])
+        evaluated = {}
+        for name, expr in self.current_vars.items():
+            # Évaluer la valeur
+            try:
+                if isinstance(expr, str):
+                    value = self._evaluate_single(expr, evaluated)
+                else:
+                    value = expr
+                evaluated[name] = value
+                value_str = str(value)
+                if isinstance(value, float):
+                    value_str = f"{value:.6g}"
+                
+                type_str = type(value).__name__
+                status = "✅"
+            except Exception as e:
+                value_str = f"Erreur: {e}"
+                type_str = "error"
+                status = "❌"
+            
+            item = QTreeWidgetItem([
+                name,
+                str(expr),
+                value_str,
+                type_str
+            ])
+            
+            # Colorer selon le statut
+            if status == "❌":
+                from PyQt6.QtGui import QBrush, QColor
+                item.setForeground(2, QBrush(QColor("red")))
+            
             self.table.addTopLevelItem(item)
     
     def _on_add(self):
-        """Ajoute une variable"""
-        name, ok1 = QInputDialog.getText(
-            self, "Nom de variable",
-            "Entrez le nom (ex: thickness, offset) :"
-        )
+        """Ajoute ou modifie une variable"""
+        name = self.name_input.text().strip()
+        expr = self.expr_input.text().strip()
         
-        if not ok1 or not name.strip():
+        if not name:
+            QMessageBox.warning(self, "Nom requis", "Entrez un nom de variable")
             return
         
-        value, ok2 = QInputDialog.getText(
-            self, "Valeur",
-            f"Valeur pour {name} :"
-        )
-        
-        if not ok2:
+        if not expr:
+            QMessageBox.warning(self, "Expression requise", "Entrez une expression")
             return
         
-        # Convertir en nombre si possible
+        # Vérifier que l'expression est valide
         try:
-            if '.' in value or 'e' in value.lower():
-                val = float(value)
-            else:
-                val = int(value)
-        except ValueError:
-            val = value  # Garder comme string
+            self._evaluate_expression(expr)
+        except Exception as e:
+            QMessageBox.critical(self, "Expression invalide", f"Erreur : {e}")
+            return
         
-        self.current_vars[name] = val
+        # Ajouter ou modifier
+        self.current_vars[name] = expr
         self._populate_table()
+        
+        # Réinitialiser le formulaire
+        self.name_input.clear()
+        self.expr_input.clear()
     
     def _on_delete(self):
         """Supprime la variable sélectionnée"""
         selected = self.table.currentItem()
         if selected:
             name = selected.text(0)
-            del self.current_vars[name]
-            self._populate_table()
+            
+            reply = QMessageBox.question(
+                self, "Confirmer",
+                f"Supprimer la variable '{name}' ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                del self.current_vars[name]
+                self._populate_table()
+    
+    def _refresh_all_values(self):
+        """Rafraîchit toutes les valeurs évaluées"""
+        self._populate_table()
     
     def get_vars(self) -> Dict[str, Any]:
         """Retourne les variables"""

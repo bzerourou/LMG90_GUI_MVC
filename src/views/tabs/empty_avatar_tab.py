@@ -384,7 +384,14 @@ class EmptyAvatarTab(QWidget):
             shape = row.shape_combo.currentText()
             color = row.color_input.text().strip()
             params_text = row.params_input.text().strip()
+            material = self.material_combo.currentText()
+            model = self.model_combo.currentText()
+            if not material:
+                raise ValidationError("Le matériau est requis")
             
+            if not model:
+                raise ValidationError("Le modèle est requis")
+
             params = {}
             if params_text:
                 try:
@@ -404,8 +411,8 @@ class EmptyAvatarTab(QWidget):
         avatar = Avatar(
             avatar_type=AvatarType.EMPTY_AVATAR,
             center=center,
-            material_name=self.material_combo.currentText(),
-            model_name=self.model_combo.currentText(),
+            material_name=material,
+            model_name= model,
             color=self.color_input.text().strip(),
             origin=AvatarOrigin.MANUAL,
             contactors=contactors

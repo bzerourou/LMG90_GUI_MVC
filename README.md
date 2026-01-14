@@ -1,11 +1,13 @@
 
 # LMGC90_GUI — Architecture MVC Refactorisée
 
-![Version](https://img.shields.io/badge/version-0.2.5)
+![Version](https://img.shields.io/badge/version-0.3.0)
 ![Python](https://img.shields.io/badge/python-3.8%2B-brightgreen)
 ![License](https://img.shields.io/badge/license-Open%20Source-green)
 
 **LMGC90_GUI** est une interface graphique moderne en architecture **MVC** (Model-View-Controller) pour le préprocesseur `pre` de [LMGC90](https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/-/wikis/home).
+
+
 
 ![](docs/captures/interface2.JPG)
 
@@ -67,6 +69,9 @@ LMGC90_GUI/
 ├── pytest.ini
 └── README.md
 ```
+
+## Documentation (fr)
+[French documentation of LMGC90_GUI](docs/overview.md)
 
 ## 🚀 Installation
 

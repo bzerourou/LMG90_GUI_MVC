@@ -1,5 +1,5 @@
 # ============================================================================
-#♀MaterialTab
+#MaterialTab
 # ============================================================================
 """
 Onglet de gestion des matériaux avec création, modification et suppression.
@@ -71,7 +71,7 @@ class MaterialTab(QWidget):
         
         self.name_input = QLineEdit()
         self.name_input.setMaxLength(5)
-        self.name_input.setPlaceholderText("Ex: MAT1")
+        self.name_input.setText("TDURx")
         form.addRow("Nom (max 5 car.) :", self.name_input)
         
         self.type_combo = QComboBox()
@@ -79,7 +79,7 @@ class MaterialTab(QWidget):
         form.addRow("Type :", self.type_combo)
         
         self.density_input = QLineEdit()
-        self.density_input.setPlaceholderText("Ex: 1000.0")
+        self.density_input.setText("2800")
         form.addRow("Densité (kg/m³) :", self.density_input)
         
         self.props_input = QLineEdit()
@@ -130,17 +130,24 @@ class MaterialTab(QWidget):
     
     def _on_type_changed(self, mat_type: str):
         """Quand le type change, suggère des propriétés"""
+        self.density_input.setText("2800")
+        self.name_input.setText("TDURx")
         suggestions = {
-            "RIGID": "Pas de propriétés requises pour un corps rigide",
-            "ELAS": "young=1e11, nu=0.3",
-            "ELAS_DILA": "young=1e11, nu=0.3, dilatation=1e-5",
-            "VISCO_ELAS": "young=1e11, nu=0.3, viscous_young=1e9",
+            "RIGID": "",
+            "ELAS": "elas=standard, young=0.1e+15, nu=0.2, anisotropy=isotropic",
+            "ELAS_DILA": "elas=standard, young=0.1e+15, nu=0.2, anisotropy=isotropic,dilatation=1e-5, T_ref_meca=20.",
+            "VISCO_ELAS": "elas=standard, anisotropy=isotropic, young=1.17e11, nu=0.35,viscous_model=KelvinVoigt, viscous_young=1.17e9, viscous_nu=0.35",
+            "ELAS_PLAS" : "elas=standard, anisotropy=isotropic, young=1.17e11, nu=0.35,critere=Von-Mises, isoh=linear, iso_hard=4.e8, isoh_coeff=1e8, cinh=none, visc=none",
+            "THERMO_ELAS" : "elas=standard, young=0.0, nu=0.0, anisotropy=isotropic, dilatation = 0.0,T_ref_meca = 0.0, conductivity=field, specific_capacity=field",
+            "PORO_ELAS" : "elas=standard, young=0.0, nu=0.0, anisotropy=isotropic,hydro_cpl = 0.0, conductivity=field, specific_capacity=field"
         }
         
         if mat_type in suggestions:
             self.help_label.setText(f"💡 Suggestion : {suggestions[mat_type]}")
-            if mat_type != "RIGID" and not self.props_input.text():
-                self.props_input.setPlaceholderText(suggestions[mat_type])
+            
+            if mat_type != "RIGID" :
+                self.props_input.setText(suggestions[mat_type])
+            else : self.props_input.setText("")
         else:
             self.help_label.setText("")
     
@@ -170,12 +177,14 @@ class MaterialTab(QWidget):
         try:
             # Parser les propriétés
             props = self._parse_properties(self.props_input.text())
-            
+            density = float(self.density_input.text() or "2800")
+           
+
             # Créer le matériau
             material = Material(
                 name=self.name_input.text().strip(),
                 material_type=MaterialType(self.type_combo.currentText()),
-                density=float(self.density_input.text()),
+                density=density,
                 properties=props
             )
             
@@ -186,9 +195,8 @@ class MaterialTab(QWidget):
             self.material_created.emit()
             self.refresh()
             QMessageBox.information(self, "Succès", f"✅ Matériau '{material.name}' créé")
-            
-            # Réinitialiser le formulaire
-            self._clear_form()
+
+            #self._clear_form()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))

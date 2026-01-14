@@ -1,0 +1,320 @@
+{
+    "project_name": "bielle_manivelle",
+    "materials": [
+        {
+            "name": "TDURx",
+            "type": "RIGID",
+            "density": 1000.0,
+            "props": {}
+        }
+    ],
+    "models": [
+        {
+            "name": "rigid",
+            "physics": "MECAx",
+            "element": "Rxx2D",
+            "dimension": 2
+        }
+    ],
+    "avatars": [
+        {
+            "type": "emptyAvatar",
+            "dimension": 2,
+            "center": [
+                0.0,
+                0.0
+            ],
+            "material": "TDURx",
+            "model": "rigid",
+            "color": "BLUEx",
+            "contactors": [
+                {
+                    "shape": "DISKx",
+                    "color": "BLUEx",
+                    "params": {
+                        "byrd": 0.5
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            0.0,
+                            0.0
+                        ]
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            0.1,
+                            0.0
+                        ]
+                    }
+                }
+            ],
+            "__from_loop": false
+        },
+        {
+            "type": "emptyAvatar",
+            "dimension": 2,
+            "center": [
+                1.0,
+                0.0
+            ],
+            "material": "TDURx",
+            "model": "rigid",
+            "color": "BLUEx",
+            "contactors": [
+                {
+                    "shape": "JONCx",
+                    "color": "WALLx",
+                    "params": {
+                        "axe1": 1.0,
+                        "axe2": 0.1
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            -1.0,
+                            0.0
+                        ]
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            -0.9,
+                            0.0
+                        ]
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            1.0,
+                            0.0
+                        ]
+                    }
+                }
+            ],
+            "__from_loop": false
+        },
+        {
+            "type": "emptyAvatar",
+            "dimension": 2,
+            "center": [
+                5.0,
+                0.0
+            ],
+            "material": "TDURx",
+            "model": "rigid",
+            "color": "BLUEx",
+            "contactors": [
+                {
+                    "shape": "JONCx",
+                    "color": "WALLx",
+                    "params": {
+                        "axe1": 3.0,
+                        "axe2": 0.1
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            -3.0,
+                            0.0
+                        ]
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            3.0,
+                            0.0
+                        ]
+                    }
+                }
+            ],
+            "__from_loop": false
+        },
+        {
+            "type": "emptyAvatar",
+            "dimension": 2,
+            "center": [
+                8.0,
+                0.0
+            ],
+            "material": "TDURx",
+            "model": "rigid",
+            "color": "BLUEx",
+            "contactors": [
+                {
+                    "shape": "POLYG",
+                    "color": "REDxx",
+                    "params": {
+                        "nb_vertices": 4,
+                        "vertices": [
+                            [
+                                -1.0,
+                                -0.5
+                            ],
+                            [
+                                1.0,
+                                -0.5
+                            ],
+                            [
+                                1.0,
+                                0.5
+                            ],
+                            [
+                                -1.0,
+                                0.5
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "shape": "PT2Dx",
+                    "color": "VERTx",
+                    "params": {
+                        "shift": [
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
+            ],
+            "__from_loop": false
+        },
+        {
+            "type": "rigidJonc",
+            "center": [
+                8.0,
+                0.61
+            ],
+            "material": "TDURx",
+            "model": "rigid",
+            "color": "REDxx",
+            "axe1": "5",
+            "axe2": "0.1",
+            "__from_loop": false
+        },
+        {
+            "type": "rigidJonc",
+            "center": [
+                8.0,
+                -0.61
+            ],
+            "material": "TDURx",
+            "model": "rigid",
+            "color": "REDxx",
+            "axe1": "5",
+            "axe2": "0.1",
+            "__from_loop": false
+        }
+    ],
+    "contact_laws": [
+        {
+            "name": "iqsc0",
+            "law": "IQS_CLB",
+            "fric": 0.3
+        },
+        {
+            "name": "iqsc1",
+            "law": "COUPLED_DOF"
+        }
+    ],
+    "visibility_rules": [
+        {
+            "CorpsCandidat": "RBDY2",
+            "candidat": "POLYG",
+            "colorCandidat": "REDxx",
+            "CorpsAntagoniste": "RBDY2",
+            "antagoniste": "JONCx",
+            "colorAntagoniste": "REDxx",
+            "behav": "iqsc0",
+            "alert": 0.05
+        },
+        {
+            "CorpsCandidat": "RBDY2",
+            "candidat": "PT2Dx",
+            "colorCandidat": "VERTx",
+            "CorpsAntagoniste": "RBDY2",
+            "antagoniste": "PT2Dx",
+            "colorAntagoniste": "VERTx",
+            "behav": "iqsc1",
+            "alert": 0.05
+        }
+    ],
+    "operations": [
+        {
+            "target": "avatar",
+            "body_index": 0,
+            "type": "imposeDrivenDof",
+            "params": {
+                "component": [
+                    1,
+                    2
+                ],
+                "dofty": "vlocy"
+            }
+        },
+        {
+            "target": "avatar",
+            "body_index": 0,
+            "type": "imposeDrivenDof",
+            "params": {
+                "component": [
+                    3
+                ],
+                "dofty": "vlocy",
+                "ct": 1,
+                "rampi": 1
+            }
+        },
+        {
+            "target": "avatar",
+            "body_index": 4,
+            "type": "imposeDrivenDof",
+            "params": {
+                "component": [
+                    1,
+                    2,
+                    3
+                ],
+                "dofty": "vlocy"
+            }
+        },
+        {
+            "target": "avatar",
+            "body_index": 5,
+            "type": "imposeDrivenDof",
+            "params": {
+                "component": [
+                    1,
+                    2,
+                    3
+                ],
+                "dofty": "vlocy"
+            }
+        }
+    ],
+    "loops": [],
+    "avatar_groups": {},
+    "group_names": []
+}

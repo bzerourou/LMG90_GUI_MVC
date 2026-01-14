@@ -18,6 +18,7 @@ class PostProTab(QWidget):
     """Onglet post-traitement"""
     
     command_added = pyqtSignal()
+    command_deleted = pyqtSignal()
     
     # Commandes disponibles
     COMMANDS = [
@@ -62,9 +63,9 @@ class PostProTab(QWidget):
         layout.addWidget(form_group)
         
         # Bouton ajouter
-        add_btn = QPushButton("Ajouter la Commande")
-        add_btn.clicked.connect(self._on_add)
-        layout.addWidget(add_btn)
+        self.add_btn = QPushButton("Ajouter la Commande")
+        self.add_btn.clicked.connect(self._on_add)
+        layout.addWidget(self.add_btn)
         
         # Liste des commandes
         layout.addWidget(QLabel("<b>Commandes actives :</b>"))
@@ -76,9 +77,9 @@ class PostProTab(QWidget):
         layout.addWidget(self.tree)
         
         # Bouton supprimer
-        del_btn = QPushButton("Supprimer la commande sélectionnée")
-        del_btn.clicked.connect(self._on_delete)
-        layout.addWidget(del_btn)
+        self.del_btn = QPushButton("Supprimer la commande sélectionnée")
+        self.del_btn.clicked.connect(self._on_delete)
+        layout.addWidget(self.del_btn)
         
         self.setLayout(layout)
     
@@ -136,6 +137,19 @@ class PostProTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Ajout échoué :\n{e}")
     
+    def load_for_edit(self, postpro  : PostProCommand):
+        """Charge une commande pour édition"""
+        self.name_combo.setCurrentText(postpro.name)
+        self.step_input.setText(str(postpro.step))
+        
+        if postpro.target_type and postpro.target_value is not None:
+            # Trouver l'index dans le combo
+            for i in range(self.target_combo.count()):
+                data = self.target_combo.itemData(i)
+                if data == (postpro.target_type, postpro.target_value):
+                    self.target_combo.setCurrentIndex(i)
+                    break
+
     def _on_delete(self):
         """Supprime la commande sélectionnée"""
         selected = self.tree.selectedItems()
@@ -154,7 +168,7 @@ class PostProTab(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.controller.remove_postpro_command(index)
             self._refresh_tree()
-    
+            self.command_deleted.emit()
     def _refresh_tree(self):
         """Rafraîchit l'arbre des commandes"""
         self.tree.clear()

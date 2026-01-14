@@ -101,7 +101,7 @@ class ModelTab(QWidget):
         
         self.name_input = QLineEdit()
         self.name_input.setMaxLength(5)
-        self.name_input.setPlaceholderText("Ex: rigid")
+        self.name_input.setText("rigid")
         form.addRow("Nom (max 5 car.) :", self.name_input)
         
         self.physics_combo = QComboBox()
@@ -192,6 +192,7 @@ class ModelTab(QWidget):
     
     def _on_element_changed(self, element):
         """Quand l'élément change"""
+        self.name_input.setText("rigid")
         for i in reversed(range(self.options_layout.count())):
             item = self.options_layout.takeAt(i)
             if item.widget():
@@ -217,6 +218,7 @@ class ModelTab(QWidget):
             combo.addItems(self.OPTION_VALUES[opt_name])
             self.options_layout.addRow(f"{opt_name} :", combo)
             self.option_combos[opt_name] = combo
+    
     
     def _show_context_menu(self, position):
         """Menu contextuel"""
@@ -254,7 +256,7 @@ class ModelTab(QWidget):
             self.model_created.emit()
             self.refresh()
             QMessageBox.information(self, "Succès", f"✅ Modèle '{model.name}' créé")
-            self._clear_form()
+            #self._clear_form()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))

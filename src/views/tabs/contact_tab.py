@@ -187,6 +187,11 @@ class ContactTab(QWidget):
 
     def _on_create(self):
         try:
+            name = self.name_input.text().strip()
+            if not name:
+                raise ValidationError("Le nom de la loi ne peut pas être vide")
+            if len(name) > 5:
+                raise ValidationError("Le nom doit faire maximum 5 caractères")
             friction = None
             if self.friction_input.isVisible():
                 friction = float(self.friction_input.text())
@@ -194,7 +199,7 @@ class ContactTab(QWidget):
                     raise ValueError("Le coefficient de friction doit être positif")
 
             law = ContactLaw(
-                name=self.name_input.text().strip(),
+                name=name,
                 law_type=ContactLawType(self.type_combo.currentText()),
                 friction=friction,
                 properties=self._parse_properties(self.props_input.text())

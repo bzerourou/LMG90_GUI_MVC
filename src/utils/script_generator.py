@@ -44,7 +44,7 @@ class ScriptGenerator:
         f.write(f'"""\n')
         f.write(f'Script LMGC90 généré automatiquement\n')
         f.write(f'Projet : {self.state.name}\n')
-        f.write(f'Généré par LMGC90_GUI v0.2.5\n')
+        f.write(f'Généré par LMGC90_GUI v0.3.0\n')
         f.write(f'"""\n\n')
     
     def _write_imports(self, f):

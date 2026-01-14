@@ -14,6 +14,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
 
 from ...core.models import Loop, AvatarOrigin
+from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 
 
@@ -215,6 +216,28 @@ class LoopTab(QWidget):
 
     def _on_create(self):
         try:
+            
+            count = int(self.count_input.text())
+            if count <= 0:
+                raise ValidationError("Le nombre d'avatars doit être > 0")
+            
+            if count > 10000:
+                raise ValidationError("Maximum 10000 avatars par boucle")
+            
+            model_idx = self.avatar_combo.currentData()
+            if model_idx is None:
+                raise ValidationError("Sélectionnez un avatar modèle")
+            
+            if self.radius_input.isVisible():
+                radius = float(self.radius_input.text())
+                if radius <= 0:
+                    raise ValidationError("Le rayon doit être > 0")
+            
+            if self.step_input.isVisible():
+                step = float(self.step_input.text())
+                if step <= 0:
+                    raise ValidationError("Le pas doit être > 0")
+            
             loop = Loop(
                 loop_type=self.type_combo.currentText(),
                 model_avatar_index=self.avatar_combo.currentData(),
@@ -234,7 +257,7 @@ class LoopTab(QWidget):
                 self, "Succès",
                 f"{len(indices)} avatars générés avec succès.\nGroupe : {loop.group_name or 'Aucun'}"
             )
-            self._clear_form()
+            #self._clear_form()
             self.refresh()
 
         except ValueError as e:
