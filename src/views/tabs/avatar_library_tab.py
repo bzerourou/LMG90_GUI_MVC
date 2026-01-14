@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...core.avatar_factory import AvatarFactory, AvatarTemplate
 from ...core.models import Avatar, AvatarOrigin
+from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 
 
@@ -270,18 +271,26 @@ class AvatarLibraryTab(QWidget):
 
     def _on_create(self):
         """Crée l'avatar depuis le template"""
-        if not self.current_template:
-            QMessageBox.warning(self, "Sélection", "Sélectionnez un template")
-            return
-        
+
         try:
+            if not self.current_template:
+                raise ValidationError("Sélectionnez un template dans la bibliothèque")
             # Parser le centre
             center = [float(x.strip()) for x in self.center_input.text().split(',')]
-            
+            if not center : 
+                raise ValidationError("Le centre est requis")
+            dim = self.controller.state.dimension
+            if len(center) != dim:
+                raise ValidationError(f"Le centre doit avoir {dim} coordonnées")
+            material = self.material_combo.text().strip()
+            if not material :
+                raise ValidationError("Le matériau est requis")
+            model  = self.model_combo.text().strip()
+            if not model:
+                raise ValidationError("Le modèle est requis")
             # Récupérer les paramètres personnalisés
             custom_params = {}
             
-            # ✅ CORRECTION ICI
             for i in range(self.params_form.count()):
                 item = self.params_form.itemAt(i)
                 if item is None:
@@ -306,8 +315,8 @@ class AvatarLibraryTab(QWidget):
             # Créer l'avatar
             avatar = self.current_template.create(
                 center=center,
-                material=self.material_combo.text().strip(),
-                model=self.model_combo.text().strip(),
+                material=material,
+                model=model,
                 color=self.color_input.text().strip(),
                 **custom_params
             )
@@ -318,6 +327,8 @@ class AvatarLibraryTab(QWidget):
             
             QMessageBox.information(self, "Succès", f"✅ Avatar créé depuis '{self.current_template.name}'")
             
+        except ValidationError as e:  
+            QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             import traceback
             QMessageBox.critical(self, "Erreur", f"Création échouée:\n{e}\n\n{traceback.format_exc()}")
