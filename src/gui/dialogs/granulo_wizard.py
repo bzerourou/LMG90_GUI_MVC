@@ -1,4 +1,4 @@
-# Créer granulo_wizard.py dans gui/dialogs/:
+
 
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QFormLayout, QLineEdit,
@@ -42,7 +42,7 @@ class GranuloWizard(QWizard):
         self.addPage(GranuloModelPage())
         self.addPage(DistributionPage())
         self.addPage(ContainerPage())
-        self.addPage(PreviewPage())
+        #self.addPage(PreviewPage())
         self.addPage(GranuloSummaryPage())
         
         self.setButtonText(QWizard.WizardButton.NextButton, "Suivant ➡️")
@@ -230,7 +230,7 @@ class GranuloMaterialPage(QWizardPage):
         self.new_material_group = QGroupBox("Nouveau matériau")
         new_form = QFormLayout()
         
-        self.mat_name_input = QLineEdit("GRAN")
+        self.mat_name_input = QLineEdit("TDURx")
         self.mat_name_input.setMaxLength(5)
         new_form.addRow("Nom :", self.mat_name_input)
         

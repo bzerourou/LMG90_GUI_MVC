@@ -99,6 +99,13 @@ class MainWindow(QMainWindow):
         wizard_action.triggered.connect(self._on_project_wizard)
         file_menu.addAction(wizard_action)
         
+
+        wizard_action = QAction("🧙 Assistant de granulométrie...", self)
+        wizard_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        wizard_action.triggered.connect(self._on_granulo_wizard)
+        file_menu.addAction(wizard_action)
+
+
         file_menu.addSeparator()
         
         quit_action = QAction("Quitter", self)
@@ -184,10 +191,9 @@ class MainWindow(QMainWindow):
         dock.setMinimumWidth(400)
         #connect le signal
         self.tree_view.item_selected.connect(self._on_tree_item_selected)
-        print("🟢 Signal tree_view.item_selected connecté")
+
     def  _on_tree_item_selected(self, item_type: str, item_data):
         """Quand un élément est sélectionné dans l'arbre"""
-        print(f"🟢 Signal reçu dans MainWindow: {item_type}, {item_data}")
         if item_type == "material":
             # Charger le matériau et switcher vers l'onglet
             material = self.controller.get_material(item_data)
@@ -325,39 +331,6 @@ class MainWindow(QMainWindow):
         
         viz_group.setLayout(viz_layout)
         layout.addWidget(viz_group)
-        """
-        # Groupe génération
-        gen_group = QGroupBox("⚙️ Génération")
-        gen_layout = QHBoxLayout()
-        
-        # Bouton Générer Script Python
-        script_btn = QPushButton("🐍 Générer Script Python")
-        script_btn.setToolTip("Génère un script Python reproductible")
-        script_btn.setMinimumHeight(40)
-        script_btn.clicked.connect(self._on_generate_script)
-        gen_layout.addWidget(script_btn)
-        
-        # Bouton Générer DATBOX (déplacé ici)
-        datbox_btn = QPushButton("📦 Générer DATBOX")
-        datbox_btn.setToolTip("Génère le fichier DATBOX pour LMGC90")
-        datbox_btn.setMinimumHeight(40)
-        datbox_btn.clicked.connect(self._on_generate_datbox)
-        gen_layout.addWidget(datbox_btn)
-        
-        gen_group.setLayout(gen_layout)
-        layout.addWidget(gen_group)
-        
-        # Informations
-        info = QLabel(
-            "<i>💡 LMGC90 : Affiche les avatars créés<br>"
-            "💡 ParaView : Résultats après simulation<br>"
-            "💡 Script Python : Génère un fichier .py reproductible<br>"
-            "💡 DATBOX : Génère le fichier d'entrée pour le solveur</i>"
-        )
-        info.setWordWrap(True)
-        info.setStyleSheet("color: #666; padding: 5px; font-size: 10px;")
-        layout.addWidget(info)
-        """
         self.render_widget.setLayout(layout)
         self.render_widget.setMinimumHeight(150)
     
@@ -408,9 +381,6 @@ class MainWindow(QMainWindow):
         self.avatar_tab.avatar_deleted.connect(self.viewer_tab.refresh)
         self.loop_tab.loop_generated.connect(self.viewer_tab.refresh)
         self.granulo_tab.granulo_generated.connect(self.viewer_tab.refresh)
-
-        
-        #self.model_tab.dimension_changed.connect( self.granulo_tab._update_avatar_types)
         
         # ========== SLOTS MENU ==========
     
@@ -835,7 +805,16 @@ class MainWindow(QMainWindow):
         if wizard.exec():
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
-    
+
+    def _on_granulo_wizard(self) : 
+        """Lance l'assistant granulométrique"""
+        from ..gui.dialogs.granulo_wizard import GranuloWizard
+        
+        wizard = GranuloWizard(self.controller, self)
+        if wizard.exec():
+            self._refresh_all()
+            self.statusBar().showMessage("✅ Distribution granulométrique générée", 5000)
+        
     
     # ========== VISUALISATION ET GÉNÉRATION ==========
     

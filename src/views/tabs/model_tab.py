@@ -55,7 +55,7 @@ class ModelTab(QWidget):
     
     def _setup_ui(self):
         """Configure l'interface"""
-        # ✅ AJOUTER UN SCROLL AREA PRINCIPAL
+        #Ajouter un scroll
         main_layout = QVBoxLayout()
         
         scroll = QScrollArea()
@@ -150,7 +150,7 @@ class ModelTab(QWidget):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
         
-        # ✅ FIN DU LAYOUT SCROLLABLE
+        # fin du scroll
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
         

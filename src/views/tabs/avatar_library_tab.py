@@ -99,6 +99,7 @@ class AvatarLibraryTab(QWidget):
         layout.addLayout(right_panel, 1)
         
         self.setLayout(layout)
+        self.refresh()
     
   
 
@@ -324,7 +325,8 @@ class AvatarLibraryTab(QWidget):
             # Ajouter au projet
             self.controller.add_avatar(avatar)
             self.avatar_created.emit()
-            
+            self.refresh()
+
             QMessageBox.information(self, "Succès", f"✅ Avatar créé depuis '{self.current_template.name}'")
             
         except ValidationError as e:  
@@ -477,6 +479,7 @@ class AvatarLibraryTab(QWidget):
             'default_params': template.default_params,
             'param_schema': template.param_schema
         }
+        self.refresh()
 
     def _on_delete_template(self):
         """Supprime un template personnalisé"""

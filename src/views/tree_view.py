@@ -30,15 +30,10 @@ class ModelTreeView(QObject):
     
     def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """Quand un item est cliqué """
-        print(f"🔵Item cliqué:", {item.text(0)})
         item_type = item.data(0, Qt.ItemDataRole.UserRole)
         item_data = item.data(1, Qt.ItemDataRole.UserRole)
-        print(f"🔵Type:", {item_type}, "Data:", {item_data})
         if item_type and item_data is not None:
-            print(f"🟢 Émission du signal: {item_type}, {item_data}")
             self.item_selected.emit(item_type, item_data)
-        else : 
-             print(f"🔴 Pas de données stockées dans cet item")
 
     def _add_materials_node(self, parent: QTreeWidgetItem):
         """Ajoute le nœud Matériaux"""

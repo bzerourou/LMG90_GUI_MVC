@@ -13,16 +13,16 @@ class ComputeWorker(QThread):
     progress = Signal(str)
     finished = Signal(bool, str)
     
-    def __init__(self, script_path, work_dir):  # ✅ Ajouter work_dir
+    def __init__(self, script_path, work_dir):  
         super().__init__()
         self.script_path = script_path
-        self.work_dir = work_dir  # ✅ Stocker
+        self.work_dir = work_dir  #Stocker
     
     def run(self):
         try:
             process = subprocess.Popen(
                 [sys.executable, str(self.script_path)],
-                cwd=str(self.work_dir),  # ✅ Définir le répertoire de travail
+                cwd=str(self.work_dir),  # Définir le répertoire de travail
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

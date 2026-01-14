@@ -1,7 +1,6 @@
 
 """
-Factory pour créer des avatars prédéfinis (comme EDEM).
-Bibliothèque de géométries courantes et complexes.
+Factory pour créer des avatars prédéfinis .
 """
 from typing import List, Dict, Any, Optional
 from .models import Avatar, AvatarType, AvatarOrigin

@@ -1,4 +1,4 @@
-# Créer setup_wizard.py dans gui/dialogs/:
+
 
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QFormLayout, QLineEdit,
