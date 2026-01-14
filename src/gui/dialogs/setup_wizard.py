@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from ...core.models import Material, Model, Avatar, MaterialType, AvatarType
+from ...core.models import Material, Model, Avatar, MaterialType, AvatarType, ContactLaw, ContactLawType, VisibilityRule
 from ...controllers.project_controller import ProjectController
 
 
@@ -17,11 +17,13 @@ class ProjectSetupWizard(QWizard):
     # IDs des pages
     PAGE_INTRO = 0
     PAGE_PROJECT = 1
+    PAGE_DIMENSION = 2
     PAGE_MATERIAL = 3
     PAGE_MODEL = 4
-    PAGE_DIMENSION = 2
     PAGE_AVATAR = 5
-    PAGE_SUMMARY = 6
+    PAGE_CONTACT = 6
+    PAGE_VISIBILITY = 7
+    PAGE_SUMMARY = 8
     
     def __init__(self, controller: ProjectController, parent=None):
         super().__init__(parent)
@@ -39,6 +41,8 @@ class ProjectSetupWizard(QWizard):
         self.addPage(MaterialPage())
         self.addPage(ModelPage())
         self.addPage(AvatarPage())
+        self.addPage(ContactPage())
+        self.addPage(VisibilityPage())
         self.addPage(SummaryPage())
         
         # Personnalisation des boutons
@@ -76,6 +80,7 @@ class ProjectSetupWizard(QWizard):
         
         # Page Matériau
         mat_page = self.page(self.PAGE_MATERIAL)
+        mat_name = None
         if mat_page.create_material_check.isChecked():
             material = Material(
                 name=mat_page.mat_name_input.text().strip(),
@@ -83,9 +88,11 @@ class ProjectSetupWizard(QWizard):
                 density=mat_page.density_spin.value()
             )
             self.controller.add_material(material)
+            mat_name = material.name
         
         # Page Modèle
         mod_page = self.page(self.PAGE_MODEL)
+        mod_name = None
         if mod_page.create_model_check.isChecked():
             model = Model(
                 name=mod_page.mod_name_input.text().strip(),
@@ -94,24 +101,65 @@ class ProjectSetupWizard(QWizard):
                 dimension=dimension
             )
             self.controller.add_model(model)
+            mod_name = model.name
         
         # Page Avatar
         avatar_page = self.page(self.PAGE_AVATAR)
+        avatar_created = False
         radius = float(avatar_page.radius_spin.value() or "0.25")
-        if avatar_page.create_avatar_check.isChecked():
+        if avatar_page.create_avatar_check.isChecked() and mat_name and mod_name :
             center = [0.0, 0.0] if dimension == 2 else [0.0, 0.0, 0.0]
-            print(avatar_page.radius_spin.value())
             avatar = Avatar(
                 avatar_type=AvatarType(avatar_page.avatar_type_combo.currentText()),
                 center=center,
-                material_name=mat_page.mat_name_input.text().strip(),
-                model_name=mod_page.mod_name_input.text().strip(),
+                material_name=mat_name,
+                model_name=mod_name,
                 radius=radius
             )
 
             
             self.controller.add_avatar(avatar)
-
+            avatar_created = True
+        # Page Contact
+        contact_page = self.page(self.PAGE_CONTACT)
+        law_name = None
+        if contact_page.create_law_check.isChecked():
+            friction = None
+            law_type = ContactLawType(contact_page.law_type_combo.currentText())
+            
+            if law_type in [ContactLawType.IQS_CLB, ContactLawType.IQS_CLB_G0]:
+                friction = contact_page.friction_spin.value()
+            
+            law = ContactLaw(
+                name=contact_page.law_name_input.text().strip(),
+                law_type=law_type,
+                friction=friction
+            )
+            self.controller.add_contact_law(law)
+            law_name = law.name
+        
+        # Page Visibilité
+        vis_page = self.page(self.PAGE_VISIBILITY)
+        if vis_page.create_visibility_check.isChecked() and law_name and avatar_created:
+            # Déterminer les types de corps et contacteurs selon dimension
+            if dimension == 2:
+                body_type = "RBDY2"
+                contactor = "DISKx"
+            else:
+                body_type = "RBDY3"
+                contactor = "SPHER"
+            
+            rule = VisibilityRule(
+                candidate_body=body_type,
+                candidate_contactor=contactor,
+                candidate_color=vis_page.candidate_color_input.text().strip(),
+                antagonist_body=body_type,
+                antagonist_contactor=contactor,
+                antagonist_color=vis_page.antagonist_color_input.text().strip(),
+                behavior_name=law_name,
+                alert=vis_page.alert_spin.value()
+            )
+            self.controller.add_visibility_rule(rule)
 
 class IntroPage(QWizardPage):
     """Page d'introduction"""
@@ -131,8 +179,11 @@ class IntroPage(QWizardPage):
             "<li>✅ Créer un matériau de base</li>"
             "<li>✅ Créer un modèle physique</li>"
             "<li>✅ Optionnellement créer un premier avatar</li>"
+            "<li>✅ Loi de contact</li>"
+            "<li>✅ Table de visibilité</li>"
             "</ul>"
             "<p><b>💡 Astuce :</b> Vous pourrez toujours modifier ces éléments après.</p>"
+            "<p><i>⏱️ Temps estimé : 2-3 minutes</i></p>"
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -350,6 +401,10 @@ class AvatarPage(QWizardPage):
         self.radius_spin.setValue(0.1)
         self.radius_spin.setSuffix(" m")
         form.addRow("Rayon :", self.radius_spin)
+
+        
+        self.color_input = QLineEdit("BLUEx")
+        form.addRow("Coleur : ", self.color_input)
         
         self.form_widget.setLayout(form)
         self.form_widget.setEnabled(False)
@@ -374,6 +429,131 @@ class AvatarPage(QWizardPage):
         else:
             self.avatar_type_combo.addItems(["rigidSphere"])
 
+class ContactPage(QWizardPage):
+    """Page de création de loi de contact"""
+    
+    def __init__(self):
+        super().__init__()
+        self.setTitle("⚡ Loi de Contact")
+        self.setSubTitle("Définissez comment les particules interagissent.")
+        
+        layout = QVBoxLayout()
+        
+        self.create_law_check = QCheckBox("Créer une loi de contact")
+        self.create_law_check.setChecked(True)
+        self.create_law_check.toggled.connect(self._toggle_form)
+        layout.addWidget(self.create_law_check)
+        
+        self.form_widget = QGroupBox("Paramètres de la loi")
+        form = QFormLayout()
+        
+        self.law_name_input = QLineEdit("iqsc0")
+        self.law_name_input.setMaxLength(20)
+        form.addRow("Nom :", self.law_name_input)
+        
+        self.law_type_combo = QComboBox()
+        self.law_type_combo.addItems([lt.value for lt in ContactLawType])
+        self.law_type_combo.setCurrentText("IQS_CLB")
+        self.law_type_combo.currentTextChanged.connect(self._on_law_type_changed)
+        form.addRow("Type de loi :", self.law_type_combo)
+        
+        self.friction_label = QLabel("Coefficient de friction :")
+        self.friction_spin = QDoubleSpinBox()
+        self.friction_spin.setRange(0.0, 10.0)
+        self.friction_spin.setValue(0.3)
+        self.friction_spin.setSingleStep(0.1)
+        form.addRow(self.friction_label, self.friction_spin)
+        
+        self.form_widget.setLayout(form)
+        layout.addWidget(self.form_widget)
+        
+        info = QLabel(
+            "💡 <b>IQS_CLB</b> : Loi de contact avec friction de Coulomb<br>"
+            "<b>Friction typique :</b> 0.3 (sable), 0.5 (gravier), 0.1 (surfaces lisses)"
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #0066cc; padding: 10px; background-color: #e6f2ff; border-radius: 5px;")
+        layout.addWidget(info)
+        
+        layout.addStretch()
+        self.setLayout(layout)
+    
+    def _toggle_form(self, checked):
+        self.form_widget.setEnabled(checked)
+    
+    def _on_law_type_changed(self, law_type):
+        """Afficher/masquer friction selon le type"""
+        needs_friction = law_type in ["IQS_CLB", "IQS_CLB_G0"]
+        self.friction_label.setVisible(needs_friction)
+        self.friction_spin.setVisible(needs_friction)
+
+
+class VisibilityPage(QWizardPage):
+    """Page de création de table de visibilité"""
+    
+    def __init__(self):
+        super().__init__()
+        self.setTitle("👁️ Table de Visibilité")
+        self.setSubTitle("Définissez quels avatars peuvent interagir entre eux.")
+        
+        layout = QVBoxLayout()
+        
+        self.create_visibility_check = QCheckBox("Créer une table de visibilité")
+        self.create_visibility_check.setChecked(True)
+        self.create_visibility_check.toggled.connect(self._toggle_form)
+        layout.addWidget(self.create_visibility_check)
+        
+        info_top = QLabel(
+            "💡 La table de visibilité définit quels contacteurs peuvent se voir et avec quelle loi.<br>"
+            "Par défaut, tous les avatars de même couleur interagissent entre eux."
+        )
+        info_top.setWordWrap(True)
+        info_top.setStyleSheet("color: #666; padding: 10px; background-color: #f5f5f5; border-radius: 5px;")
+        layout.addWidget(info_top)
+        
+        self.form_widget = QGroupBox("Configuration de visibilité")
+        form = QFormLayout()
+        
+        self.candidate_color_input = QLineEdit("BLUEx")
+        form.addRow("Couleur candidat :", self.candidate_color_input)
+        
+        self.antagonist_color_input = QLineEdit("BLUEx")
+        form.addRow("Couleur antagoniste :", self.antagonist_color_input)
+        
+        self.alert_spin = QDoubleSpinBox()
+        self.alert_spin.setRange(0.001, 10.0)
+        self.alert_spin.setValue(0.1)
+        self.alert_spin.setSuffix(" m")
+        form.addRow("Distance d'alerte :", self.alert_spin)
+        
+        self.form_widget.setLayout(form)
+        layout.addWidget(self.form_widget)
+        
+        info_bottom = QLabel(
+            "<b>Configuration automatique :</b><br>"
+            "• Corps : RBDY2 (2D) ou RBDY3 (3D)<br>"
+            "• Contacteur : DISKx (2D) ou SPHER (3D)<br>"
+            "• Loi : celle créée à l'étape précédente"
+        )
+        info_bottom.setWordWrap(True)
+        info_bottom.setStyleSheet("color: #0066cc; padding: 10px; background-color: #e6f2ff; border-radius: 5px;")
+        layout.addWidget(info_bottom)
+        
+        layout.addStretch()
+        self.setLayout(layout)
+    
+    def _toggle_form(self, checked):
+        self.form_widget.setEnabled(checked)
+    
+    def initializePage(self):
+        """Synchroniser les couleurs avec l'avatar"""
+        wizard = self.wizard()
+        avatar_page = wizard.page(ProjectSetupWizard.PAGE_AVATAR)
+        
+        if avatar_page.create_avatar_check.isChecked():
+            color = avatar_page.color_input.text().strip()
+            self.candidate_color_input.setText(color)
+            self.antagonist_color_input.setText(color)
 
 class SummaryPage(QWizardPage):
     """Page récapitulative"""
@@ -400,6 +580,8 @@ class SummaryPage(QWizardPage):
         mat_page = wizard.page(ProjectSetupWizard.PAGE_MATERIAL)
         mod_page = wizard.page(ProjectSetupWizard.PAGE_MODEL)
         avatar_page = wizard.page(ProjectSetupWizard.PAGE_AVATAR)
+        contact_page = wizard.page(ProjectSetupWizard.PAGE_CONTACT)
+        vis_page = wizard.page(ProjectSetupWizard.PAGE_VISIBILITY)
         
         dimension = "2D" if dim_page.dim_2d_radio.isChecked() else "3D"
         
@@ -450,9 +632,46 @@ class SummaryPage(QWizardPage):
         else:
             summary += "<p><i>Aucun avatar créé</i></p>"
         
+        summary += "<h3>⚡ Loi de Contact</h3>"
+        
+        if contact_page.create_law_check.isChecked():
+            friction_text = ""
+            if contact_page.friction_spin.isVisible():
+                friction_text = f"<li><b>Friction :</b> {contact_page.friction_spin.value()}</li>"
+            
+            summary += f"""
+<ul>
+<li><b>Nom :</b> {contact_page.law_name_input.text()}</li>
+<li><b>Type :</b> {contact_page.law_type_combo.currentText()}</li>
+{friction_text}
+</ul>
+"""
+        else:
+            summary += "<p><i>Aucune loi créée</i></p>"
+        
+        summary += "<h3>👁️ Table de Visibilité</h3>"
+        
+        if vis_page.create_visibility_check.isChecked():
+            body_type = "RBDY2" if dimension == "2D" else "RBDY3"
+            contactor = "DISKx" if dimension == "2D" else "SPHER"
+            
+            summary += f"""
+<ul>
+<li><b>Candidat :</b> {body_type} / {contactor} / {vis_page.candidate_color_input.text()}</li>
+<li><b>Antagoniste :</b> {body_type} / {contactor} / {vis_page.antagonist_color_input.text()}</li>
+<li><b>Loi appliquée :</b> {contact_page.law_name_input.text() if contact_page.create_law_check.isChecked() else 'N/A'}</li>
+<li><b>Distance d'alerte :</b> {vis_page.alert_spin.value()} m</li>
+</ul>
+"""
+        else:
+            summary += "<p><i>Aucune table créée</i></p>"
+        
+        
         summary += """
 <hr>
-<p><b>✅ Cliquez sur 'Créer le Projet' pour finaliser.</b></p>
+<h3 style='color: green;'>✅ Projet Prêt !</h3>
+<p><b>Cliquez sur 'Créer le Projet' pour finaliser.</b></p>
+<p>Votre projet sera complet et prêt pour ajouter plus d'avatars ou lancer une simulation.</p>
 """
         
         self.summary_text.setHtml(summary)
