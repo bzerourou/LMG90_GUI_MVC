@@ -8,7 +8,6 @@ from enum import Enum
 from pathlib import Path
 
 
-
 # ============================================================================
 # EXCEPTIONS - Erreurs personnalisées
 # ============================================================================
@@ -403,6 +402,42 @@ class Loop:
             generated_indices=data.get('generated_avatar_indices', [])
         )
 
+@dataclass
+class ForLoop:
+    """Configuration d'une boucle for générique"""
+    loop_var: str
+    start_expr: str
+    end_expr: str
+    step_expr: str = "1"
+    target_type: str = "avatar"
+    template_config: dict = field(default_factory=dict)
+    group_name: str = None
+    generated_indices: list = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        return {
+            'loop_var': self.loop_var,
+            'start_expr': self.start_expr,
+            'end_expr': self.end_expr,
+            'step_expr': self.step_expr,
+            'target_type': self.target_type,
+            'template_config': self.template_config,
+            'group_name': self.group_name,
+            'generated_indices': self.generated_indices
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'ForLoop':
+        return cls(
+            loop_var=data['loop_var'],
+            start_expr=data['start_expr'],
+            end_expr=data['end_expr'],
+            step_expr=data.get('step_expr', '1'),
+            target_type=data['target_type'],
+            template_config=data.get('template_config', {}),
+            group_name=data.get('group_name'),
+            generated_indices=data.get('generated_indices', [])
+        )
 
 @dataclass
 class GranuloGeneration:
@@ -579,7 +614,6 @@ class ProjectState:
     
     def to_dict(self) -> Dict:
         """Convertit l'état complet en dictionnaire pour sauvegarde JSON"""
-        # Ne sauvegarder que les avatars manuels (pas ceux générés)
         manual_avatars = [a for a in self.avatars if a.origin == AvatarOrigin.MANUAL]
         
         return {
@@ -590,6 +624,7 @@ class ProjectState:
             'materials': [m.to_dict() for m in self.materials],
             'models': [m.to_dict() for m in self.models],
             'avatars': [a.to_dict() for a in manual_avatars],
+            'custom_templates': self.custom_templates,
             'contact_laws': [c.to_dict() for c in self.contact_laws],
             'visibility_rules': [v.to_dict() for v in self.visibility_rules],
             'operations': [o.to_dict() for o in self.operations],

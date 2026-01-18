@@ -2,14 +2,344 @@
 Générateur de scripts Python pour LMGC90.
 Permet de créer des scripts reproductibles depuis l'état du projet.
 """
-from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ..controllers.project_controller import ProjectController
+from pathlib import Path
+from typing import TextIO
+
+from ..controllers.project_controller import ProjectController
+from ..core.models import (
+    MaterialType, AvatarType, AvatarOrigin, ContactLawType
+)
 
 
 class ScriptGenerator:
+    """Génère un script Python reproductible du projet"""
+    
+    def __init__(self, controller: ProjectController):
+        self.controller = controller
+        self.state = controller.state
+    
+    def generate(self, output_path: Path) -> None:
+        """Génère le script complet"""
+        with open(output_path, 'w', encoding='utf-8') as f:
+            self._write_header(f)
+            self._write_imports(f)
+            self._write_containers(f)
+            self._write_materials(f)
+            self._write_models(f)
+            self._write_avatars_manual(f)
+            self._write_loops(f)
+            self._write_granulo(f)
+            self._write_contact_laws(f)
+            self._write_visibility(f)
+            self._write_dof_operations(f)
+            self._write_postpro(f)
+            self._write_datbox(f)
+    
+    def _write_header(self, f: TextIO):
+        f.write(f'"""\n')
+        f.write(f'Script généré automatiquement par LMGC90_GUI\n')
+        f.write(f'Projet: {self.state.name}\n')
+        f.write(f'Dimension: {self.state.dimension}D\n')
+        f.write(f'"""\n\n')
+    
+    def _write_imports(self, f: TextIO):
+        f.write('from pylmgc90 import pre\n')
+        f.write('import numpy as np\n')
+        f.write('import math\n\n')
+    
+    def _write_containers(self, f: TextIO):
+        f.write('# Conteneurs\n')
+        f.write('mats = pre.materials()\n')
+        f.write('mods = pre.models()\n')
+        f.write('bodies = pre.avatars()\n')
+        f.write('tacts = pre.tact_behavs()\n')
+        f.write('sees = pre.see_tables()\n')
+        f.write('post = pre.postpro_commands()\n\n')
+    
+    def _write_materials(self, f: TextIO):
+        if not self.state.materials:
+            return
+        
+        f.write('# Matériaux\n')
+        for mat in self.state.materials:
+            f.write(f"mat_{mat.name} = pre.material(\n")
+            f.write(f"    name='{mat.name}',\n")
+            f.write(f"    materialType='{mat.material_type.value}',\n")
+            f.write(f"    rho={mat.density}")
+            
+            if mat.properties:
+                for key, value in mat.properties.items():
+                    f.write(',\n    ')
+                    if isinstance(value, str):
+                        f.write(f"{key}='{value}'")
+                    else:
+                        f.write(f"{key}={value}")
+            
+            f.write('\n)\n')
+            f.write(f"mats.addMaterial(mat_{mat.name})\n\n")
+    
+    def _write_models(self, f: TextIO):
+        if not self.state.models:
+            return
+        
+        f.write('# Modèles\n')
+        for mod in self.state.models:
+            f.write(f"mod_{mod.name} = pre.model(\n")
+            f.write(f"    name='{mod.name}',\n")
+            f.write(f"    physics='{mod.physics}',\n")
+            f.write(f"    element='{mod.element}'")
+            
+            if mod.options:
+                for key, value in mod.options.items():
+                    f.write(',\n    ')
+                    if isinstance(value, str):
+                        f.write(f"{key}='{value}'")
+                    else:
+                        f.write(f"{key}={value}")
+            
+            f.write('\n)\n')
+            f.write(f"mods.addModel(mod_{mod.name})\n\n")
+    
+    def _write_avatars_manual(self, f: TextIO):
+        manual_avatars = [a for a in self.state.avatars if a.origin == AvatarOrigin.MANUAL]
+        if not manual_avatars:
+            return
+        
+        f.write('# Avatars manuels\n')
+        for i, av in enumerate(manual_avatars):
+            self._write_single_avatar(f, av, f"av_manual_{i}")
+        f.write('\n')
+    
+    def _write_single_avatar(self, f: TextIO, av, var_name: str):
+        avatar_type = av.avatar_type.value
+        
+        f.write(f"{var_name} = pre.{avatar_type}(\n")
+        f.write(f"    center={av.center},\n")
+        f.write(f"    material=mat_{av.material_name},\n")
+        f.write(f"    model=mod_{av.model_name},\n")
+        f.write(f"    color='{av.color}'")
+        
+        if av.radius is not None:
+            f.write(f",\n    r={av.radius}")
+        
+        if av.is_hollow:
+            f.write(f",\n    is_Hollow=True")
+        
+        if av.axis:
+            for key, val in av.axis.items():
+                f.write(f",\n    {key}={val}")
+        
+        if av.nb_vertices is not None:
+            f.write(f",\n    nb_vertices={av.nb_vertices}")
+        
+        if av.generation_type:
+            f.write(f",\n    gen_type='{av.generation_type}'")
+        
+        if av.vertices:
+            f.write(f",\n    vertices={av.vertices}")
+        
+        if av.wall_params:
+            for key, val in av.wall_params.items():
+                f.write(f",\n    {key}={val}")
+        
+        if av.contactors:
+            f.write(f",\n    contactors=[\n")
+            for cont in av.contactors:
+                f.write(f"        {cont},\n")
+            f.write(f"    ]")
+        
+        f.write('\n)\n')
+        f.write(f"bodies.addAvatar({var_name})\n\n")
+    
+    def _write_loops(self, f: TextIO):
+        if not self.state.loops:
+            return
+        
+        f.write('# Boucles\n')
+        for i, loop in enumerate(self.state.loops):
+            f.write(f"# Boucle {i+1}: {loop.loop_type}\n")
+            
+            model_avatar = self.state.avatars[loop.model_avatar_index]
+            
+            if loop.loop_type == "Cercle":
+                f.write(f"for angle_idx in range({loop.count}):\n")
+                f.write(f"    angle = 2 * math.pi * angle_idx / {loop.count}\n")
+                f.write(f"    x = {model_avatar.center[0]} + {loop.offset_x} + {loop.radius} * math.cos(angle)\n")
+                f.write(f"    y = {model_avatar.center[1]} + {loop.offset_y} + {loop.radius} * math.sin(angle)\n")
+                center_calc = "[x, y]" if self.state.dimension == 2 else "[x, y, 0]"
+            
+            elif loop.loop_type == "Grille":
+                n_side = int(loop.count ** 0.5)
+                f.write(f"n_side = {n_side}\n")
+                f.write(f"for i in range(n_side):\n")
+                f.write(f"    for j in range(n_side):\n")
+                f.write(f"        x = {model_avatar.center[0]} + {loop.offset_x} + i * {loop.step}\n")
+                f.write(f"        y = {model_avatar.center[1]} + {loop.offset_y} + j * {loop.step}\n")
+                center_calc = "[x, y]" if self.state.dimension == 2 else "[x, y, 0]"
+            
+            elif loop.loop_type == "Ligne":
+                axis = 1 if loop.invert_axis else 0
+                f.write(f"for idx in range({loop.count}):\n")
+                if axis == 0:
+                    f.write(f"    x = {model_avatar.center[0]} + {loop.offset_x} + idx * {loop.step}\n")
+                    f.write(f"    y = {model_avatar.center[1]} + {loop.offset_y}\n")
+                else:
+                    f.write(f"    x = {model_avatar.center[0]} + {loop.offset_x}\n")
+                    f.write(f"    y = {model_avatar.center[1]} + {loop.offset_y} + idx * {loop.step}\n")
+                center_calc = "[x, y]" if self.state.dimension == 2 else "[x, y, 0]"
+            
+            elif loop.loop_type == "Spirale":
+                f.write(f"for idx in range({loop.count}):\n")
+                f.write(f"    angle = 2 * math.pi * idx / 10\n")
+                f.write(f"    r = {loop.radius} + idx * {loop.spiral_factor}\n")
+                f.write(f"    x = {model_avatar.center[0]} + {loop.offset_x} + r * math.cos(angle)\n")
+                f.write(f"    y = {model_avatar.center[1]} + {loop.offset_y} + r * math.sin(angle)\n")
+                center_calc = "[x, y]" if self.state.dimension == 2 else "[x, y, 0]"
+            else:
+                continue
+            
+            indent = "    " if loop.loop_type == "Grille" else "    "
+            if loop.loop_type == "Grille":
+                indent = "        "
+            
+            f.write(f"{indent}center = {center_calc}\n")
+            f.write(f"{indent}av = pre.{model_avatar.avatar_type.value}(\n")
+            f.write(f"{indent}    center=center,\n")
+            f.write(f"{indent}    material=mat_{model_avatar.material_name},\n")
+            f.write(f"{indent}    model=mod_{model_avatar.model_name},\n")
+            f.write(f"{indent}    color='{model_avatar.color}'")
+            
+            if model_avatar.radius is not None:
+                f.write(f",\n{indent}    r={model_avatar.radius}")
+            
+            f.write(f"\n{indent})\n")
+            f.write(f"{indent}bodies.addAvatar(av)\n\n")
+    
+    def _write_granulo(self, f: TextIO):
+        if not self.state.granulo_generations:
+            return
+        
+        f.write('# Génération granulométrique\n')
+        for i, gen in enumerate(self.state.granulo_generations):
+            f.write(f"# Dépôt granulo {i+1}\n")
+            
+            container_params_str = ', '.join(f"{k}={v}" for k, v in gen.container_params.items())
+            
+            f.write(f"nb_particles_{i}, coords_{i}, radii_{i} = pre.{gen.container_type}(\n")
+            f.write(f"    nb={gen.nb_particles},\n")
+            f.write(f"    rmin={gen.radius_min},\n")
+            f.write(f"    rmax={gen.radius_max}")
+            if gen.seed:
+                f.write(f",\n    seed={gen.seed}")
+            if container_params_str:
+                f.write(f",\n    {container_params_str}")
+            f.write(f"\n)\n\n")
+            
+            f.write(f"for j in range(nb_particles_{i}):\n")
+            f.write(f"    av = pre.{gen.avatar_type}(\n")
+            f.write(f"        center=coords_{i}[j].tolist(),\n")
+            f.write(f"        material=mat_{gen.material_name},\n")
+            f.write(f"        model=mod_{gen.model_name},\n")
+            f.write(f"        color='{gen.color}',\n")
+            f.write(f"        r=float(radii_{i}[j])\n")
+            f.write(f"    )\n")
+            f.write(f"    bodies.addAvatar(av)\n\n")
+    
+    def _write_contact_laws(self, f: TextIO):
+        if not self.state.contact_laws:
+            return
+        
+        f.write('# Lois de contact\n')
+        for law in self.state.contact_laws:
+            f.write(f"law_{law.name} = pre.tact_behav(\n")
+            f.write(f"    name='{law.name}',\n")
+            f.write(f"    law='{law.law_type.value}'")
+            
+            if law.friction is not None:
+                f.write(f",\n    fric={law.friction}")
+            
+            if law.properties:
+                for key, value in law.properties.items():
+                    f.write(',\n    ')
+                    if isinstance(value, str):
+                        f.write(f"{key}='{value}'")
+                    else:
+                        f.write(f"{key}={value}")
+            
+            f.write('\n)\n')
+            f.write(f"tacts.addBehav(law_{law.name})\n\n")
+    
+    def _write_visibility(self, f: TextIO):
+        if not self.state.visibility_rules:
+            return
+        
+        f.write('# Tables de visibilité\n')
+        for i, rule in enumerate(self.state.visibility_rules):
+            f.write(f"see_{i} = pre.see_table(\n")
+            f.write(f"    CorpsCandidat='{rule.candidate_body}',\n")
+            f.write(f"    candidat='{rule.candidate_contactor}',\n")
+            f.write(f"    colorCandidat='{rule.candidate_color}',\n")
+            f.write(f"    CorpsAntagoniste='{rule.antagonist_body}',\n")
+            f.write(f"    antagoniste='{rule.antagonist_contactor}',\n")
+            f.write(f"    colorAntagoniste='{rule.antagonist_color}',\n")
+            f.write(f"    behav=law_{rule.behavior_name},\n")
+            f.write(f"    alert={rule.alert}\n")
+            f.write(f")\n")
+            f.write(f"sees.addSeeTable(see_{i})\n\n")
+    
+    def _write_dof_operations(self, f: TextIO):
+        if not self.state.operations:
+            return
+        
+        f.write('# Opérations DOF\n')
+        for i, op in enumerate(self.state.operations):
+            params_str = ', '.join(f"{k}={repr(v)}" for k, v in op.parameters.items())
+            
+            if op.target_type == 'avatar':
+                f.write(f"# DOF sur avatar #{op.target_value}\n")
+                f.write(f"# bodies.get({op.target_value}).{op.operation_type}({params_str})\n\n")
+            elif op.target_type == 'group':
+                f.write(f"# DOF sur groupe '{op.target_value}'\n")
+                f.write(f"# for av in group_{op.target_value}:\n")
+                f.write(f"#     av.{op.operation_type}({params_str})\n\n")
+    
+    def _write_postpro(self, f: TextIO):
+        if not self.state.postpro_commands:
+            return
+        
+        f.write('# Post-traitement\n')
+        for i, cmd in enumerate(self.state.postpro_commands):
+            if cmd.target_type and cmd.target_value is not None:
+                f.write(f"# Commande avec cible: {cmd.target_type} = {cmd.target_value}\n")
+                f.write(f"# rigid_set = [...]  # À définir selon la cible\n")
+                f.write(f"# post_cmd_{i} = pre.postpro_command(\n")
+                f.write(f"#     name='{cmd.name}',\n")
+                f.write(f"#     step={cmd.step},\n")
+                f.write(f"#     rigid_set=rigid_set\n")
+                f.write(f"# )\n")
+            else:
+                f.write(f"post = pre.postpro_commands()")
+                f.write(f"post_cmd_{i} = pre.postpro_command(\n")
+                f.write(f"    name='{cmd.name}',\n")
+                f.write(f"    step={cmd.step}\n")
+                f.write(f")\n")
+                f.write(f"post.addCommand(post_cmd_{i})\n")
+            f.write('\n')
+    
+    def _write_datbox(self, f: TextIO):
+        f.write('# Génération DATBOX\n')
+        f.write(f"pre.writeDatbox(\n")
+        f.write(f"    dim={self.state.dimension},\n")
+        f.write(f"    mats=mats,\n")
+        f.write(f"    mods=mods,\n")
+        f.write(f"    bodies=bodies,\n")
+        f.write(f"    tacts=tacts,\n")
+        f.write(f"    sees=sees,\n")
+        f.write(f"    post=post,\n")
+        f.write(f"    datbox_path='DATBOX'\n")
+        f.write(f")\n\n")
+        f.write(f"print('DATBOX généré avec succès!')\n")
     """Génère un script Python exécutable depuis l'état du projet"""
     
     def __init__(self, controller: 'ProjectController'):

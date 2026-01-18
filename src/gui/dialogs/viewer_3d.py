@@ -336,9 +336,9 @@ class Viewer3D(QWidget):
         """Réinitialise la caméra"""
         if dimension == 2:
             # Vue orthogonale 2D : plan XY de face, sans perspective
-            self.plotter.view_xy()                           
-            self.plotter.camera.parallel_projection = True   
-            self.plotter.camera.zoom(1.2)                    
+            self.plotter.view_xy()                           # raccourci PyVista = vue le long de Z
+            self.plotter.camera.parallel_projection = True   # ortho = pas d'effet perspective
+            self.plotter.camera.zoom(1.2)                    # un peu de marge
             self.plotter.reset_camera()
         else : 
             self.plotter.reset_camera()

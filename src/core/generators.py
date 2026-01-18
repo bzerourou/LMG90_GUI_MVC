@@ -96,6 +96,231 @@ class LoopGenerator:
         else:
             raise ValueError(f"Type de boucle inconnu: {loop.loop_type}")
 
+class ForLoopGenerator:
+    """Génère des éléments via boucle for avec expressions"""
+    @staticmethod
+    def generate_items(for_loop, controller, evaluator) -> List[Any]:
+        """Génère les items de la boucle for"""
+        items = []
+        
+        context = ForLoopGenerator._build_context(controller)
+        
+        start = int(evaluator.eval_expression(for_loop.start_expr, context))
+        end = int(evaluator.eval_expression(for_loop.end_expr, context))
+        step = int(evaluator.eval_expression(for_loop.step_expr, context))
+        
+        if step == 0:
+            raise ValueError("Le step ne peut pas être 0")
+        
+        range_values = range(start, end, step) if step > 0 else range(start, end, step)
+        for loop_value in range_values:
+            context[for_loop.loop_var] = loop_value
+            item = ForLoopGenerator._create_item(
+                for_loop.target_type,
+                for_loop.template_config,
+                context,
+                evaluator,
+                controller
+            )
+            items.append(item)
+        return items
+    
+    @staticmethod
+    def _build_context(controller) -> Dict[str, Any]:
+        """Construit le contexte d'évaluation"""
+        context = {
+            'math': math,
+            'np': np,
+            'sqrt': math.sqrt,
+            'pi': math.pi,
+            'e': math.e,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'len': len,
+        }
+        
+        if hasattr(controller.state, 'dynamic_vars'):
+            for var_name, var_expr in controller.state.dynamic_vars.items():
+                try:
+                    if isinstance(var_expr, str):
+                        context[var_name] = eval(var_expr, {"__builtins__": {}}, context)
+                    else:
+                        context[var_name] = var_expr
+                except:
+                    context[var_name] = var_expr
+        
+        return context
+    
+    @staticmethod
+    def _create_item(target_type: str, template: dict, context: dict, evaluator, controller) -> Any:
+        """Crée un item selon le type"""
+        
+        if target_type == "avatar":
+            return ForLoopGenerator._create_avatar(template, context, evaluator, controller)
+        elif target_type == "material":
+            return ForLoopGenerator._create_material(template, context, evaluator)
+        elif target_type == "model":
+            return ForLoopGenerator._create_model(template, context, evaluator)
+        elif target_type == "contact_law":
+            return ForLoopGenerator._create_contact_law(template, context, evaluator)
+        elif target_type == "visibility":
+            return ForLoopGenerator._create_visibility(template, context, evaluator)
+        elif target_type == "dof":
+            return ForLoopGenerator._create_dof(template, context, evaluator)
+        else:
+            raise ValueError(f"Type non supporté: {target_type}")
+    
+    @staticmethod
+    def _eval_field(field_value: str, context: dict, evaluator) -> Any:
+        """Évalue un champ avec le contexte"""
+        if not isinstance(field_value, str):
+            return field_value
+        
+        try:
+            return evaluator.eval_expression(field_value, context)
+        except:
+            return field_value
+    
+    @staticmethod
+    def _create_avatar(template: dict, context: dict, evaluator, controller) -> Any:
+        """Crée un avatar depuis le template"""
+        from ..core.models import Avatar, AvatarType, AvatarOrigin
+        
+        center_expr = template.get('center', '[0, 0]')
+        center = ForLoopGenerator._eval_field(center_expr, context, evaluator)
+        if isinstance(center, str):
+            center = eval(center, {"__builtins__": {}}, context)
+        if not isinstance(center, list):
+            center = list(center)
+        
+        avatar = Avatar(
+            avatar_type=AvatarType(template['avatar_type']),
+            center=center,
+            material_name=str(ForLoopGenerator._eval_field(template['material_name'], context, evaluator)),
+            model_name=str(ForLoopGenerator._eval_field(template['model_name'], context, evaluator)),
+            color=str(ForLoopGenerator._eval_field(template.get('color', 'BLUEx'), context, evaluator)),
+            origin=AvatarOrigin.LOOP
+        )
+        
+        if 'radius' in template:
+            avatar.radius = float(ForLoopGenerator._eval_field(template['radius'], context, evaluator))
+        
+        if 'axis' in template:
+            axis = {}
+            for k, v in template['axis'].items():
+                axis[k] = float(ForLoopGenerator._eval_field(v, context, evaluator))
+            avatar.axis = axis
+        
+        if 'nb_vertices' in template:
+            avatar.nb_vertices = int(ForLoopGenerator._eval_field(template['nb_vertices'], context, evaluator))
+        
+        if 'generation_type' in template:
+            avatar.generation_type = template['generation_type']
+        
+        if 'vertices' in template:
+            vertices_expr = template['vertices']
+            vertices = ForLoopGenerator._eval_field(vertices_expr, context, evaluator)
+            if isinstance(vertices, str):
+                vertices = eval(vertices, {"__builtins__": {}}, context)
+            avatar.vertices = vertices
+        
+        if 'wall_params' in template:
+            wall_params = {}
+            for k, v in template['wall_params'].items():
+                wall_params[k] = float(ForLoopGenerator._eval_field(v, context, evaluator))
+            avatar.wall_params = wall_params
+        
+        if 'contactors' in template:
+            avatar.contactors = template['contactors']
+        
+        if 'is_hollow' in template:
+            avatar.is_hollow = template['is_hollow']
+        
+        return avatar
+    
+    @staticmethod
+    def _create_material(template: dict, context: dict, evaluator) -> Any:
+        """Crée un matériau depuis le template"""
+        from ..core.models import Material, MaterialType
+        
+        name = str(ForLoopGenerator._eval_field(template['name'], context, evaluator))
+        density = float(ForLoopGenerator._eval_field(template['density'], context, evaluator))
+        
+        props = {}
+        if 'properties' in template:
+            for k, v in template['properties'].items():
+                props[k] = ForLoopGenerator._eval_field(v, context, evaluator)
+        
+        return Material(
+            name=name,
+            material_type=MaterialType(template['material_type']),
+            density=density,
+            properties=props
+        )
+    
+    @staticmethod
+    def _create_model(template: dict, context: dict, evaluator) -> Any:
+        """Crée un modèle depuis le template"""
+        from ..core.models import Model
+        
+        return Model(
+            name=str(ForLoopGenerator._eval_field(template['name'], context, evaluator)),
+            physics=template['physics'],
+            element=template['element'],
+            dimension=int(template['dimension']),
+            options=template.get('options', {})
+        )
+    
+    @staticmethod
+    def _create_contact_law(template: dict, context: dict, evaluator) -> Any:
+        """Crée une loi de contact depuis le template"""
+        from ..core.models import ContactLaw, ContactLawType
+        
+        friction = None
+        if 'friction' in template:
+            friction = float(ForLoopGenerator._eval_field(template['friction'], context, evaluator))
+        
+        return ContactLaw(
+            name=str(ForLoopGenerator._eval_field(template['name'], context, evaluator)),
+            law_type=ContactLawType(template['law_type']),
+            friction=friction,
+            properties=template.get('properties', {})
+        )
+    
+    @staticmethod
+    def _create_visibility(template: dict, context: dict, evaluator) -> Any:
+        """Crée une règle de visibilité depuis le template"""
+        from ..core.models import VisibilityRule
+        
+        return VisibilityRule(
+            candidate_body=template['candidate_body'],
+            candidate_contactor=template['candidate_contactor'],
+            candidate_color=str(ForLoopGenerator._eval_field(template['candidate_color'], context, evaluator)),
+            antagonist_body=template['antagonist_body'],
+            antagonist_contactor=template['antagonist_contactor'],
+            antagonist_color=str(ForLoopGenerator._eval_field(template['antagonist_color'], context, evaluator)),
+            behavior_name=template['behavior_name'],
+            alert=float(ForLoopGenerator._eval_field(template.get('alert', 0.1), context, evaluator))
+        )
+    
+    @staticmethod
+    def _create_dof(template: dict, context: dict, evaluator) -> Any:
+        """Crée une opération DOF depuis le template"""
+        from ..core.models import DOFOperation
+        
+        params = {}
+        if 'parameters' in template:
+            for k, v in template['parameters'].items():
+                params[k] = ForLoopGenerator._eval_field(v, context, evaluator)
+        
+        return DOFOperation(
+            operation_type=template['operation_type'],
+            target_type=template['target_type'],
+            target_value=ForLoopGenerator._eval_field(template['target_value'], context, evaluator),
+            parameters=params
+        )
 
 class GranuloGenerator:
     """Génère des distributions granulométriques"""
@@ -146,8 +371,8 @@ class GranuloGenerator:
             raise ValueError("Échec du dépôt. Réduisez le nombre de particules.")
         
         # Reshape coordinates
-        nb_remaining = np.shape(coor)[0] // 2
-        coor = np.reshape(coor, (nb_remaining, 2))
+        #nb_remaining = np.shape(coor)[0] // 2
+        coor.shape = [coor.size//2,2]
         
         # Tronquer les rayons au nombre effectif
         radii = radii[:nb_remaining]

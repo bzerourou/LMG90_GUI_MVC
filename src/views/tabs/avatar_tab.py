@@ -15,9 +15,12 @@ from PyQt6.QtGui import QBrush, QColor
 from ...core.models import Avatar, AvatarType, AvatarOrigin
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
+from ...views.tabs.base_tab import BaseTab
+from ...utils.safe_eval import SafeEvaluator
+from typing import Any, Dict 
 
 
-class AvatarTab(QWidget):
+class AvatarTab(BaseTab):
     """Onglet de gestion des avatars"""
     
     avatar_created = pyqtSignal()
@@ -36,7 +39,7 @@ class AvatarTab(QWidget):
     ]
     
     def __init__(self, controller: ProjectController):
-        super().__init__()
+        super().__init__(controller)
         self.controller = controller
         self.current_edit_index = None
         self._setup_ui()
@@ -82,7 +85,7 @@ class AvatarTab(QWidget):
         form.addRow("Type :", self.type_combo)
         
         self.center_label = QLabel("Centre (x,y) :")
-        self.center_input = QLineEdit("0.0, 0.0")
+        self.center_input = QLineEdit("center=[0.0, 0.0]")
         form.addRow(self.center_label, self.center_input)
         
         self.material_combo = QComboBox()
@@ -163,6 +166,7 @@ class AvatarTab(QWidget):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
         
+        self.add_expression_help_label(layout)
         layout.addStretch()
         self.setLayout(layout)
         
@@ -256,7 +260,9 @@ class AvatarTab(QWidget):
             self.radius_input.setVisible(True) 
         elif avatar_type == "rigidPlan":
             self.axes_label.setVisible(True)
+            self.axes_label.setText("Axes (axe1, axe,axe3) :")
             self.axes_input.setVisible(True)  
+            self.axes_input.setText("2.0, 2.0,0.05")
         elif avatar_type == "rigidCylinder":
             self.radius_label.setVisible(True)
             self.radius_input.setVisible(True)  
@@ -278,9 +284,12 @@ class AvatarTab(QWidget):
             self.wall_height_label.setVisible(True)
             self.wall_height_input.setVisible(True)
             self.wall_height_label.setText("Largeur :")
+            self.wall_height_input.setText("2.0")
+
             self.wall_nb_label.setVisible(True)
             self.wall_nb_input.setVisible(True)
-            self.wall_nb_label.setText(" Rayon (r) :")
+            self.wall_nb_label.setText("R (Rayon):")
+            self.wall_nb_input.setText("0.25")
         elif avatar_type == "granuloRoughWall3D":
             self.wall_length_label.setVisible(True)
             self.wall_length_input.setVisible(True)
@@ -288,10 +297,12 @@ class AvatarTab(QWidget):
             self.wall_height_label.setVisible(True)
             self.wall_height_input.setVisible(True)
             self.wall_height_label.setText("Largeur :")
+            self.wall_height_input.setText("2.0")
+            
             self.wall_nb_label.setVisible(True)
             self.wall_nb_input.setVisible(True)
             self.wall_nb_label.setText("Rmin et Rmax :")
-           
+            self.wall_nb_input.setText("0.10, 0.15")
         
     
     def _on_gen_type_changed(self, gen_type):
@@ -480,9 +491,14 @@ class AvatarTab(QWidget):
     
     def _build_avatar_from_form(self) -> Avatar:
         """Construit un avatar depuis le formulaire"""
-        center = [float(x.strip()) for x in self.center_input.text().split(',')]
+        #ce code est une cata
+        dim = self.controller.state.dimension
+        center = self.eval_list(
+            self.center_input.text(),
+            expected_length=dim,
+            field_name="Centre"
+        )
         avatar_type = AvatarType(self.type_combo.currentText())
-        
         avatar = Avatar(
             avatar_type=avatar_type,
             center=center,
@@ -491,78 +507,192 @@ class AvatarTab(QWidget):
             color=self.color_input.text().strip()
         )
         
-        if avatar_type in [AvatarType.RIGID_DISK, AvatarType.RIGID_DISCRETE, AvatarType.RIGID_CLUSTER]:
-            avatar.radius = float(self.radius_input.text())
+        if avatar_type in [AvatarType.RIGID_DISK, AvatarType.RIGID_DISCRETE, AvatarType.RIGID_CLUSTER] :
+            avatar.radius = self.eval_float(
+                self.radius_input.text(), 
+                default=0.1, 
+                field_name="Rayon"
+            )
             if avatar_type == AvatarType.RIGID_DISK:
                 avatar.is_hollow = self.hollow_check.isChecked()
             if avatar_type == AvatarType.RIGID_CLUSTER:
-                avatar.nb_vertices = int(self.nb_vertices_input.text())
+                avatar.nb_vertices = self.eval_int(
+                    self.nb_vertices_input.text(), 
+                    default=5, 
+                    field_name="Nb disques")
         
         elif avatar_type == AvatarType.RIGID_JONC:
-            axes = [float(x.strip()) for x in self.axes_input.text().split(',')]
+            axes = self.eval_list(
+                self.axes_input.text(), 
+                expected_length=2, 
+                field_name="Axes"
+            )
             avatar.axis = {'axe1': axes[0], 'axe2': axes[1]}
         
         elif avatar_type == AvatarType.RIGID_POLYGON:
-            avatar.radius = float(self.radius_input.text())
+            avatar.radius = float(self._eval_expression(self.radius_input.text()))
+            avatar.radius = self.eval_float(
+                self.radius_input.text(), 
+                default=0.1, 
+                field_name="Rayon"
+            )
             avatar.generation_type = self.gen_type_combo.currentText()
             if avatar.generation_type == "regular":
-                avatar.nb_vertices = int(self.nb_vertices_input.text())
+                avatar.nb_vertices = self.eval_int(
+                    self.nb_vertices_input.text(), 
+                    default=5, 
+                    field_name="Nb vertices"
+                )
             else:
+                #Évaluer vertices
                 import ast
-                avatar.vertices = ast.literal_eval(self.vertices_input.text())
+                vertices_text = self.vertices_input.text().strip()
+                try:
+                    avatar.vertices = ast.literal_eval(vertices_text)
+                except:
+                    raise ValueError(f"Format vertices invalide: {vertices_text}")
         
         elif avatar_type == AvatarType.RIGID_OVOID:
-            radii = [float(x.strip()) for x in self.ovoid_input.text().split(',')]
+            radii = self.eval_list(
+                self.ovoid_input.text(), 
+                expected_length=2, 
+                field_name="Rayons (ra, rb)"
+            )
             avatar.wall_params = {'ra': radii[0], 'rb': radii[1]}
-            avatar.nb_vertices = int(self.nb_vertices_input.text())
+            avatar.nb_vertices = self.eval_int(
+                self.nb_vertices_input.text(), 
+                default=10, 
+                field_name="Nb vertices"
+            )
         
         elif avatar_type in [AvatarType.ROUGH_WALL, AvatarType.FINE_WALL, 
                             AvatarType.SMOOTH_WALL, AvatarType.GRANULO_WALL]:
-            wall_params = {'l': float(self.wall_length_input.text())}
+            wall_params = {
+                'l': self.eval_float(
+                    self.wall_length_input.text(), 
+                    default=2.0, 
+                    field_name="Longueur"
+                )
+            }
             
             if avatar_type == AvatarType.GRANULO_WALL:
-                radii = [float(x.strip()) for x in self.wall_height_input.text().split(',')]
+                radii = self.eval_list(
+                    self.wall_height_input.text(), 
+                    expected_length=2, 
+                    field_name="Rayons (rmin, rmax)"
+                )
                 wall_params['rmin'] = radii[0]
                 wall_params['rmax'] = radii[1]
-                wall_params['nb_vertex'] = int(self.wall_nb_input.text())
+                wall_params['nb_vertex'] = self.eval_int(
+                    self.wall_nb_input.text(), 
+                    default=10, 
+                    field_name="Nb vertices"
+                )
             elif avatar_type == AvatarType.SMOOTH_WALL:
-                wall_params['h'] = float(self.wall_height_input.text())
-                wall_params['nb_polyg'] = int(self.wall_nb_input.text())
+                wall_params['h'] = self.eval_float(
+                    self.wall_height_input.text(), 
+                    default=0.15, 
+                    field_name="Hauteur"
+                )
+                wall_params['nb_polyg'] = self.eval_int(
+                    self.wall_nb_input.text(), 
+                    default=10, 
+                    field_name="Nb polygones"
+                )
             else:
-                wall_params['r'] = float(self.wall_height_input.text())
-                wall_params['nb_vertex'] = int(self.wall_nb_input.text())
-            
+                wall_params['r'] = self.eval_float(
+                    self.wall_height_input.text(), 
+                    default=0.15, 
+                    field_name="Rayon"
+                )
+                wall_params['nb_vertex'] = self.eval_int(
+                    self.wall_nb_input.text(), 
+                    default=10, 
+                    field_name="Nb vertices"
+                )
             avatar.wall_params = wall_params
+
         elif avatar_type == AvatarType.RIGID_SPHERE:
-            avatar.radius = float(self.radius_input.text())
+            avatar.radius = self.eval_float(
+                self.radius_input.text(), 
+                default=0.1, 
+                field_name="Rayon"
+            )
 
         elif avatar_type == AvatarType.RIGID_PLAN:
-            axes = [float(x.strip()) for x in self.axes_input.text().split(',')]
+            axes = self.eval_list(
+                self.axes_input.text(), 
+                expected_length=3, 
+                field_name="Axes (axe1, axe2, axe3)"
+            )
             avatar.axis = {'axe1': axes[0], 'axe2': axes[1], 'axe3': axes[2]}
-
+        
         elif avatar_type == AvatarType.RIGID_CYLINDER:
-            avatar.radius = float(self.radius_input.text())
-            avatar.wall_params = {'height': float(self.wall_height_input.text())}
+            avatar.radius = self.eval_float(
+                self.radius_input.text(), 
+                default=0.1, 
+                field_name="Rayon"
+            )
+            avatar.wall_params = {
+                'h': self.eval_float(
+                    self.wall_height_input.text(), 
+                    default=0.2, 
+                    field_name="Hauteur"
+                )
+            }
         
         elif avatar_type == AvatarType.RIGID_POLYHEDRON:
-            avatar.radius = float(self.radius_input.text())
-            avatar.nb_vertices = int(self.nb_vertices_input.text())
+            avatar.radius = self.eval_float(
+                self.radius_input.text(), 
+                default=0.1, 
+                field_name="Rayon"
+            )
+            avatar.nb_vertices = self.eval_int(
+                self.nb_vertices_input.text(), 
+                default=20, 
+                field_name="Nb vertices"
+            )
             avatar.generation_type = self.gen_type_combo.currentText()
+        
         elif avatar_type == AvatarType.ROUGH_WALL_3D:
-            avatar.radius = float(self.wall_nb_input.text())
+            avatar.radius = self.eval_float(
+                self.wall_nb_input.text(), 
+                default=0.25, 
+                field_name="Rayon"
+            )
             avatar.wall_params = {
-                'lx': float(self.wall_length_input.text()),
-                'ly': float(self.wall_height_input.text())
+                'lx': self.eval_float(
+                    self.wall_length_input.text(), 
+                    default=2.0, 
+                    field_name="Longueur"
+                ),
+                'ly': self.eval_float(
+                    self.wall_height_input.text(), 
+                    default=2.0, 
+                    field_name="Largeur"
+                )
             }
-
+        
         elif avatar_type == AvatarType.GRANULO_ROUGH_WALL_3D:
+            radii = self.eval_list(
+                self.wall_nb_input.text(), 
+                expected_length=2, 
+                field_name="Rmin et Rmax"
+            )
             avatar.wall_params = {
-                'lx': float(self.wall_length_input.text()),
-                'ly': float(self.wall_height_input.text()),
-                'rmin': float(self.wall_nb_input.text().split(',')[0].strip()),
-                'rmax': float(self.wall_nb_input.text().split(',')[1].strip())
+                'lx': self.eval_float(
+                    self.wall_length_input.text(), 
+                    default=2.0, 
+                    field_name="Longueur"
+                ),
+                'ly': self.eval_float(
+                    self.wall_height_input.text(), 
+                    default=2.0, 
+                    field_name="Largeur"
+                ),
+                'rmin': radii[0],
+                'rmax': radii[1]
             }
-
         
         return avatar
     

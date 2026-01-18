@@ -1,9 +1,9 @@
-# ============================================================================
-#MaterialTab
-# ============================================================================
+
 """
 Onglet de gestion des matériaux avec création, modification et suppression.
 """
+
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, 
     QComboBox, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem,
@@ -15,9 +15,10 @@ from PyQt6.QtGui import QBrush, QColor
 from ...core.models import Material, MaterialType
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
+from ...views.tabs.base_tab import BaseTab
 
 
-class MaterialTab(QWidget):
+class MaterialTab(BaseTab):
     """Onglet de gestion des matériaux"""
     
     material_created = pyqtSignal()
@@ -25,17 +26,15 @@ class MaterialTab(QWidget):
     material_deleted = pyqtSignal()
     
     def __init__(self, controller: ProjectController):
-        super().__init__()
+        super().__init__(controller)
         self.controller = controller
-        self.current_edit_name = None  # Pour tracking du mode édition
+        self.current_edit_name = None
         self._setup_ui()
         self._connect_signals()
     
     def _setup_ui(self):
-        """Configure l'interface"""
         layout = QVBoxLayout()
         
-        # === SECTION 1: ARBRE DES MATÉRIAUX ===
         tree_label = QLabel("<b>📋 Liste des Matériaux</b>")
         layout.addWidget(tree_label)
         
@@ -49,7 +48,6 @@ class MaterialTab(QWidget):
         self.tree.setMaximumHeight(200)
         layout.addWidget(self.tree)
         
-        # Boutons d'action rapide sur l'arbre
         tree_btn_layout = QHBoxLayout()
         
         edit_tree_btn = QPushButton("✏️ Modifier Sélection")
@@ -63,7 +61,6 @@ class MaterialTab(QWidget):
         tree_btn_layout.addStretch()
         layout.addLayout(tree_btn_layout)
         
-        # === SECTION 2: FORMULAIRE ===
         form_label = QLabel("<b>📝 Formulaire</b>")
         layout.addWidget(form_label)
         
@@ -86,7 +83,6 @@ class MaterialTab(QWidget):
         self.props_input.setPlaceholderText("ex: young=1e9, nu=0.3")
         form.addRow("Propriétés :", self.props_input)
         
-        # Aide contextuelle
         self.help_label = QLabel()
         self.help_label.setWordWrap(True)
         self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
@@ -94,7 +90,6 @@ class MaterialTab(QWidget):
         
         layout.addLayout(form)
         
-        # === SECTION 3: BOUTONS D'ACTION ===
         btn_layout = QHBoxLayout()
         
         self.create_btn = QPushButton("✅ Créer Matériau")
@@ -119,40 +114,39 @@ class MaterialTab(QWidget):
         
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
+        self.add_expression_help_label(layout)
         
         layout.addStretch()
         self.setLayout(layout)
     
     def _connect_signals(self):
-        """Connecte les signaux"""
         self.tree.itemDoubleClicked.connect(self._on_edit_from_tree)
         self.type_combo.currentTextChanged.connect(self._on_type_changed)
     
     def _on_type_changed(self, mat_type: str):
-        """Quand le type change, suggère des propriétés"""
         self.density_input.setText("2800")
         self.name_input.setText("TDURx")
         suggestions = {
             "RIGID": "",
-            "ELAS": "elas=standard, young=0.1e+15, nu=0.2, anisotropy=isotropic",
-            "ELAS_DILA": "elas=standard, young=0.1e+15, nu=0.2, anisotropy=isotropic,dilatation=1e-5, T_ref_meca=20.",
-            "VISCO_ELAS": "elas=standard, anisotropy=isotropic, young=1.17e11, nu=0.35,viscous_model=KelvinVoigt, viscous_young=1.17e9, viscous_nu=0.35",
-            "ELAS_PLAS" : "elas=standard, anisotropy=isotropic, young=1.17e11, nu=0.35,critere=Von-Mises, isoh=linear, iso_hard=4.e8, isoh_coeff=1e8, cinh=none, visc=none",
-            "THERMO_ELAS" : "elas=standard, young=0.0, nu=0.0, anisotropy=isotropic, dilatation = 0.0,T_ref_meca = 0.0, conductivity=field, specific_capacity=field",
-            "PORO_ELAS" : "elas=standard, young=0.0, nu=0.0, anisotropy=isotropic,hydro_cpl = 0.0, conductivity=field, specific_capacity=field"
+            "ELAS": "elas='standard', young=0.1e+15, nu=0.2, anisotropy='isotropic'",
+            "ELAS_DILA": "elas='standard', young=0.1e+15, nu=0.2, anisotropy='isotropic',dilatation=1e-5, T_ref_meca=20.",
+            "VISCO_ELAS": "elas='standard', anisotropy='isotropic', young=1.17e11, nu=0.35,viscous_model='KelvinVoigt', viscous_young=1.17e9, viscous_nu=0.35",
+            "ELAS_PLAS": "elas='standard', anisotropy='isotropic', young=1.17e11, nu=0.35,critere='Von-Mises', isoh='linear', iso_hard=4.e8, isoh_coeff=1e8, cinh='none', visc='none'",
+            "THERMO_ELAS": "elas='standard', young=0.0, nu=0.0, anisotropy='isotropic', dilatation = 0.0,T_ref_meca = 0.0, conductivity='field', specific_capacity='field'",
+            "PORO_ELAS": "elas='standard', young=0.0, nu=0.0, anisotropy='isotropic',hydro_cpl = 0.0, conductivity='field', specific_capacity='field'"
         }
         
         if mat_type in suggestions:
             self.help_label.setText(f"💡 Suggestion : {suggestions[mat_type]}")
             
-            if mat_type != "RIGID" :
+            if mat_type != "RIGID":
                 self.props_input.setText(suggestions[mat_type])
-            else : self.props_input.setText("")
+            else:
+                self.props_input.setText("")
         else:
             self.help_label.setText("")
     
     def _show_context_menu(self, position):
-        """Menu contextuel clic droit"""
         item = self.tree.itemAt(position)
         if not item:
             return
@@ -173,14 +167,18 @@ class MaterialTab(QWidget):
         menu.exec(self.tree.viewport().mapToGlobal(position))
     
     def _on_create(self):
-        """Crée un nouveau matériau"""
         try:
-            # Parser les propriétés
-            props = self._parse_properties(self.props_input.text())
-            density = float(self.density_input.text() or "2800")
-           
-
-            # Créer le matériau
+            density = self.eval_float(
+                self.density_input.text(),
+                default=2800,
+                field_name="Densité"
+            )
+            
+            props = self.eval_dict(
+                self.props_input.text(),
+                field_name="Propriétés"
+            )
+            
             material = Material(
                 name=self.name_input.text().strip(),
                 material_type=MaterialType(self.type_combo.currentText()),
@@ -188,25 +186,17 @@ class MaterialTab(QWidget):
                 properties=props
             )
             
-            # Ajouter via le contrôleur
             self.controller.add_material(material)
-            
-            # Succès
             self.material_created.emit()
             self.refresh()
             QMessageBox.information(self, "Succès", f"✅ Matériau '{material.name}' créé")
-
-            #self._clear_form()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur", f"Valeur invalide :\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
     def _on_edit_from_tree(self):
-        """Charge le matériau sélectionné pour édition"""
         selected = self.tree.currentItem()
         if not selected:
             QMessageBox.warning(self, "Sélection", "Sélectionnez un matériau à modifier")
@@ -222,39 +212,38 @@ class MaterialTab(QWidget):
         self.load_for_edit(material)
     
     def _on_update(self):
-        """Met à jour le matériau existant"""
         try:
-            # Parser les propriétés
-            props = self._parse_properties(self.props_input.text())
+            density = self.eval_float(
+                self.density_input.text(),
+                default=2800,
+                field_name="Densité"
+            )
             
-            # Créer le nouveau matériau
+            props = self.eval_dict(
+                self.props_input.text(),
+                field_name="Propriétés"
+            )
+            
             material = Material(
                 name=self.name_input.text().strip(),
                 material_type=MaterialType(self.type_combo.currentText()),
-                density=float(self.density_input.text()),
+                density=density,
                 properties=props
             )
             
-            # Mettre à jour via le contrôleur
             self.controller.update_material(self.current_edit_name, material)
             
-            # Succès
             self.material_updated.emit()
             self.refresh()
             QMessageBox.information(self, "Succès", f"✅ Matériau '{material.name}' modifié")
-            
-            # Sortir du mode édition
             self._on_cancel_edit()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur", f"Valeur invalide :\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Modification échouée :\n{e}")
     
     def _on_delete(self):
-        """Supprime le matériau sélectionné"""
         selected = self.tree.currentItem()
         if not selected:
             QMessageBox.warning(self, "Sélection", "Sélectionnez un matériau à supprimer")
@@ -262,7 +251,6 @@ class MaterialTab(QWidget):
         
         mat_name = selected.text(0)
         
-        # Vérifier si utilisé
         is_used, refs = self.controller.is_material_used(mat_name)
         
         if is_used:
@@ -291,7 +279,6 @@ class MaterialTab(QWidget):
             if reply != QMessageBox.StandardButton.Yes:
                 return
         
-        # Supprimer
         try:
             if self.controller.remove_material(mat_name):
                 self.material_deleted.emit()
@@ -301,7 +288,6 @@ class MaterialTab(QWidget):
                     self.parent().tree_view.refresh()
                 QMessageBox.information(self, "Succès", f"✅ Matériau '{mat_name}' supprimé")
                 
-                # Si c'était le matériau en cours d'édition, sortir du mode édition
                 if self.current_edit_name == mat_name:
                     self._on_cancel_edit()
             else:
@@ -310,7 +296,6 @@ class MaterialTab(QWidget):
             QMessageBox.critical(self, "Erreur", f"Suppression échouée :\n{e}")
     
     def _show_info(self):
-        """Affiche les informations détaillées"""
         selected = self.tree.currentItem()
         if not selected:
             return
@@ -340,19 +325,15 @@ class MaterialTab(QWidget):
         QMessageBox.information(self, f"Infos : {mat_name}", info)
     
     def _on_cancel_edit(self):
-        """Annule le mode édition"""
         self.current_edit_name = None
         
-        # Revenir en mode création
         self.create_btn.setVisible(True)
         self.update_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
         
-        # Réinitialiser le formulaire
         self._clear_form()
     
     def _clear_form(self):
-        """Réinitialise le formulaire"""
         self.name_input.clear()
         self.type_combo.setCurrentIndex(0)
         self.density_input.clear()
@@ -360,34 +341,9 @@ class MaterialTab(QWidget):
         self.help_label.clear()
         self.name_input.setFocus()
     
-    def _parse_properties(self, text: str) -> dict:
-        """Parse la chaîne de propriétés"""
-        if not text.strip():
-            return {}
-        
-        props = {}
-        for pair in text.split(','):
-            if '=' in pair:
-                key, value = pair.split('=', 1)
-                key = key.strip()
-                value = value.strip()
-                
-                # Essayer de convertir en nombre
-                try:
-                    if '.' in value or 'e' in value.lower():
-                        props[key] = float(value)
-                    else:
-                        props[key] = int(value)
-                except ValueError:
-                    props[key] = value
-        
-        return props
-    
     def load_for_edit(self, material: Material):
-        """Charge un matériau pour édition"""
         self.current_edit_name = material.name
         
-        # Remplir le formulaire
         self.name_input.setText(material.name)
         self.type_combo.setCurrentText(material.material_type.value)
         self.density_input.setText(str(material.density))
@@ -398,21 +354,17 @@ class MaterialTab(QWidget):
         else:
             self.props_input.clear()
         
-        # Passer en mode édition
         self.create_btn.setVisible(False)
         self.update_btn.setVisible(True)
         self.cancel_btn.setVisible(True)
         
-        # Highlight visuel
         self.name_input.setFocus()
         self.name_input.selectAll()
         
-        # Message dans la barre d'aide
         self.help_label.setText(f"🔧 Mode édition : {material.name}")
         self.help_label.setStyleSheet("color: #FF9800; font-weight: bold; padding: 5px;")
     
     def refresh(self):
-        """Rafraîchit l'arbre"""
         self.tree.clear()
         
         materials = self.controller.get_materials()
@@ -429,9 +381,8 @@ class MaterialTab(QWidget):
                 props_str
             ])
             
-            # Colorer si utilisé
             is_used, _ = self.controller.is_material_used(mat.name)
             if is_used:
-                item.setForeground(0, QBrush(QColor(0, 100, 0)))  # Vert foncé
+                item.setForeground(0, QBrush(QColor(0, 100, 0)))
             
             self.tree.addTopLevelItem(item)

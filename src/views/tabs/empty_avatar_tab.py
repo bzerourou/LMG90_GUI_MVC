@@ -4,6 +4,7 @@
 """
 Onglet pour créer des avatars vides avec contacteurs personnalisés.
 """
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox, 
     QPushButton, QMessageBox, QScrollArea, QLabel, QHBoxLayout,
@@ -15,9 +16,10 @@ from PyQt6.QtGui import QBrush, QColor
 from ...core.models import Avatar, AvatarType, AvatarOrigin
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
+from ...views.tabs.base_tab import BaseTab
 
 
-class EmptyAvatarTab(QWidget):
+class EmptyAvatarTab(BaseTab):
     """Onglet création d'avatars vides"""
     
     avatar_created = pyqtSignal()
@@ -25,16 +27,14 @@ class EmptyAvatarTab(QWidget):
     avatar_deleted = pyqtSignal()
     
     def __init__(self, controller: ProjectController):
-        super().__init__()
+        super().__init__(controller)
         self.controller = controller
         self.current_edit_index = None
         self._setup_ui()
     
     def _setup_ui(self):
-        """Configure l'interface"""
         layout = QVBoxLayout()
         
-        # === ARBRE ===
         tree_label = QLabel("<b>📋 Avatars Vides Existants</b>")
         layout.addWidget(tree_label)
         
@@ -59,7 +59,6 @@ class EmptyAvatarTab(QWidget):
         tree_btn_layout.addStretch()
         layout.addLayout(tree_btn_layout)
         
-        # === FORMULAIRE ===
         form_label = QLabel("<b>📝 Formulaire Avatar Vide</b>")
         layout.addWidget(form_label)
         
@@ -85,7 +84,6 @@ class EmptyAvatarTab(QWidget):
         
         layout.addLayout(form)
         
-        # === CONTACTEURS ===
         layout.addWidget(QLabel("<b>Contacteurs à ajouter :</b>"))
         
         scroll = QScrollArea()
@@ -103,7 +101,6 @@ class EmptyAvatarTab(QWidget):
         add_cont_btn.clicked.connect(self._add_contactor_row)
         layout.addWidget(add_cont_btn)
         
-        # === BOUTONS ===
         btn_layout = QHBoxLayout()
         
         self.create_btn = QPushButton("✅ Créer Avatar Vide")
@@ -129,12 +126,13 @@ class EmptyAvatarTab(QWidget):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
         
+        self.add_expression_help_label(layout)
+        
         self.setLayout(layout)
         
         self._add_contactor_row()
     
     def _on_dim_changed(self, dim_text):
-        """Quand dimension change"""
         dim = int(dim_text)
         center_default = "0.0, 0.0" if dim == 2 else "0.0, 0.0, 0.0"
         self.center_input.setText(center_default)
@@ -146,7 +144,6 @@ class EmptyAvatarTab(QWidget):
         self._add_contactor_row()
     
     def _add_contactor_row(self):
-        """Ajoute une ligne de contacteur"""
         row = QHBoxLayout()
         
         row.addWidget(QLabel("Forme :"))
@@ -156,7 +153,7 @@ class EmptyAvatarTab(QWidget):
         if dim == 2:
             shape_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
         else:
-            shape_combo.addItems(["SPHER",  "PLANx", "CYLND", "POLYR", "PT3Dx"])
+            shape_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
 
         shape_combo.currentTextChanged.connect(
             lambda: self._on_contactor_type_changed(row)
@@ -189,7 +186,6 @@ class EmptyAvatarTab(QWidget):
         self.contactors_layout.addWidget(widget)
     
     def _on_contactor_type_changed(self, row):
-        """Quand le type de contacteur change"""
         shape = row.shape_combo.currentText()
         
         if shape in ["DISKx", "xKSID"]:
@@ -206,7 +202,6 @@ class EmptyAvatarTab(QWidget):
             row.params_label.setText("Params :")
     
     def _remove_contactor_row(self, row):
-        """Supprime une ligne de contacteur"""
         for i in range(self.contactors_layout.count()):
             widget = self.contactors_layout.itemAt(i).widget()
             if widget and widget.layout() == row:
@@ -214,7 +209,6 @@ class EmptyAvatarTab(QWidget):
                 return
     
     def _show_context_menu(self, position):
-        """Menu contextuel"""
         item = self.tree.itemAt(position)
         if not item:
             return
@@ -235,7 +229,6 @@ class EmptyAvatarTab(QWidget):
         menu.exec(self.tree.viewport().mapToGlobal(position))
     
     def _on_create(self):
-        """Crée l'avatar vide"""
         try:
             avatar = self._build_avatar_from_form()
             
@@ -248,13 +241,10 @@ class EmptyAvatarTab(QWidget):
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur de Valeur", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
     def _on_edit_from_tree(self):
-        """Charge pour édition"""
         selected = self.tree.currentItem()
         if not selected:
             QMessageBox.warning(self, "Sélection", "Sélectionnez un avatar")
@@ -267,7 +257,6 @@ class EmptyAvatarTab(QWidget):
             self.load_for_edit(avatar_idx, avatar)
     
     def _on_update(self):
-        """Met à jour"""
         try:
             avatar = self._build_avatar_from_form()
             
@@ -284,7 +273,6 @@ class EmptyAvatarTab(QWidget):
             QMessageBox.critical(self, "Erreur", f"Modification échouée :\n{e}")
     
     def _on_delete(self):
-        """Supprime"""
         selected = self.tree.currentItem()
         if not selected:
             QMessageBox.warning(self, "Sélection", "Sélectionnez un avatar")
@@ -318,7 +306,6 @@ class EmptyAvatarTab(QWidget):
                     self._on_cancel_edit()
     
     def _show_info(self):
-        """Affiche infos"""
         selected = self.tree.currentItem()
         if not selected:
             return
@@ -343,7 +330,6 @@ class EmptyAvatarTab(QWidget):
         QMessageBox.information(self, f"Infos : Avatar #{avatar_idx}", info)
     
     def _on_cancel_edit(self):
-        """Annule édition"""
         self.current_edit_index = None
         self.create_btn.setVisible(True)
         self.update_btn.setVisible(False)
@@ -351,29 +337,25 @@ class EmptyAvatarTab(QWidget):
         self._clear_form()
     
     def _clear_form(self):
-        """Réinitialise"""
         dim = int(self.dim_combo.currentText())
         self.center_input.setText("0.0, 0.0" if dim == 2 else "0.0, 0.0, 0.0")
         self.color_input.setText("BLUEx")
         
-        # Supprimer tous les contacteurs
         for i in reversed(range(self.contactors_layout.count())):
             widget = self.contactors_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
         
-        # Ajouter un contacteur par défaut
         self._add_contactor_row()
     
     def _build_avatar_from_form(self) -> Avatar:
-        """Construit un avatar depuis le formulaire"""
         dim = int(self.dim_combo.currentText())
-        center = [float(x.strip()) for x in self.center_input.text().split(',')]
+        center = self.eval_list(
+            self.center_input.text(),
+            expected_length=dim,
+            field_name="Centre"
+        )
         
-        if len(center) != dim:
-            raise ValueError(f"Centre doit avoir {dim} coordonnées")
-        
-        # Parser les contacteurs
         contactors = []
         for i in range(self.contactors_layout.count()):
             widget = self.contactors_layout.itemAt(i).widget()
@@ -386,6 +368,7 @@ class EmptyAvatarTab(QWidget):
             params_text = row.params_input.text().strip()
             material = self.material_combo.currentText()
             model = self.model_combo.currentText()
+            
             if not material:
                 raise ValidationError("Le matériau est requis")
             
@@ -412,7 +395,7 @@ class EmptyAvatarTab(QWidget):
             avatar_type=AvatarType.EMPTY_AVATAR,
             center=center,
             material_name=material,
-            model_name= model,
+            model_name=model,
             color=self.color_input.text().strip(),
             origin=AvatarOrigin.MANUAL,
             contactors=contactors
@@ -421,7 +404,6 @@ class EmptyAvatarTab(QWidget):
         return avatar
     
     def _parse_params(self, params_text: str) -> dict:
-        """Parse les paramètres de contacteur"""
         import re
         import ast
         
@@ -439,11 +421,8 @@ class EmptyAvatarTab(QWidget):
                     val = val.strip()
                     
                     try:
-                        if '.' in val or 'e' in val.lower():
-                            params[key] = float(val)
-                        else:
-                            params[key] = int(val)
-                    except ValueError:
+                        params[key] = self.eval_float(val, field_name=f"Paramètre {key}")
+                    except:
                         params[key] = val
             
             return params
@@ -462,17 +441,13 @@ class EmptyAvatarTab(QWidget):
                     raise ValueError(f"Format de liste invalide pour '{key}': {value_str}")
             else:
                 try:
-                    if '.' in value_str or 'e' in value_str.lower():
-                        params[key] = float(value_str)
-                    else:
-                        params[key] = int(value_str)
-                except ValueError:
-                    raise ValueError(f"Valeur numérique invalide pour '{key}': {value_str}")
+                    params[key] = self.eval_float(value_str, field_name=f"Paramètre {key}")
+                except:
+                    params[key] = value_str
         
         return params
     
     def load_for_edit(self, index: int, avatar: Avatar):
-        """Charge pour édition"""
         self.current_edit_index = index
         
         self.dim_combo.setCurrentText(str(len(avatar.center)))
@@ -484,13 +459,11 @@ class EmptyAvatarTab(QWidget):
         self.model_combo.setCurrentText(avatar.model_name)
         self.color_input.setText(avatar.color)
         
-        # Supprimer contacteurs existants
         for i in reversed(range(self.contactors_layout.count())):
             widget = self.contactors_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
         
-        # Charger les contacteurs
         for cont in avatar.contactors:
             self._add_contactor_row()
             widget = self.contactors_layout.itemAt(self.contactors_layout.count() - 1).widget()
@@ -509,7 +482,6 @@ class EmptyAvatarTab(QWidget):
         self.cancel_btn.setVisible(True)
     
     def refresh(self):
-        """Rafraîchit"""
         self.tree.clear()
         
         self.material_combo.clear()

@@ -30,6 +30,7 @@ class SafeEvaluator:
             'pi': math.pi,
             'e': math.e,
             'str': str, 'int': int, 'float': float, 'list': list, 'dict': dict, 'tuple': tuple,
+            #'avatar', avatar.nodes[1].coor
         })
     
     def eval_dict(self, expression: str) -> Dict[str, Any]:

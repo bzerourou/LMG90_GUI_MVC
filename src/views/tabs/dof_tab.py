@@ -1,10 +1,3 @@
-# ============================================================================
-# DOFTab
-# ============================================================================
-"""
-Onglet de gestion des conditions aux limites DOF avec création, modification et suppression.
-Style identique aux autres onglets (MaterialTab, LoopTab, AvatarTab...).
-"""
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
     QComboBox, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem,
@@ -16,9 +9,11 @@ from PyQt6.QtGui import QBrush, QColor
 from ...core.models import DOFOperation, AvatarOrigin
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
+from ...views.tabs.base_tab import BaseTab
+from typing import Dict, Any
 
 
-class DOFTab(QWidget):
+class DOFTab(BaseTab):
     """Onglet opérations DOF"""
     
     operation_applied = pyqtSignal()
@@ -26,7 +21,7 @@ class DOFTab(QWidget):
     operation_deleted = pyqtSignal()
 
     def __init__(self, controller: ProjectController):
-        super().__init__()
+        super().__init__(controller)
         self.controller = controller
         self.current_edit_index = None
         self._setup_ui()
@@ -35,7 +30,6 @@ class DOFTab(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout()
 
-        # === SECTION 1: ARBRE DES OPÉRATIONS DOF ===
         tree_label = QLabel("<b>📋 Liste des Opérations DOF</b>")
         layout.addWidget(tree_label)
 
@@ -49,7 +43,6 @@ class DOFTab(QWidget):
         self.tree.setMaximumHeight(180)
         layout.addWidget(self.tree)
 
-        # Boutons sous l'arbre : Modifier et Supprimer sélection
         actions_layout = QHBoxLayout()
         
         self.edit_btn = QPushButton("✏️ Modifier sélection")
@@ -63,39 +56,32 @@ class DOFTab(QWidget):
         actions_layout.addStretch()
         layout.addLayout(actions_layout)
 
-        # === SECTION 2: FORMULAIRE ===
         form_label = QLabel("<b>📝 Paramètres de l'Opération DOF</b>")
         layout.addWidget(form_label)
 
         form = QFormLayout()
 
-        # Cible (avatar ou groupe)
         self.target_combo = QComboBox()
         form.addRow("Cible :", self.target_combo)
 
-        # Action
         self.action_combo = QComboBox()
         self.action_combo.addItems([
-            "translate", "rotate", "imposeDrivenDof", "imposeInitValue",
-            "blockDof", "driveDof"
+            "translate", "rotate", "imposeDrivenDof", "imposeInitValue"
         ])
         self.action_combo.currentTextChanged.connect(self._on_action_changed)
         form.addRow("Action :", self.action_combo)
 
-        # Paramètres
         self.params_input = QLineEdit("dx=0.0, dy=0.0, ramp=1.0")
         self.params_input.setPlaceholderText("Ex: dx=1.0, dy=-0.5, dofty='vlocy'")
         form.addRow("Paramètres :", self.params_input)
 
         layout.addLayout(form)
 
-        # Aide contextuelle
         self.help_label = QLabel("Sélectionnez une action pour voir des exemples de paramètres.")
         self.help_label.setWordWrap(True)
         self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
         layout.addWidget(self.help_label)
 
-        # === BOUTONS PRINCIPAUX EN BAS ===
         btn_layout = QHBoxLayout()
         
         self.apply_btn = QPushButton("✅ Appliquer DOF")
@@ -110,6 +96,7 @@ class DOFTab(QWidget):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
+        self.add_expression_help_label(layout)
         layout.addStretch()
         self.setLayout(layout)
 
@@ -125,13 +112,13 @@ class DOFTab(QWidget):
 
     def _on_action_changed(self, action: str):
         help_texts = {
-            "translate": "Ex: dx=1.0, dy=-0.5 → déplacement imposé",
-            "rotate": "Ex: rz=90.0, centerx=0.0, centery=0.0 → rotation en degrés",
-            "imposeDrivenDof": "Ex: dofx='vlocx', ramp=1.0, value=2.0",
-            "imposeInitValue": "Ex: dofy='vlocy', value=0.0",
-            "blockDof": "Ex: dofx=True, dofy=True → bloque les degrés",
-            "driveDof": "Ex: dofrz='vrotz', ramp=1.0"
+            "translate": "dx=0.0, dy=2.0",
+            "rotate": "psi=math.pi/2.0, center=[0.0, 0.0]",
+            "imposeDrivenDof": "component=[1,2,3], dofty='vlocy'",
+            "imposeInitValue": "component=1, value=3.0"
         }
+
+        self.params_input.setText(help_texts[action])
         self.help_label.setText(help_texts.get(action, "Paramètres sous forme clé=valeur séparés par virgules."))
 
     def _show_context_menu(self, position):
@@ -162,37 +149,25 @@ class DOFTab(QWidget):
         else:
             QMessageBox.information(self, "Sélection", "Veuillez d'abord sélectionner une opération à supprimer.")
 
-    def _parse_params(self, text: str) -> dict:
-        """Parse les paramètres saisis par l'utilisateur"""
-        if not text.strip():
-            return {}
-        params = {}
-        for pair in text.split(','):
-            pair = pair.strip()
-            if '=' in pair:
-                key, value = pair.split('=', 1)
-                key = key.strip()
-                value_str = value.strip()
-                if value_str in ['True', 'False']:
-                    params[key] = value_str == 'True'
-                elif '.' in value_str or 'e' in value_str.lower():
-                    params[key] = float(value_str)
-                else:
-                    try:
-                        params[key] = int(value_str)
-                    except ValueError:
-                        params[key] = value_str  # garde comme string (ex: 'vlocy')
-        return params
+    def _parse_params(self, text: str) -> Dict[str, Any]:
+        """Parse avec évaluateur - VERSION CORRIGÉE"""
+        try:
+            return self.eval_dict(text, field_name="Paramètres DOF")
+        except Exception as e:
+            raise ValidationError(f"Paramètres invalides: {e}")
 
     def _on_apply(self):
         try:
             target_type, target_value = self.target_combo.currentData()
             if target_value is None:
                 raise ValueError("Aucune cible valide sélectionnée")
-
-            params = self._parse_params(self.params_input.text())
-            if not params:
+            
+            params_str = self.params_input.text().strip()
+            params = {}
+            if not params_str:
                 raise ValidationError("Aucun paramètre valide détecté")
+            else:
+                params = self._parse_params(params_str)
             
             operation = DOFOperation(
                 target_type=target_type,
@@ -200,15 +175,13 @@ class DOFTab(QWidget):
                 operation_type=self.action_combo.currentText(),
                 parameters=params
             )
-
-            self.controller.apply_dof_operation(operation)
+            self.controller.add_dof_operation(operation)
             self.operation_applied.emit()
             QMessageBox.information(self, "Succès", "Opération DOF appliquée avec succès.")
-            self._clear_form()
             self.refresh()
 
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur de saisie", f"Valeurs invalides :\n{e}")
+        except ValidationError as e:
+            QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Échec de l'application :\n{e}")
 
@@ -231,8 +204,8 @@ class DOFTab(QWidget):
             self._clear_form()
             self.refresh()
 
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur de saisie", f"Valeurs invalides :\n{e}")
+        except ValidationError as e:
+            QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Échec de la modification :\n{e}")
 
@@ -253,11 +226,10 @@ class DOFTab(QWidget):
             self._clear_form()
             self.refresh()
 
-    def load_for_edit(self, index: int, option = None):
+    def load_for_edit(self, index: int, option=None):
         operation = self.controller.state.operations[index]
         self.current_edit_index = index
 
-        # Sélectionner la cible
         for i in range(self.target_combo.count()):
             if self.target_combo.itemData(i) == (operation.target_type, operation.target_value):
                 self.target_combo.setCurrentIndex(i)
@@ -265,14 +237,12 @@ class DOFTab(QWidget):
 
         self.action_combo.setCurrentText(operation.operation_type)
 
-        # Reconstruire les paramètres
         if operation.parameters:
             params_str = ", ".join(f"{k}={v}" for k, v in operation.parameters.items())
             self.params_input.setText(params_str)
         else:
             self.params_input.clear()
 
-        # Mode édition
         self.apply_btn.setVisible(False)
         self.update_btn.setVisible(True)
 
@@ -290,12 +260,10 @@ class DOFTab(QWidget):
         self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
 
     def refresh(self):
-        """Rafraîchit le combo des cibles et l'arbre des opérations"""
         current_target = self.target_combo.currentData() if self.target_combo.count() > 0 else None
 
         self.target_combo.clear()
 
-        # Avatars individuels
         for i, avatar in enumerate(self.controller.state.avatars):
             origin_mark = ""
             if avatar.origin == AvatarOrigin.LOOP:
@@ -305,20 +273,17 @@ class DOFTab(QWidget):
             label = f"Avatar #{i} — {avatar.avatar_type.value} ({avatar.color}){origin_mark}"
             self.target_combo.addItem(label, ('avatar', i))
 
-        # Groupes
         for group_name, indices in self.controller.state.avatar_groups.items():
-            label = f"🔷 GROUPE : {group_name} ({len(indices)} avatars)"
+            label = f"📷 GROUPE : {group_name} ({len(indices)} avatars)"
             self.target_combo.addItem(label, ('group', group_name))
 
         if self.target_combo.count() == 0:
             self.target_combo.addItem("(Aucun avatar disponible)", None)
 
-        # Restaurer la cible si possible
         if current_target and current_target in [self.target_combo.itemData(i) for i in range(self.target_combo.count())]:
             idx = [self.target_combo.itemData(i) for i in range(self.target_combo.count())].index(current_target)
             self.target_combo.setCurrentIndex(idx)
 
-        # Rafraîchir l'arbre
         self.tree.clear()
         for idx, op in enumerate(self.controller.state.operations):
             target_label = op.target_value if isinstance(op.target_value, str) else f"Avatar #{op.target_value}"
@@ -333,5 +298,3 @@ class DOFTab(QWidget):
                 params_str or "—"
             ])
             self.tree.addTopLevelItem(item)
-
-        self._clear_form()

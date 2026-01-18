@@ -4,14 +4,16 @@
 """
 Gestionnaire de sauvegarde/chargement de projets.
 """
+
 import json
 from pathlib import Path
 from typing import Dict, Any
+
 from .models import ProjectState
 
 
 class ProjectSerializer:
-    """Gère la sérialisation des projets"""
+    """Sérialisation/désérialisation de l'état du projet"""
     
     @staticmethod
     def save(state: ProjectState, filepath: Path) -> None:
@@ -25,12 +27,10 @@ class ProjectSerializer:
         Raises:
             IOError: En cas d'erreur d'écriture
         """
-        try:
-            data = state.to_dict()
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            raise IOError(f"Erreur lors de la sauvegarde: {e}")
+        data = state.to_dict()
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
     
     @staticmethod
     def load(filepath: Path) -> ProjectState:
@@ -47,12 +47,12 @@ class ProjectSerializer:
             IOError: En cas d'erreur de lecture
             ValueError: Si le format est invalide
         """
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return ProjectState.from_dict(data)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Fichier JSON invalide: {e}")
-        except Exception as e:
-            raise IOError(f"Erreur lors du chargement: {e}")
-
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        state = ProjectState.from_dict(data)
+        
+        if 'custom_templates' in data:
+            state.custom_templates = data['custom_templates']
+        
+        return state

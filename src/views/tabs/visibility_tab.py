@@ -15,9 +15,10 @@ from PyQt6.QtGui import QBrush, QColor
 from ...core.models import VisibilityRule
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
+from ...views.tabs.base_tab import BaseTab
 
 
-class VisibilityTab(QWidget):
+class VisibilityTab(BaseTab):
     """Onglet visibilité"""
     
     rule_created = pyqtSignal()
@@ -25,14 +26,13 @@ class VisibilityTab(QWidget):
     rule_deleted = pyqtSignal()
     
     def __init__(self, controller: ProjectController):
-        super().__init__()
+        super().__init__(controller)
         self.controller = controller
         self.current_edit_index = None
         self._setup_ui()
         self._connect_signals()
     
     def _setup_ui(self):
-        """Configure l'interface"""
         main_layout = QVBoxLayout()
         
         scroll = QScrollArea()
@@ -44,7 +44,6 @@ class VisibilityTab(QWidget):
         layout = QVBoxLayout()
         scroll_widget.setLayout(layout)
         
-        # === ARBRE ===
         tree_label = QLabel("<b>📋 Tables de Visibilité Existantes</b>")
         layout.addWidget(tree_label)
         
@@ -71,11 +70,9 @@ class VisibilityTab(QWidget):
         tree_btn_layout.addStretch()
         layout.addLayout(tree_btn_layout)
         
-        # === FORMULAIRE ===
         form_label = QLabel("<b>📝 Formulaire de Règle de Visibilité</b>")
         layout.addWidget(form_label)
         
-        # Candidat
         candidate_group = QGroupBox("🔵 Candidat")
         candidate_form = QFormLayout()
         
@@ -84,7 +81,6 @@ class VisibilityTab(QWidget):
         candidate_form.addRow("Corps :", self.candidate_body_combo)
         
         self.candidate_contactor_combo = QComboBox()
-        #self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
         candidate_form.addRow("Contacteur :", self.candidate_contactor_combo)
         
         self.candidate_color_input = QLineEdit("BLUEx")
@@ -93,7 +89,6 @@ class VisibilityTab(QWidget):
         candidate_group.setLayout(candidate_form)
         layout.addWidget(candidate_group)
         
-        # Antagoniste
         antagonist_group = QGroupBox("🔴 Antagoniste")
         antagonist_form = QFormLayout()
         
@@ -102,7 +97,6 @@ class VisibilityTab(QWidget):
         antagonist_form.addRow("Corps :", self.antagonist_body_combo)
         
         self.antagonist_contactor_combo = QComboBox()
-        #self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
         antagonist_form.addRow("Contacteur :", self.antagonist_contactor_combo)
         
         self.antagonist_color_input = QLineEdit("VERTx")
@@ -111,7 +105,6 @@ class VisibilityTab(QWidget):
         antagonist_group.setLayout(antagonist_form)
         layout.addWidget(antagonist_group)
         
-        # Loi de contact et Alert
         params_form = QFormLayout()
         
         self.behavior_combo = QComboBox()
@@ -122,7 +115,6 @@ class VisibilityTab(QWidget):
         
         layout.addLayout(params_form)
         
-        # Aide
         help_label = QLabel(
             "💡 <i>La table de visibilité définit quels contacteurs peuvent interagir.<br>"
             "Candidat = corps actif, Antagoniste = corps passif.</i>"
@@ -131,7 +123,6 @@ class VisibilityTab(QWidget):
         help_label.setStyleSheet("color: #666; padding: 5px;")
         layout.addWidget(help_label)
         
-        # === BOUTONS ===
         btn_layout = QHBoxLayout()
         
         self.create_btn = QPushButton("✅ Créer Règle de Visibilité")
@@ -157,35 +148,33 @@ class VisibilityTab(QWidget):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
         
+        self.add_expression_help_label(layout)
+        
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
         
         self.setLayout(main_layout)
     
     def _connect_signals(self):
-        """Connecte les signaux"""
         self.tree.itemDoubleClicked.connect(self._on_edit_from_tree)
         self.candidate_body_combo.currentTextChanged.connect(self._update_candidate_contactors)
         self.antagonist_body_combo.currentTextChanged.connect(self._update_antagonist_contactors)
     
     def _update_candidate_contactors(self, body_type):
-        """Met à jour les contacteurs candidats selon le type de corps"""
         self.candidate_contactor_combo.clear()
         if body_type == "RBDY2":
             self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
-        else:  # RBDY3
-            self.candidate_contactor_combo.addItems(["SPHER",  "PLANx", "CYLND", "POLYR", "PT3Dx"])
+        else:
+            self.candidate_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
 
     def _update_antagonist_contactors(self, body_type):
-        """Met à jour les contacteurs antagonistes selon le type de corps"""
         self.antagonist_contactor_combo.clear()
         if body_type == "RBDY2":
             self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
-        else:  # RBDY3
-            self.antagonist_contactor_combo.addItems(["SPHER",  "PLANx", "CYLND", "POLYR", "PT3Dx"])
+        else:
+            self.antagonist_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
 
     def _show_context_menu(self, position):
-        """Menu contextuel"""
         item = self.tree.itemAt(position)
         if not item:
             return
@@ -206,14 +195,19 @@ class VisibilityTab(QWidget):
         menu.exec(self.tree.viewport().mapToGlobal(position))
     
     def _on_create(self):
-        """Crée la règle de visibilité"""
         try:
-            alert = float(self.alert_input.text())
+            alert = self.eval_float(
+                self.alert_input.text(),
+                default=0.1,
+                field_name="Alert"
+            )
             if alert <= 0:
                 raise ValidationError("L'alerte doit être > 0")
+            
             cand_color = self.candidate_color_input.text().strip()
             if not cand_color:
                 raise ValidationError("La couleur candidat est requise")
+            
             ant_color = self.antagonist_color_input.text().strip()
             if not ant_color:
                 raise ValidationError("La couleur antagoniste est requise")
@@ -236,13 +230,12 @@ class VisibilityTab(QWidget):
             QMessageBox.information(self, "Succès", "✅ Règle de visibilité créée")
             self._clear_form()
             
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
+        except ValidationError as e:
+            QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
     
     def _on_edit_from_tree(self):
-        """Charge pour édition"""
         selected = self.tree.currentItem()
         if not selected:
             QMessageBox.warning(self, "Sélection", "Sélectionnez une règle")
@@ -255,8 +248,13 @@ class VisibilityTab(QWidget):
             self.load_for_edit(rule_idx, rule)
     
     def _on_update(self):
-        """Met à jour"""
         try:
+            alert = self.eval_float(
+                self.alert_input.text(),
+                default=0.1,
+                field_name="Alert"
+            )
+            
             rule = VisibilityRule(
                 candidate_body=self.candidate_body_combo.currentText(),
                 candidate_contactor=self.candidate_contactor_combo.currentText(),
@@ -265,7 +263,7 @@ class VisibilityTab(QWidget):
                 antagonist_contactor=self.antagonist_contactor_combo.currentText(),
                 antagonist_color=self.antagonist_color_input.text().strip(),
                 behavior_name=self.behavior_combo.currentText(),
-                alert=float(self.alert_input.text())
+                alert=alert
             )
             
             self.controller.update_visibility_rule(self.current_edit_index, rule)
@@ -275,13 +273,12 @@ class VisibilityTab(QWidget):
             QMessageBox.information(self, "Succès", "✅ Règle modifiée")
             self._on_cancel_edit()
             
-        except ValueError as e:
-            QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
+        except ValidationError as e:
+            QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Modification échouée :\n{e}")
     
     def _on_delete(self):
-        """Supprime"""
         selected = self.tree.currentItem()
         if not selected:
             QMessageBox.warning(self, "Sélection", "Sélectionnez une règle")
@@ -304,7 +301,6 @@ class VisibilityTab(QWidget):
                     self._on_cancel_edit()
     
     def _show_info(self):
-        """Affiche infos"""
         selected = self.tree.currentItem()
         if not selected:
             return
@@ -330,7 +326,6 @@ class VisibilityTab(QWidget):
         QMessageBox.information(self, f"Infos : Règle #{rule_idx + 1}", info)
     
     def _on_cancel_edit(self):
-        """Annule édition"""
         self.current_edit_index = None
         self.create_btn.setVisible(True)
         self.update_btn.setVisible(False)
@@ -338,7 +333,6 @@ class VisibilityTab(QWidget):
         self._clear_form()
     
     def _clear_form(self):
-        """Réinitialise"""
         self.candidate_body_combo.setCurrentIndex(0)
         self.candidate_contactor_combo.setCurrentIndex(0)
         self.candidate_color_input.setText("BLUEx")
@@ -353,7 +347,6 @@ class VisibilityTab(QWidget):
             self.behavior_combo.setCurrentIndex(0)
     
     def load_for_edit(self, index: int, rule: VisibilityRule):
-        """Charge pour édition"""
         self.current_edit_index = index
         
         self.candidate_body_combo.setCurrentText(rule.candidate_body)
@@ -372,7 +365,6 @@ class VisibilityTab(QWidget):
         self.cancel_btn.setVisible(True)
     
     def refresh(self):
-        """Rafraîchit"""
         self.tree.clear()
         
         self.behavior_combo.clear()
