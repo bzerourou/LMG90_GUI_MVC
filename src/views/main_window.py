@@ -154,6 +154,44 @@ class MainWindow(QMainWindow):
         gen_script_action.triggered.connect(self._on_generate_compute_script)
         compute_menu.addAction(gen_script_action)
         
+        # menu tabs
+        tabs_menu = menubar.addMenu("📑 Onglets")
+        # Sous-menu pour ouvrir des onglets
+        open_submenu = tabs_menu.addMenu("➕ Ouvrir")
+        
+        all_tab_actions = [
+            ('material', '🧱 Matériau'),
+            ('model', '⚙️ Modèle'),
+            ('avatar', '🎯 Avatar'),
+            ('empty_avatar', '⭕ Avatar vide'),
+            ('library', '📚 Bibliothèque'),
+            ('loop', '🔁 Boucles'),
+            ('granulo', '🎲 Granulométrie'),
+            ('dof', '🔒 DOF'),
+            ('contact', '⚡ Contact'),
+            ('visibility', '👁️ Visibilité'),
+            ('postpro', '📊 Post-Pro'),
+            ('compute', '⚙️ Calcul'),
+            ('viewer', '🎨 Visualisation 3D')
+        ]
+        
+        for tab_id, tab_name in all_tab_actions:
+            action = open_submenu.addAction(tab_name)
+            action.triggered.connect(lambda checked, tid=tab_id: self._add_tab(tid))
+        
+        tabs_menu.addSeparator()
+        
+        close_others_action = tabs_menu.addAction("❌ Fermer les autres")
+        close_others_action.triggered.connect(self._close_other_tabs)
+        
+        close_all_action = tabs_menu.addAction("🗑️ Fermer tous (sauf essentiels)")
+        close_all_action.triggered.connect(self._close_all_tabs)
+        
+        tabs_menu.addSeparator()
+        
+        defaults_action = tabs_menu.addAction("🔄 Onglets par défaut")
+        defaults_action.triggered.connect(self._reopen_default_tabs)
+
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
         
@@ -274,6 +312,10 @@ class MainWindow(QMainWindow):
     def _create_tabs(self):
         """Crée les onglets de travail"""
         self.tabs = QTabWidget()
+
+        #fermeture des tabs 
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
         
         # Créer chaque onglet
         self.material_tab = MaterialTab(self.controller)
@@ -290,20 +332,29 @@ class MainWindow(QMainWindow):
         self.compute_tab = ComputeTab(self.controller)
         self.viewer_tab = ViewerTab(self.controller)
         
-        # Ajouter aux onglets
-        self.tabs.addTab(self.material_tab, "Matériau")
-        self.tabs.addTab(self.model_tab, "Modèle")
-        self.tabs.addTab(self.avatar_tab, "Avatar")
-        self.tabs.addTab(self.empty_avatar_tab, "Avatar vide")
-        self.tabs.addTab(self.avatar_library_tab, "📚 Bibliothèque")
-        self.tabs.addTab(self.loop_tab, "Boucles")
-        self.tabs.addTab(self.granulo_tab, "Granulométrie")
-        self.tabs.addTab(self.dof_tab, "DOF")
-        self.tabs.addTab(self.contact_tab, "Contact")
-        self.tabs.addTab(self.visibility_tab, "Visibilité")
-        self.tabs.addTab(self.postpro_tab, "Post-Pro")
-        self.tabs.addTab(self.compute_tab, "Calcul")
-        self.tabs.addTab(self.viewer_tab, "🎨 Visualisation 3D")
+    # Ajouter aux onglets
+    # Dictionnaire pour gérer les onglets
+        self.all_tabs = {
+            'material': ('Matériau', self.material_tab, '🧱'),
+            'model': ('Modèle', self.model_tab, '⚙️'),
+            'avatar': ('Avatar', self.avatar_tab, '🎯'),
+            'empty_avatar': ('Avatar vide', self.empty_avatar_tab, '⭕'),
+            'library': ('📚 Bibliothèque', self.avatar_library_tab, '📚'),
+            'loop': ('Boucles', self.loop_tab, '🔁'),
+            'granulo': ('Granulométrie', self.granulo_tab, '🎲'),
+            'dof': ('DOF', self.dof_tab, '🔒'),
+            'contact': ('Contact', self.contact_tab, '⚡'),
+            'visibility': ('Visibilité', self.visibility_tab, '👁️'),
+            'postpro': ('Post-Pro', self.postpro_tab, '📊'),
+            'compute': ('Calcul', self.compute_tab, '⚙️'),
+            'viewer': ('🎨 Visualisation 3D', self.viewer_tab, '🎨')
+        }
+        
+        # Onglets ouverts par défaut
+        default_tabs = ['material', 'model', 'avatar', 'library', 'compute', 'viewer']
+        
+        for tab_id in default_tabs:
+            self._add_tab(tab_id)
     
     def _create_render_widget(self):
         """Crée le widget de rendu (toujours visible en bas)"""
@@ -655,7 +706,73 @@ class MainWindow(QMainWindow):
             output_text.append(f"\n❌ EXCEPTION : {e}")
         
         dialog.exec()
+    # ======Tabs======================
+
+    def _add_tab(self, tab_id: str):
+        """Ajoute un onglet s'il n'est pas déjà ouvert"""
+        if tab_id not in self.all_tabs:
+            return
+        
+        title, widget, icon = self.all_tabs[tab_id]
+        
+        # Vérifier si déjà ouvert
+        for i in range(self.tabs.count()):
+            if self.tabs.widget(i) == widget:
+                self.tabs.setCurrentIndex(i)
+                return
+        
+        # Ajouter l'onglet
+        index = self.tabs.addTab(widget, f"{icon} {title}")
+        self.tabs.setCurrentIndex(index)
+    def _on_tab_close_requested(self, index : int): 
+        """Gère la fermeture d'un onglet"""
+        widget = self.tabs.widget(index)
+        tab_name = self.tabs.tabText(index)
+        
+        # Empêcher la fermeture de certains onglets essentiels
+        essential_tabs = [self.material_tab, self.model_tab]
+        
+        if widget in essential_tabs:
+            QMessageBox.warning(
+                self, "Onglet essentiel",
+                f"L'onglet '{tab_name}' ne peut pas être fermé car il est essentiel."
+            )
+            return
     
+        # Fermer l'onglet (ne pas le supprimer, juste le retirer)
+        self.tabs.removeTab(index)
+    
+    def _close_other_tabs(self):
+        """Ferme tous les onglets sauf celui actif"""
+        current_index = self.tabs.currentIndex()
+        current_widget = self.tabs.widget(current_index)
+        
+        # Fermer en ordre inverse pour garder les indices valides
+        for i in range(self.tabs.count() - 1, -1, -1):
+            if i != current_index:
+                widget = self.tabs.widget(i)
+                essential_tabs = [self.material_tab, self.model_tab, self.compute_tab]
+                
+                if widget not in essential_tabs:
+                    self.tabs.removeTab(i)
+
+    def _close_all_tabs(self):
+        """Ferme tous les onglets non essentiels"""
+        essential_tabs = [self.material_tab, self.model_tab, self.compute_tab]
+        
+        # Fermer en ordre inverse
+        for i in range(self.tabs.count() - 1, -1, -1):
+            widget = self.tabs.widget(i)
+            if widget not in essential_tabs:
+                self.tabs.removeTab(i)
+
+    def _reopen_default_tabs(self):
+        """Rouvre les onglets par défaut"""
+        default_tabs = ['material', 'model', 'avatar', 'library', 'compute', 'viewer']
+        
+        for tab_id in default_tabs:
+            self._add_tab(tab_id)
+   
     # =======Menu Outils =============
     def _on_dynamic_vars(self):
         """Ouvre le dialogue des variables dynamiques"""
