@@ -414,6 +414,8 @@ class MainWindow(QMainWindow):
         #dof
         self.dof_tab.operation_applied.connect(self._refresh_all)   
         self.dof_tab.operation_deleted.connect(self._refresh_all)
+        # rafraîchir viewer
+        self.dof_tab.operation_applied.connect(self.viewer_tab.refresh)
         #contact
         self.contact_tab.law_created.connect(self._refresh_all)
         self.contact_tab.law_updated.connect(self._refresh_all)

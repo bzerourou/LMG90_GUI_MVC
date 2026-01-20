@@ -560,6 +560,8 @@ class ProjectController:
             if 0 <= idx < len(self._pylmgc_bodies):
                 body = self._pylmgc_bodies[idx]
                 LMGC90Bridge.apply_dof_operation(operation, body)
+                #synchroniser la position 
+                self._sync_avatar_position(idx, body)
         
         elif operation.target_type == 'group':
             group_name = operation.target_value
@@ -568,6 +570,8 @@ class ProjectController:
                 if 0 <= idx < len(self._pylmgc_bodies):
                     body = self._pylmgc_bodies[idx]
                     LMGC90Bridge.apply_dof_operation(operation, body)
+                    #synchroniser la position 
+                    self._sync_avatar_position(idx, body)
 
 
     def add_dof_operation(self, operation: DOFOperation) -> None:
@@ -598,6 +602,19 @@ class ProjectController:
     def remove_dof_operation(self, index: int):
         """Supprime une opération DOF"""
         del self.state.operations[index]
+
+    def _sync_avatar_position(self, index: int, body):
+        """Synchronise la position d'un avatar depuis son objet pylmgc90"""
+        if index >= len(self.state.avatars):
+            return
+        
+        try:
+            # Extraire la nouvelle position
+            if hasattr(body, 'nodes') and len(body.nodes) > 0:
+                new_center = body.nodes[1].coor
+                self.state.avatars[index].center = new_center
+        except Exception as e:
+            print(f"⚠️ Erreur synchronisation position avatar {index}: {e}")
 
     # ========== BOUCLES ==========
     def generate_loop(self, loop: Loop) -> List[int]:
