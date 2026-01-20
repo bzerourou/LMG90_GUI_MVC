@@ -701,20 +701,30 @@ class ScriptGenerator:
         if not self.state.operations:
             return
         
-        f.write("# ============================================\n")
-        f.write("# CONDITIONS AUX LIMITES (DOF)\n")
-        f.write("# ============================================\n\n")
+        f.write('# ============================================\n')
+        f.write('# CONDITIONS AUX LIMITES (DOF)\n')
+        f.write('# ============================================\n\n')
         
         for op in self.state.operations:
             params = ", ".join(f"{k}={repr(v)}" for k, v in op.parameters.items())
             
             if op.target_type == 'avatar':
-                f.write(f"bodies_list[{op.target_value}].{op.operation_type}({params})\n")
+                # Opération sur un avatar individuel
+                f.write(f"# DOF sur avatar #{op.target_value}\n")
+                f.write(f"bodies_list[{op.target_value}].{op.operation_type}({params})\n\n")
+            
             elif op.target_type == 'group':
-                f.write(f"# Groupe : {op.target_value}\n")
-                indices = self.state.avatar_groups.get(op.target_value, [])
-                for idx in indices:
-                    f.write(f"bodies_list[{idx}].{op.operation_type}({params})\n")
+                # Opération sur un groupe - CORRECTION ICI
+                group_name = op.target_value
+                indices = self.state.avatar_groups.get(group_name, [])
+                
+                if not indices:
+                    f.write(f"# Groupe '{group_name}' vide ou introuvable\n\n")
+                    continue
+                
+                f.write(f"# DOF sur groupe '{group_name}' ({len(indices)} avatars)\n")
+                f.write(f"for avatar_idx in {indices}:\n")
+                f.write(f"    bodies_list[avatar_idx].{op.operation_type}({params})\n")
         
         f.write("\n")
     

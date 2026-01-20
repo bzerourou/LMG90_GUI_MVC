@@ -7,7 +7,7 @@ Onglet de gestion des avatars standards avec création, modification et suppress
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, 
     QComboBox, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem,
-    QMenu, QLabel, QCheckBox
+    QMenu, QLabel, QCheckBox, QScrollArea
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
@@ -46,8 +46,20 @@ class AvatarTab(BaseTab):
         self._connect_signals()
     
     def _setup_ui(self):
-        """Configure l'interface"""
+        """Configure l'interface avec scroll"""
+        # Layout principal
+        main_layout = QVBoxLayout()
+        
+        # Créer une zone de défilement
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Widget contenant tout le contenu
+        scroll_widget = QWidget()
         layout = QVBoxLayout()
+        scroll_widget.setLayout(layout)
         
         # === ARBRE ===
         tree_label = QLabel("<b>📋 Liste des Avatars</b>")
@@ -85,7 +97,7 @@ class AvatarTab(BaseTab):
         form.addRow("Type :", self.type_combo)
         
         self.center_label = QLabel("Centre (x,y) :")
-        self.center_input = QLineEdit("center=[0.0, 0.0]")
+        self.center_input = QLineEdit("0.0, 0.0")
         form.addRow(self.center_label, self.center_input)
         
         self.material_combo = QComboBox()
@@ -167,8 +179,12 @@ class AvatarTab(BaseTab):
         layout.addLayout(btn_layout)
         
         self.add_expression_help_label(layout)
-        layout.addStretch()
-        self.setLayout(layout)
+        
+        # Configurer le scroll
+        scroll.setWidget(scroll_widget)
+        main_layout.addWidget(scroll)
+        
+        self.setLayout(main_layout)
         
         self._update_avatar_types()
     

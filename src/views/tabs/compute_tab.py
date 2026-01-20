@@ -1,9 +1,10 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QPushButton, QMessageBox, QGroupBox, QTextEdit, QProgressBar, QLabel
+    QPushButton, QMessageBox, QGroupBox, QTextEdit, QProgressBar, QLabel, 
+    QScrollArea
 )
-from PyQt6.QtCore import pyqtSignal, QThread, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSignal as Signal
 from ...core.validators import ValidationError
 import subprocess
 import sys
@@ -53,8 +54,22 @@ class ComputeTab(QWidget):
         self._setup_ui()
     
     def _setup_ui(self):
-        layout = QVBoxLayout()
+        # Layout principal
+        main_layout = QVBoxLayout()
         
+        # Créer une zone de défilement
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Widget contenant tout le contenu
+        scroll_widget = QWidget()
+        layout = QVBoxLayout()
+        scroll_widget.setLayout(layout)
+
+        title = QLabel("<h2>⚙️ Configuration du Calcul</h2>")
+        layout.addWidget(title)
         # Paramètres temporels
         time_group = QGroupBox("⏱️ Paramètres Temporels")
         time_form = QFormLayout()
@@ -140,7 +155,12 @@ class ComputeTab(QWidget):
         btn_layout.addWidget(self.stop_btn)
         
         layout.addLayout(btn_layout)
-        self.setLayout(layout)
+        # Configurer le scroll
+        scroll.setWidget(scroll_widget)
+        main_layout.addWidget(scroll)
+        
+        self.setLayout(main_layout)
+
     
     def get_parameters(self):
         """Retourne les paramètres de calcul"""

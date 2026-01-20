@@ -33,7 +33,19 @@ class EmptyAvatarTab(BaseTab):
         self._setup_ui()
     
     def _setup_ui(self):
+        # Layout principal
+        main_layout = QVBoxLayout()
+        
+        # Créer une zone de défilement
+        scroll_p = QScrollArea()
+        scroll_p.setWidgetResizable(True)
+        scroll_p.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_p.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Widget contenant tout le contenu
+        scroll_widget = QWidget()
         layout = QVBoxLayout()
+        scroll_widget.setLayout(layout)
         
         tree_label = QLabel("<b>📋 Avatars Vides Existants</b>")
         layout.addWidget(tree_label)
@@ -128,7 +140,9 @@ class EmptyAvatarTab(BaseTab):
         
         self.add_expression_help_label(layout)
         
-        self.setLayout(layout)
+        scroll_p.setWidget(scroll_widget)
+        main_layout.addWidget(scroll_p)
+        self.setLayout(main_layout)
         
         self._add_contactor_row()
     
