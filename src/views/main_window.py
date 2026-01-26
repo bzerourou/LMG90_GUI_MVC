@@ -43,6 +43,7 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._connect_signals()
         self._update_recent_menu()
+        self._refresh_all()
         
         # État initial
         self.statusBar().showMessage("Prêt", 3000)
@@ -104,6 +105,11 @@ class MainWindow(QMainWindow):
         wizard_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
         wizard_action.triggered.connect(self._on_granulo_wizard)
         file_menu.addAction(wizard_action)
+
+        #wizard_action = QAction("🧙 Assistant de déformable...", self)
+        #wizard_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        #wizard_action.triggered.connect(self._on_deformable_wizard)
+        #file_menu.addAction(wizard_action)
 
 
         file_menu.addSeparator()
@@ -339,7 +345,7 @@ class MainWindow(QMainWindow):
             'model': ('Modèle', self.model_tab, '⚙️'),
             'avatar': ('Avatar', self.avatar_tab, '🎯'),
             'empty_avatar': ('Avatar vide', self.empty_avatar_tab, '⭕'),
-            'library': ('📚 Bibliothèque', self.avatar_library_tab, '📚'),
+            'library': ('Bibliothèque', self.avatar_library_tab, '📚'),
             'loop': ('Boucles', self.loop_tab, '🔁'),
             'granulo': ('Granulométrie', self.granulo_tab, '🎲'),
             'dof': ('DOF', self.dof_tab, '🔒'),
@@ -347,11 +353,11 @@ class MainWindow(QMainWindow):
             'visibility': ('Visibilité', self.visibility_tab, '👁️'),
             'postpro': ('Post-Pro', self.postpro_tab, '📊'),
             'compute': ('Calcul', self.compute_tab, '⚙️'),
-            'viewer': ('🎨 Visualisation 3D', self.viewer_tab, '🎨')
+            'viewer': ('Visualisation 3D', self.viewer_tab, '🎨')
         }
         
         # Onglets ouverts par défaut
-        default_tabs = ['material', 'model', 'avatar', 'library', 'compute', 'viewer']
+        default_tabs = ['material', 'model', 'avatar']
         
         for tab_id in default_tabs:
             self._add_tab(tab_id)
@@ -398,6 +404,7 @@ class MainWindow(QMainWindow):
         self.model_tab.model_updated.connect(self._refresh_all)
         self.model_tab.model_deleted.connect(self._refresh_all)
         self.model_tab.dimension_changed.connect( self.avatar_tab._update_avatar_types)
+
         #avatars
         self.avatar_tab.avatar_created.connect(self._refresh_all)
         self.avatar_tab.avatar_updated.connect(self._refresh_all)
@@ -434,6 +441,16 @@ class MainWindow(QMainWindow):
         self.avatar_tab.avatar_deleted.connect(self.viewer_tab.refresh)
         self.loop_tab.loop_generated.connect(self.viewer_tab.refresh)
         self.granulo_tab.granulo_generated.connect(self.viewer_tab.refresh)
+        # librairie d'avatars 
+        self.controller.state_changed.connect(self.avatar_tab.refresh)
+        self.controller.state_changed.connect(self.material_tab.refresh)
+        self.controller.state_changed.connect(self.model_tab.refresh)
+        self.controller.state_changed.connect(self.avatar_library_tab.refresh)
+        self.controller.state_changed.connect(self._refresh_all)
+        self.model_tab.dimension_changed.connect( self.avatar_library_tab.refresh)
+
+
+    
         
         # ========== SLOTS MENU ==========
     
@@ -725,7 +742,7 @@ class MainWindow(QMainWindow):
         
         # Ajouter l'onglet
         index = self.tabs.addTab(widget, f"{icon} {title}")
-        self.tabs.setCurrentIndex(index)
+        self.tabs.setCurrentIndex(0)
     def _on_tab_close_requested(self, index : int): 
         """Gère la fermeture d'un onglet"""
         widget = self.tabs.widget(index)
@@ -933,6 +950,16 @@ class MainWindow(QMainWindow):
         if wizard.exec():
             self._refresh_all()
             self.statusBar().showMessage("✅ Distribution granulométrique générée", 5000)
+
+    def _on_deformable_wizard(self) : 
+        """Lance l'assistant granulométrique"""
+        from ..gui.dialogs.mesh_wizard_deformable import MeshWizard
+        
+        wizard = MeshWizard(self.controller, self)
+        if wizard.exec():
+            self._refresh_all()
+            self.statusBar().showMessage("✅ Distribution granulométrique générée", 5000)
+
         
     
     # ========== VISUALISATION ET GÉNÉRATION ==========

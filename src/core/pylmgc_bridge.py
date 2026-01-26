@@ -313,17 +313,77 @@ class LMGC90Bridge:
     @staticmethod
     def create_contact_law(law: ContactLaw) -> Any:
         """Crée une loi de contact pylmgc90"""
-        if law.law_type in [ContactLawType.IQS_CLB, ContactLawType.IQS_CLB_G0]:
+        law_type = law.law_type
+        
+        # Lois simples
+        if law_type in [ContactLawType.IQS_CLB, ContactLawType.IQS_CLB_G0]:
             return pre.tact_behav(
                 name=law.name,
                 law=law.law_type.value,
                 fric=law.friction
             )
-        else:
+        
+        # IQS_DS_CLB : Loi discrète avec rigidités
+        elif law_type == ContactLawType.IQS_DS_CLB:
             return pre.tact_behav(
                 name=law.name,
-                law=law.law_type.value
+                law=law_type.value,
+                stfr=law.properties.get('stfr', 1e8),
+                dyfr=law.properties.get('dyfr', 1e8)
             )
+        
+        # IQS_MOHR_DS_CLB : Critère de Mohr-Coulomb
+        elif law_type == ContactLawType.IQS_MOHR_DS_CLB:
+            return pre.tact_behav(
+                name=law.name,
+                law=law_type.value,
+                stfr=law.properties.get('stfr', 1e8),
+                dyfr=law.properties.get('dyfr', 1e8),
+                cohn=law.properties.get('cohn', 0.1),
+                cohr=law.properties.get('cohr', 0.1)  
+            )
+        
+        # IQS_MAC_CZM : Modèle de zone cohésive
+        elif law_type == ContactLawType.IQS_MAC_CZM:
+            return pre.tact_behav(
+                name=law.name,
+                law=law_type.value,
+                stfr=law.properties.get('stfr', 1e10),
+                dyfr=law.properties.get('dyfr', 1e10),
+                cn=law.properties.get('cn', 0.1),    # Énergie de rupture
+                ct=law.properties.get('ct', 0.1),       # Résistance en traction
+                b=law.properties.get('b', 0.1),
+                w=law.properties.get('w', 0.1)
+            )
+        
+        # ELASTIC_WIRE : Fil élastique
+        elif law_type == ContactLawType.ELASTIC_WIRE:
+            return pre.tact_behav(
+                name=law.name,
+                law=law_type.value,
+                stiffness=law.properties.get('stiffness', 1e6),
+                prestrain=law.properties.get('prestrain', 1e5)
+            )
+        
+        # ELASTIC_REPELL_CLB : Répulsion élastique avec friction
+        elif law_type == ContactLawType.ELASTIC_REPELL_CLB:
+            return pre.tact_behav(
+                name=law.name,
+                law=law_type.value,
+                fric=law.friction,
+                Kn=law.properties.get('Kn', 1e8)
+            )
+        
+        # COUPLED_DOF
+        elif law_type == ContactLawType.COUPLED_DOF:
+            return pre.tact_behav(
+                name=law.name,
+                law=law_type.value
+            )
+        
+        else:
+            raise ValueError(f"Type de loi non supporté: {law_type}")
+
     
     @staticmethod
     def create_visibility_rule(rule: VisibilityRule, behavior_obj: Any) -> Any:

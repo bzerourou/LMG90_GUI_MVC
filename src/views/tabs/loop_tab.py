@@ -409,6 +409,55 @@ class LoopTab(BaseTab):
     def _on_edit(self):
         QMessageBox.information(self, "Info", "Modification non implémentée pour les boucles For")
 
+    def load_for_edit(self, index: int, loop=None):
+        """Charge une boucle pour visualisation"""
+        total_loops = len(self.controller.state.loops)
+        
+        if index < total_loops:
+            # Boucle classique
+            if loop is None:
+                loop = self.controller.state.loops[index]
+            
+            self.type_combo.setCurrentText(loop.loop_type)
+            self.count_input.setText(str(loop.count))
+            
+            # Trouver l'avatar modèle
+            for i in range(self.avatar_combo.count()):
+                if self.avatar_combo.itemData(i) == loop.model_avatar_index:
+                    self.avatar_combo.setCurrentIndex(i)
+                    break
+            
+            self.radius_input.setText(str(loop.radius))
+            self.step_input.setText(str(loop.step))
+            self.offset_x_input.setText(str(loop.offset_x))
+            self.offset_y_input.setText(str(loop.offset_y))
+            self.spiral_input.setText(str(loop.spiral_factor))
+            self.invert_check.setChecked(loop.invert_axis)
+            
+            if loop.group_name:
+                self.store_check.setChecked(True)
+                self.group_name_input.setText(loop.group_name)
+        
+        else:
+            # Boucle For
+            for_index = index - total_loops
+            if for_index < len(self.controller.state.for_loops):
+                for_loop = self.controller.state.for_loops[for_index]
+                
+                self.type_combo.setCurrentText("For")
+                self.loop_var_input.setText(for_loop.loop_var)
+                self.start_input.setText(for_loop.start_expr)
+                self.end_input.setText(for_loop.end_expr)
+                self.step_for_input.setText(for_loop.step_expr)
+                self.target_type_combo.setCurrentText(for_loop.target_type)
+                
+                import json
+                self.template_input.setPlainText(json.dumps(for_loop.template_config, indent=2))
+                
+                if for_loop.group_name:
+                    self.store_check.setChecked(True)
+                    self.group_name_input.setText(for_loop.group_name)
+
     def _on_delete(self, index: int):
         if index < len(self.controller.state.loops):
             loop = self.controller.state.loops[index]

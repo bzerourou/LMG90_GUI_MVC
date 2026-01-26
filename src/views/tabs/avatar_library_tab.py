@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...core.avatar_factory import AvatarFactory, AvatarTemplate
-from ...core.models import Avatar, AvatarOrigin
+from ...core.models import Avatar, AvatarOrigin, MaterialType
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 
@@ -16,6 +16,8 @@ class AvatarLibraryTab(QWidget):
     """Onglet bibliothèque d'avatars"""
     
     avatar_created = pyqtSignal()
+    dimension_changed = pyqtSignal(int)
+
     
     def __init__(self, controller: ProjectController):
         super().__init__()
@@ -75,10 +77,10 @@ class AvatarLibraryTab(QWidget):
         self.center_input = QLineEdit("0.0, 0.0")
         pos_form.addRow("Centre:", self.center_input)
         
-        self.material_combo = QLineEdit()
+        self.material_combo = QComboBox()
         pos_form.addRow("Matériau:", self.material_combo)
         
-        self.model_combo = QLineEdit()
+        self.model_combo = QComboBox()
         pos_form.addRow("Modèle:", self.model_combo)
         
         self.color_input = QLineEdit("BLUEx")
@@ -150,7 +152,7 @@ class AvatarLibraryTab(QWidget):
         params_label = QLabel(
             "<i>Définissez les paramètres par défaut en JSON:</i><br>"
             "<b>Exemple pour rigidDisk:</b> {\"radius\": 0.1}<br>"
-            "<b>Exemple pour rigidJonc:</b> {\"axis\": {\"axe1\": 0.2, \"axe2\": 0.1}}"
+            "<b>Exemple pour rigidJonc:</b> {\"axis\": {\"axe1\": 2, \"axe2\": 0.1}}"
         )
         params_label.setWordWrap(True)
         params_layout.addWidget(params_label)
@@ -237,7 +239,8 @@ class AvatarLibraryTab(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", 
                     f"Création échouée:\n{e}")
-    
+                
+
     def _on_template_selected(self, item: QTreeWidgetItem, column: int):
         """Quand un template est sélectionné"""
         template_id = item.data(0, Qt.ItemDataRole.UserRole)
@@ -255,40 +258,164 @@ class AvatarLibraryTab(QWidget):
         # Afficher les infos
         self.info_label.setText(f"<b>{template.name}</b><br>{template.description}")
         
+        # Charger matériau et modèle existants ou créer des défauts
+        self._load_or_create_material_and_model()
+        
         # Nettoyer le formulaire
         while self.params_form.count() > 0:
             item = self.params_form.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         
-        # Ajouter les paramètres
+        # Ajouter les paramètres du template
         for param_name, schema in template.param_schema.items():
             default = template.default_params.get(param_name, 0.1)
-            input_field = QLineEdit(str(default))
-            self.params_form.addRow(f"{param_name}:", input_field)
-            input_field.setObjectName(param_name)
-    
-    # Dans avatar_library_tab.py, remplace la méthode _on_create():
+            
+            # Gérer les paramètres complexes (dict)
+            if isinstance(default, dict):
+                # Pour axis par exemple
+                if param_name == 'axis':
+                    axe1_input = QLineEdit(str(default.get('axe1', 2)))
+                    axe1_input.setObjectName('axe1')
+                    axe1_input.setText("2")
+                    self.params_form.addRow("Axe 1:", axe1_input)
+                    
+                    axe2_input = QLineEdit(str(default.get('axe2', 0.1)))
+                    axe2_input.setObjectName('axe2')
+                    axe2_input.setText("0.1")
+                    self.params_form.addRow("Axe 2:", axe2_input)
+                else:
+                    # Pour d'autres dict, afficher en JSON
+                    import json
+                    input_field = QLineEdit(json.dumps(default))
+                    input_field.setObjectName(param_name)
+                    self.params_form.addRow(f"{param_name}:", input_field)
+            else:
+                # Paramètre simple
+                input_field = QLineEdit(str(default))
+                input_field.setObjectName(param_name)
+                self.params_form.addRow(f"{param_name}:", input_field)
+
+
+    def _load_or_create_material_and_model(self):
+        """Charge un matériau et modèle existants ou crée des défauts"""
+        # Récupérer les matériaux et modèles existants
+        materials = self.controller.state.materials
+        models = self.controller.state.models
+        dim = self.controller.state.dimension
+        
+        # Vider les combobox
+        self.material_combo.clear()
+        self.model_combo.clear()
+        
+        # Charger ou créer le matériau
+        if materials:
+            # Remplir le combo avec tous les matériaux disponibles
+            if isinstance(materials, dict):
+                for material_name in materials.keys():
+                    self.material_combo.addItem(material_name)
+            else:
+                # Si c'est une liste d'objets Material
+                for material in materials:
+                    self.material_combo.addItem(material.name)
+        else:
+            # Créer un matériau par défaut
+            default_material_name = "TDURx"
+            from ...core.models import Material
+            default_material = Material(
+                name=default_material_name,
+                material_type= MaterialType.RIGID ,
+                density=2500.0,
+  
+            )
+            # Utiliser la méthode du controller pour ajouter
+            self.controller.add_material(default_material)
+            self.material_combo.addItem(default_material_name)
+        
+        # Charger ou créer le modèle
+        if models:
+            # Remplir le combo avec tous les modèles disponibles
+            if isinstance(models, dict):
+                for model_name in models.keys():
+                    self.model_combo.addItem(model_name)
+            else:
+                # Si c'est une liste d'objets Model
+                for model in models:
+                    self.model_combo.addItem(model.name)
+        elif dim == 2 :
+            # Créer un modèle par défaut
+            default_model_name = "rigid"
+            from ...core.models import Model
+            default_model = Model(
+                name=default_model_name,
+                physics= "MECAx",
+                element= "Rxx2D", 
+                dimension = self.controller.state.dimension
+            )
+            # Utiliser la méthode du controller pour ajouter
+            self.controller.add_model(default_model)
+            self.model_combo.addItem(default_model_name)
+        else : 
+            # Créer un modèle par défaut
+            default_model_name = "rigid"
+            from ...core.models import Model
+            default_model = Model(
+                name=default_model_name,
+                physics= "MECAx",
+                element= "Rxx3D", 
+                dimension = self.controller.state.dimension
+            )
+            # Utiliser la méthode du controller pour ajouter
+            self.controller.add_model(default_model)
+            self.model_combo.addItem(default_model_name)
+
 
     def _on_create(self):
         """Crée l'avatar depuis le template"""
-
         try:
             if not self.current_template:
                 raise ValidationError("Sélectionnez un template dans la bibliothèque")
+            
             # Parser le centre
             center = [float(x.strip()) for x in self.center_input.text().split(',')]
-            if not center : 
+            if not center:
                 raise ValidationError("Le centre est requis")
+            
             dim = self.controller.state.dimension
             if len(center) != dim:
                 raise ValidationError(f"Le centre doit avoir {dim} coordonnées")
-            material = self.material_combo.text().strip()
-            if not material :
+            
+            # Matériau et modèle
+            material = self.material_combo.currentText().strip()
+            if not material:
                 raise ValidationError("Le matériau est requis")
-            model  = self.model_combo.text().strip()
+            
+            # Vérifier que le matériau existe
+            materials = self.controller.state.materials
+            material_exists = False
+            if isinstance(materials, dict):
+                material_exists = material in materials
+            elif isinstance(materials, list):
+                material_exists = any(m.name == material for m in materials)
+            
+            if not material_exists:
+                raise ValidationError(f"Le matériau '{material}' n'existe pas. Veuillez d'abord créer ce matériau dans l'onglet Matériaux.")
+            
+            model = self.model_combo.currentText().strip()
             if not model:
                 raise ValidationError("Le modèle est requis")
+            
+            # Vérifier que le modèle existe
+            models = self.controller.state.models
+            model_exists = False
+            if isinstance(models, dict):
+                model_exists = model in models
+            elif isinstance(models, list):
+                model_exists = any(m.name == model for m in models)
+            
+            if not model_exists:
+                raise ValidationError(f"Le modèle '{model}' n'existe pas. Veuillez d'abord créer ce modèle dans l'onglet Modèles.")
+            
             # Récupérer les paramètres personnalisés
             custom_params = {}
             
@@ -305,13 +432,36 @@ class AvatarLibraryTab(QWidget):
                 # Si c'est un QLineEdit avec objectName
                 if isinstance(widget, QLineEdit) and widget.objectName():
                     param_name = widget.objectName()
-                    try:
-                        # Essayer de convertir en float
-                        param_value = float(widget.text())
-                        custom_params[param_name] = param_value
-                    except ValueError:
-                        # Garder comme string si pas un nombre
-                        custom_params[param_name] = widget.text()
+                    text_value = widget.text().strip()
+                    
+                    # Gérer les axes spéciaux (axe1, axe2)
+                    if param_name in ['axe1', 'axe2']:
+                        if 'axis' not in custom_params:
+                            custom_params['axis'] = {}
+                        try:
+                            custom_params['axis'][param_name] = float(text_value)
+                        except ValueError:
+                            raise ValidationError(f"Valeur invalide pour {param_name}: {text_value}")
+                    else:
+                        # Essayer de détecter le type
+                        try:
+                            # Tenter float
+                            param_value = float(text_value)
+                            custom_params[param_name] = param_value
+                        except ValueError:
+                            try:
+                                # Tenter int
+                                param_value = int(text_value)
+                                custom_params[param_name] = param_value
+                            except ValueError:
+                                # Tenter JSON (pour dict/list)
+                                try:
+                                    import json
+                                    param_value = json.loads(text_value)
+                                    custom_params[param_name] = param_value
+                                except:
+                                    # Garder comme string
+                                    custom_params[param_name] = text_value
             
             # Créer l'avatar
             avatar = self.current_template.create(
@@ -322,19 +472,28 @@ class AvatarLibraryTab(QWidget):
                 **custom_params
             )
             
-            # Ajouter au projet
+            # Ajouter au projet via le controller (émet automatiquement les signaux)
             self.controller.add_avatar(avatar)
-            self.avatar_created.emit()
-            self.refresh()
-
-            QMessageBox.information(self, "Succès", f"✅ Avatar créé depuis '{self.current_template.name}'")
             
-        except ValidationError as e:  
+            # Émettre le signal local
+            self.avatar_created.emit()
+
+            QMessageBox.information(
+                self, 
+                "Succès", 
+                f"✅ Avatar créé depuis '{self.current_template.name}'"
+            )
+            
+        except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             import traceback
-            QMessageBox.critical(self, "Erreur", f"Création échouée:\n{e}\n\n{traceback.format_exc()}")
-    
+            QMessageBox.critical(
+                self, 
+                "Erreur", 
+                f"Création échouée:\n{e}\n\n{traceback.format_exc()}"
+            )
+
     def _on_save_as_template(self):
         """Créer un template depuis un avatar existant du projet"""
         from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QComboBox
@@ -537,7 +696,7 @@ class AvatarLibraryTab(QWidget):
             
             self.tree.addTopLevelItem(cat_item)
         
-        # ✅ Templates personnalisés
+        #Templates personnalisés
         if hasattr(self.controller.state, 'custom_templates'):
             custom = self.controller.state.custom_templates.get(dim, {})
             
@@ -563,5 +722,5 @@ class AvatarLibraryTab(QWidget):
                     cat_item.addChild(item)
                 
                 self.tree.addTopLevelItem(cat_item)
-    
+
     

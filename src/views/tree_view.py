@@ -35,25 +35,6 @@ class ModelTreeView(QObject):
         if item_type and item_data is not None:
             self.item_selected.emit(item_type, item_data)
 
-    def _add_materials_node(self, parent: QTreeWidgetItem):
-        """Ajoute le nœud Matériaux"""
-        materials = self.controller.get_materials()
-        mat_node = QTreeWidgetItem(parent, ["Matériaux", "", f"{len(materials)}"])
-        
-        for mat in materials:
-            item = QTreeWidgetItem([
-                f"{mat.name} - {mat.material_type.value}",
-                "Matériau",
-                f"ρ={mat.density}"
-            ])
-            # ✅ Stocker le type et le nom
-            item.setData(0, Qt.ItemDataRole.UserRole, "material")
-            item.setData(1, Qt.ItemDataRole.UserRole, mat.name)
-            mat_node.addChild(item)
-        
-        if len(materials) <= 10:
-            mat_node.setExpanded(True)
-
     def refresh(self):
         """Rafraîchit l'arbre complet"""
         self.tree.clear()
@@ -110,7 +91,7 @@ class ModelTreeView(QObject):
         
         if len(materials) <= 10:
             mat_node.setExpanded(True)
-    
+
     def _add_models_node(self, parent: QTreeWidgetItem):
         """Ajoute le nœud Modèles"""
         models = self.controller.get_models()

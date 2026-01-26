@@ -144,11 +144,44 @@ class ContactLawValidator:
             return False, "Le nom de la loi ne peut pas être vide"
         
         from .models import ContactLawType
-        if law.law_type in [ContactLawType.IQS_CLB, ContactLawType.IQS_CLB_G0]:
+        # Lois nécessitant une friction
+        friction_required = [
+            ContactLawType.IQS_CLB, 
+            ContactLawType.IQS_CLB_G0,
+            ContactLawType.IQS_DS_CLB,           
+            ContactLawType.IQS_MOHR_DS_CLB,      
+            ContactLawType.ELASTIC_REPELL_CLB    
+        ]
+        
+        if law.law_type in friction_required:
             if law.friction is None:
                 return False, f"Friction requise pour {law.law_type.value}"
             if law.friction < 0:
                 return False, "Le coefficient de friction doit être positif"
+        # Validation des propriétés spécifiques
+        if law.law_type == ContactLawType.IQS_DS_CLB:
+            # Nécessite: Kn, Ks (rigidités normale et tangentielle)
+            if 'stfr' not in law.properties or 'dyfr' not in law.properties:
+                return False, "IQS_DS_CLB nécessite stfr et dyfr"
+        
+        elif law.law_type == ContactLawType.IQS_MOHR_DS_CLB:
+            # Nécessite: Kn, Ks, cohesion, phi (angle de frottement interne)
+            required = ['stfr', 'dyfr', 'cohn', 'coht']
+            missing = [p for p in required if p not in law.properties]
+            if missing:
+                return False, f"IQS_MOHR_DS_CLB nécessite: {', '.join(missing)}"
+        
+        elif law.law_type == ContactLawType.IQS_MAC_CZM:
+            # Nécessite: Kn, Ks, Gc (énergie de rupture), ft (résistance traction)
+            required = ['stfr', 'dyfr', 'cn', 'ct', 'b', 'w']
+            missing = [p for p in required if p not in law.properties]
+            if missing:
+                return False, f"IQS_MAC_CZM nécessite: {', '.join(missing)}"
+        
+        elif law.law_type == ContactLawType.ELASTIC_WIRE:
+            # Nécessite: Kn, Kt (rigidité tangentielle)
+            if 'stiffness' not in law.properties or 'prestrain' not in law.properties:
+                return False, "ELASTIC_WIRE nécessite stiffness et prestrain"
         
         return True, ""
     

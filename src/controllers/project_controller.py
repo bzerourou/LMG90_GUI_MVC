@@ -7,6 +7,7 @@ Fait le lien entre Model et View.
 """
 from typing import Optional, List, Tuple, Dict, Any
 from pathlib import Path
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from ..core.models import (
     ProjectState, Material, Model, Avatar, ContactLaw, VisibilityRule,
@@ -22,11 +23,12 @@ from ..core.pylmgc_bridge import LMGC90Bridge
 from pylmgc90 import pre
 
 
-class ProjectController:
+class ProjectController(QObject):
     """Contrôleur principal gérant l'état du projet"""
-    
-    def __init__(self):
-        self.state = ProjectState(name="Nouveau_Projet")
+    state_changed = pyqtSignal()
+    def __init__(self, state= None):
+        super().__init__()
+        self.state = state or ProjectState(name="Nouveau_Projet")
         self.project_path: Optional[Path] = None
         self._is_loading = False 
         
@@ -100,6 +102,9 @@ class ProjectController:
         Raises:
             ValidationError: Si validation échoue
         """
+        if any(m.name==material.name for m in self.state.materials):
+            raise ValidationError(f"Nom de matériau '{material.name}' déjà utilisé. Les noms doivent être uniques.")
+
         MaterialValidator.validate_or_raise(material)
         
         # Créer l'objet pylmgc90
@@ -109,7 +114,7 @@ class ProjectController:
         
         # Ajouter au modèle
         self.state.materials.append(material)
-    
+        self.state_changed.emit()
     def update_material(self, old_name: str, material: Material) -> None:
         """
         Met à jour un matériau existant.
@@ -213,6 +218,8 @@ class ProjectController:
         Raises:
             ValidationError: Si validation échoue
         """
+        if any(m.name == model.name for m in self.state.models ) :
+            raise ValidationError(f"Nom de modèle '{model.name}' déjà utilisé. Les noms doivent être uniques.")
         ModelValidator.validate_or_raise(model)
         
         # Créer l'objet pylmgc90
@@ -222,6 +229,7 @@ class ProjectController:
         
         # Ajouter au modèle
         self.state.models.append(model)
+        self.state_changed.emit()
     
     def update_model(self, old_name: str, model: Model) -> None:
         """
@@ -333,6 +341,7 @@ class ProjectController:
         
         # Ajouter au modèle
         self.state.avatars.append(avatar)
+        self.state_changed.emit()
         
         return len(self.state.avatars) - 1
     
@@ -424,6 +433,8 @@ class ProjectController:
     
     def add_contact_law(self, law: ContactLaw) -> None:
         """Ajoute une loi de contact"""
+        if self._find_contact_law(law.name): 
+            raise ValidationError(f"Une loi nommée '{law.name}' existe déjà")
         ContactLawValidator.validate_or_raise(law)
         
         law_obj = LMGC90Bridge.create_contact_law(law)

@@ -48,6 +48,7 @@ class AvatarType(Enum):
     SMOOTH_WALL = "smoothWall"
     GRANULO_WALL = "granuloRoughWall"
     EMPTY_AVATAR = "emptyAvatar"
+    MESH_DEFORMABLE = "mesh"
     # 3D
     RIGID_SPHERE = "rigidSphere"
     RIGID_PLAN = "rigidPlan"
@@ -61,6 +62,12 @@ class ContactLawType(Enum):
     IQS_CLB = "IQS_CLB"
     IQS_CLB_G0 = "IQS_CLB_g0"
     COUPLED_DOF = "COUPLED_DOF"
+    IQS_DS_CLB = "IQS_DS_CLB"                    
+    IQS_MOHR_DS_CLB = "IQS_MOHR_DS_CLB"          
+    IQS_MAC_CZM = "IQS_MAC_CZM"                  
+    ELASTIC_WIRE = "ELASTIC_WIRE"                
+    ELASTIC_REPELL_CLB = "ELASTIC_REPELL_CLB"    
+
 
 
 class AvatarOrigin(Enum):

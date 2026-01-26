@@ -240,6 +240,7 @@ class BaseTab(QWidget):
     
     def eval_dict(self, text: str, field_name: str = "") -> dict:
         """Évalue un dictionnaire de propriétés - Format: key1=val1, key2=val2"""
+ 
         if not text.strip():
             return {}
         
@@ -247,17 +248,77 @@ class BaseTab(QWidget):
             evaluator = self._get_evaluator()
             props = {}
             
-            for pair in text.split(','):
-                pair = pair.strip()
-                if '=' in pair:
-                    key, value_str = pair.split('=', 1)
-                    key = key.strip()
-                    value_str = value_str.strip()
-                    
+            # parser chaque paire individuellement
+            current_key = None
+            current_value = ""
+            paren_depth = 0
+            bracket_depth = 0
+            in_quotes = False
+            quote_char = None
+            
+            i = 0
+            while i < len(text):
+                char = text[i]
+                
+                # Gérer les guillemets
+                if char in ('"', "'") and (i == 0 or text[i-1] != '\\'):
+                    if not in_quotes:
+                        in_quotes = True
+                        quote_char = char
+                    elif char == quote_char:
+                        in_quotes = False
+                        quote_char = None
+                
+                # Si on est dans des guillemets, tout ajouter
+                if in_quotes:
+                    current_value += char
+                    i += 1
+                    continue
+                
+                # Compter les parenthèses et crochets
+                if char == '(':
+                    paren_depth += 1
+                elif char == ')':
+                    paren_depth -= 1
+                elif char == '[':
+                    bracket_depth += 1
+                elif char == ']':
+                    bracket_depth -= 1
+                
+                # Si on trouve '=' et qu'on n'a pas de clé
+                if char == '=' and current_key is None and paren_depth == 0 and bracket_depth == 0:
+                    current_key = current_value.strip()
+                    current_value = ""
+                    i += 1
+                    continue
+                
+                # Si on trouve ',' à la racine (pas dans [], ())
+                if char == ',' and paren_depth == 0 and bracket_depth == 0 and current_key is not None:
+                    # Évaluer la paire key=value
+                    value_str = current_value.strip()
                     try:
-                        props[key] = evaluator.eval_expression(value_str)
+                        props[current_key] = evaluator.eval_expression(value_str)
                     except:
-                        props[key] = value_str
+                        # Si échec, garder comme string
+                        props[current_key] = value_str
+                    
+                    # Reset
+                    current_key = None
+                    current_value = ""
+                    i += 1
+                    continue
+                
+                # Ajouter le caractère
+                current_value += char
+                i += 1
+            
+            # Traiter la dernière paire
+            if current_key is not None:
+                value_str = current_value.strip()
+                try:
+                    props[current_key] = evaluator.eval_expression(value_str)
+                except:
+                    props[current_key] = value_str
             
             return props
             

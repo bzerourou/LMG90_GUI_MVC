@@ -22,7 +22,7 @@ class AvatarTemplate:
                color: str = "BLUEx", **custom_params) -> Avatar:
         """Crée un avatar depuis le template"""
         params = self.default_params.copy()
-        params.update(custom_params)
+        #params.update(custom_params)
         
         return Avatar(
             avatar_type=self.avatar_type,
@@ -71,7 +71,7 @@ class AvatarFactory:
             name="Cylindre Horizontal",
             description="Jonc allongé horizontalement (2:1)",
             avatar_type=AvatarType.RIGID_JONC,
-            default_params={'axis': {'axe1': 0.2, 'axe2': 0.1}},
+            default_params={'axis': {'axe1': 2, 'axe2': 0.1}},
             param_schema={
                 'axe1': {'type': float, 'min': 0.001, 'max': 10.0},
                 'axe2': {'type': float, 'min': 0.001, 'max': 10.0}
@@ -82,11 +82,12 @@ class AvatarFactory:
             name="Cylindre Vertical",
             description="Jonc allongé verticalement (1:2)",
             avatar_type=AvatarType.RIGID_JONC,
-            default_params={'axis': {'axe1': 0.1, 'axe2': 0.2}},
+            default_params={'axis': {'axe1': 2, 'axe2': 0.1}},
             param_schema={
                 'axe1': {'type': float, 'min': 0.001, 'max': 10.0},
                 'axe2': {'type': float, 'min': 0.001, 'max': 10.0}
             }
+
         ),
         
         # Polygones réguliers
@@ -163,13 +164,13 @@ class AvatarFactory:
         "wall_horizontal": AvatarTemplate(
             name="Mur Horizontal",
             description="Mur horizontal lisse",
-            avatar_type=AvatarType.SMOOTH_WALL,
+            avatar_type=AvatarType.FINE_WALL,
             default_params={
-                'wall_params': {'l': 2.0, 'h': 0.1, 'nb_polyg': 20}
+                'wall_params': {'l': 2.0, 'r': 0.1, 'nb_polyg': 20}
             },
             param_schema={
                 'l': {'type': float, 'min': 0.1, 'max': 100.0},
-                'h': {'type': float, 'min': 0.01, 'max': 10.0}
+                'r': {'type': float, 'min': 0.01, 'max': 10.0}
             }
         ),
     }
@@ -219,11 +220,13 @@ class AvatarFactory:
             name="Plan Sol",
             description="Plan horizontal (sol)",
             avatar_type=AvatarType.RIGID_PLAN,
-            default_params={},
-            param_schema={}
-        ),
+            default_params={'axis': {'axe1': 2, 'axe2': 2, 'axe3': 0.1}},
+            param_schema={'axe1': {'type': float, 'min': 0.001, 'max': 10.0},
+                          'axe2': {'type': float, 'min': 0.001, 'max': 10.0}, 
+                          'axe3': {'type': float, 'min': 0.001, 'max': 10.0}
+            }
+        )
     }
-    
     # ========== ASSEMBLAGES COMPLEXES ==========
     
     @staticmethod

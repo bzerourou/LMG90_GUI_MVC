@@ -285,6 +285,54 @@ class GranuloTab(BaseTab):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
+    def load_for_edit(self, index: int, granulo=None):
+        """Charge un dépôt granulo pour visualisation (édition non supportée)"""
+        if granulo is None:
+            granulo = self.controller.get_granulo(index)
+        
+        if not granulo:
+            return
+        
+        self.nb_input.setText(str(granulo.nb_particles))
+        self.rmin_input.setText(str(granulo.radius_min))
+        self.rmax_input.setText(str(granulo.radius_max))
+        self.shape_combo.setCurrentText(granulo.container_type)
+        
+        # Charger les paramètres du conteneur
+        if granulo.container_type == "Box2D":
+            self.lx_input.setText(str(granulo.container_params.get('lx', 4.0)))
+            self.ly_input.setText(str(granulo.container_params.get('ly', 4.0)))
+        elif granulo.container_type in ["Disk2D", "Drum2D"]:
+            self.r_input.setText(str(granulo.container_params.get('r', 2.0)))
+        elif granulo.container_type == "Couette2D":
+            self.rint_input.setText(str(granulo.container_params.get('rint', 2.0)))
+            self.rext_input.setText(str(granulo.container_params.get('rext', 4.0)))
+        
+        # Matériau et modèle
+        mat_idx = self.material_combo.findText(granulo.material_name)
+        if mat_idx >= 0:
+            self.material_combo.setCurrentIndex(mat_idx)
+        
+        mod_idx = self.model_combo.findText(granulo.model_name)
+        if mod_idx >= 0:
+            self.model_combo.setCurrentIndex(mod_idx)
+        
+        # Avatar type
+        for i in range(self.avatar_combo.count()):
+            if self.avatar_combo.itemData(i) == granulo.avatar_type:
+                self.avatar_combo.setCurrentIndex(i)
+                break
+        
+        self.color_input.setText(granulo.color)
+        
+        if granulo.seed:
+            self.seed_input.setText(str(granulo.seed))
+        
+        if granulo.group_name:
+            self.store_check.setChecked(True)
+            self.group_name_input.setText(granulo.group_name)
+
+    
     def _on_delete(self):
         selected = self.tree.currentItem()
         if not selected:

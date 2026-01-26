@@ -52,6 +52,7 @@ class ModelTab(QWidget):
         self.option_combos = {}
         self._setup_ui()
         self._connect_signals()
+        self.refresh()
     
     def _setup_ui(self):
         """Configure l'interface"""
@@ -390,6 +391,8 @@ class ModelTab(QWidget):
     
     def load_for_edit(self, model: Model):
         """Charge pour édition"""
+        if not model : 
+            return 
         self.current_edit_name = model.name
         
         self.name_input.setText(model.name)
@@ -397,7 +400,11 @@ class ModelTab(QWidget):
         self.dimension_combo.setCurrentText(str(model.dimension))
         
         self._update_elements()
-        self.element_combo.setCurrentText(model.element)
+        
+        elem_idx = self.element_combo.findText(model.element)
+        if elem_idx >= 0:
+            self.element_combo.setCurrentIndex(elem_idx)
+
         self._on_element_changed(model.element)
         
         if model.options:

@@ -268,8 +268,11 @@ class AvatarTab(BaseTab):
             elif avatar_type == "smoothWall":
                 self.wall_height_label.setText("Hauteur (h) :")
                 self.wall_nb_label.setText("Nb polygones :")
+                self.wall_height_input.setText("0.15")
+
             else:
                 self.wall_height_label.setText("Rayon (r) :")
+                self.wall_height_input.setText("0.15")
                 self.wall_nb_label.setText("Nb vertices :")
         elif avatar_type == "rigidSphere" :
             self.radius_label.setVisible(True)
@@ -278,7 +281,7 @@ class AvatarTab(BaseTab):
             self.axes_label.setVisible(True)
             self.axes_label.setText("Axes (axe1, axe,axe3) :")
             self.axes_input.setVisible(True)  
-            self.axes_input.setText("2.0, 2.0,0.05")
+            self.axes_input.setText("2.0, 2.0, 0.05")
         elif avatar_type == "rigidCylinder":
             self.radius_label.setVisible(True)
             self.radius_input.setVisible(True)  

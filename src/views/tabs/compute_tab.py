@@ -180,8 +180,13 @@ class ComputeTab(QWidget):
     
     def run_computation(self):
         """Lance le calcul"""
-        try:
 
+        if not self.controller.project_path : 
+            QMessageBox.warning(self, "Projet non sauvegardé","Veuillez d'abord sauvegarder le projet avant de lancer le calcul."
+        )
+            return
+        try:
+            
             params = self.get_parameters()
             if params['dt'] <= 0:
                 raise ValidationError("Le pas de temps doit être > 0")
