@@ -3,10 +3,9 @@
 # ============================================================================
 """
 Validateurs pour les modèles de données.
-Séparation de la logique de validation.
 """
 from typing import Tuple
-from .models import Material, Model, Avatar, ContactLaw
+from .models import Material, Model, Avatar, ContactLaw, AvatarType
 
 
 class ValidationError(Exception):
@@ -86,50 +85,261 @@ class ModelValidator:
 class AvatarValidator:
     """Valide les données d'avatar"""
     
+    RIGID_AVATARS_2D = {
+        AvatarType.RIGID_DISK,
+        AvatarType.RIGID_JONC,
+        AvatarType.RIGID_POLYGON,
+        AvatarType.RIGID_OVOID,
+        AvatarType.RIGID_DISCRETE,
+        AvatarType.RIGID_CLUSTER,
+        AvatarType.ROUGH_WALL,
+        AvatarType.FINE_WALL,
+        AvatarType.SMOOTH_WALL,
+        AvatarType.GRANULO_WALL
+    }
+    
+    RIGID_AVATARS_3D = {
+        AvatarType.RIGID_SPHERE,
+        AvatarType.RIGID_PLAN,
+        AvatarType.RIGID_CYLINDER,
+        AvatarType.RIGID_POLYHEDRON,
+        AvatarType.ROUGH_WALL_3D,
+        AvatarType.GRANULO_ROUGH_WALL_3D
+    }
+    
+    RIGID_ELEMENTS_2D = ["Rxx2D"]
+    RIGID_ELEMENTS_3D = ["Rxx3D"]
+    
+    DEFORMABLE_ELEMENTS_2D = ["T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
+    DEFORMABLE_ELEMENTS_3D = ["H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
+    
+
     @staticmethod
-    def validate(avatar: Avatar, dimension: int) -> Tuple[bool, str]:
+    def validate(avatar: Avatar, model: Model) -> Tuple[bool, str]:
         """
-        Valide un avatar.
+        Valide un avatar avec son modèle.
         
         Args:
             avatar: Avatar à valider
-            dimension: Dimension du modèle (2 ou 3)
+            model: Modèle associé à l'avatar
             
         Returns:
             (is_valid, error_message)
         """
+        dimension = model.dimension
+        element = model.element
+        
         if len(avatar.center) != dimension:
             return False, f"Le centre doit avoir {dimension} coordonnées (actuellement {len(avatar.center)})"
         
         if not avatar.material_name or not avatar.model_name:
             return False, "Matériau et modèle requis"
         
-        # Validation spécifique selon le type
-        from .models import AvatarType
+        atype = avatar.avatar_type
         
-        if avatar.avatar_type in [AvatarType.RIGID_DISK, AvatarType.RIGID_DISCRETE, 
-                                  AvatarType.RIGID_CLUSTER]:
+        if atype in AvatarValidator.RIGID_AVATARS_2D:
+            if dimension != 2:
+                return False, f"{atype.value} nécessite un modèle 2D"
+            if element not in AvatarValidator.RIGID_ELEMENTS_2D:
+                return False, f"{atype.value} nécessite un élément rigide 2D (Rxx2D), pas {element}"
+        
+        if atype in AvatarValidator.RIGID_AVATARS_3D:
+            if dimension != 3:
+                return False, f"{atype.value} nécessite un modèle 3D"
+            if element not in AvatarValidator.RIGID_ELEMENTS_3D:
+                return False, f"{atype.value} nécessite un élément rigide 3D (Rxx3D), pas {element}"
+        
+        if atype == AvatarType.MESH_DEFORMABLE:
+            valid_elements = (AvatarValidator.DEFORMABLE_ELEMENTS_2D if dimension == 2 
+                            else AvatarValidator.DEFORMABLE_ELEMENTS_3D)
+            if element not in valid_elements:
+                return False, f"Élément {element} invalide pour mesh déformable en {dimension}D"
+        
+        if atype == AvatarType.EMPTY_AVATAR:
+            pass
+        
+        if atype == AvatarType.RIGID_DISK:
+            if dimension != 2:
+                return False, "rigidDisk est uniquement 2D"
             if avatar.radius is None or avatar.radius <= 0:
-                return False, f"Rayon positif requis pour {avatar.avatar_type.value}"
+                return False, "Rayon positif requis pour rigidDisk"
         
-        if avatar.avatar_type == AvatarType.RIGID_JONC:
+        elif atype == AvatarType.RIGID_JONC:
+            if dimension != 2:
+                return False, "rigidJonc est uniquement 2D"
             if not avatar.axis or 'axe1' not in avatar.axis or 'axe2' not in avatar.axis:
                 return False, "Axes axe1 et axe2 requis pour rigidJonc"
         
-        if avatar.avatar_type == AvatarType.RIGID_POLYGON:
+        elif atype == AvatarType.RIGID_POLYGON:
+            if dimension != 2:
+                return False, "rigidPolygon est uniquement 2D"
             if avatar.generation_type == "regular":
                 if not avatar.nb_vertices or avatar.nb_vertices < 3:
                     return False, "nb_vertices >= 3 requis pour polygone régulier"
+                if avatar.radius is None or avatar.radius <= 0:
+                    return False, "Rayon positif requis pour polygone régulier"
             else:
                 if not avatar.vertices or len(avatar.vertices) < 3:
-                    return False, "Au moins 3 vertices requis"
+                    return False, "Au moins 3 vertices requis pour polygone personnalisé"
+        
+        elif atype == AvatarType.RIGID_OVOID:
+            if dimension != 2:
+                return False, "rigidOvoidPolygon est uniquement 2D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour rigidOvoidPolygon"
+            if 'ra' not in avatar.wall_params or 'rb' not in avatar.wall_params:
+                return False, "ra et rb requis dans wall_params pour rigidOvoidPolygon"
+            if avatar.wall_params['ra'] <= 0 or avatar.wall_params['rb'] <= 0:
+                return False, "ra et rb doivent être positifs"
+            if not avatar.nb_vertices or avatar.nb_vertices < 3:
+                return False, "nb_vertices >= 3 requis pour rigidOvoidPolygon"
+        
+        elif atype == AvatarType.RIGID_DISCRETE:
+            if dimension != 2:
+                return False, "rigidDiscreteDisk est uniquement 2D"
+            if avatar.radius is None or avatar.radius <= 0:
+                return False, "Rayon positif requis pour rigidDiscreteDisk"
+        
+        elif atype == AvatarType.RIGID_CLUSTER:
+            if dimension != 2:
+                return False, "rigidCluster est uniquement 2D"
+            if avatar.radius is None or avatar.radius <= 0:
+                return False, "Rayon positif requis pour rigidCluster"
+            if not avatar.nb_vertices or avatar.nb_vertices < 2:
+                return False, "nb_disk >= 2 requis pour rigidCluster"
+        
+        elif atype == AvatarType.ROUGH_WALL:
+            if dimension != 2:
+                return False, "roughWall est uniquement 2D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour roughWall"
+            if 'l' not in avatar.wall_params or 'r' not in avatar.wall_params:
+                return False, "l et r requis dans wall_params pour roughWall"
+            if avatar.wall_params['l'] <= 0 or avatar.wall_params['r'] <= 0:
+                return False, "l et r doivent être positifs"
+        
+        elif atype == AvatarType.FINE_WALL:
+            if dimension != 2:
+                return False, "fineWall est uniquement 2D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour fineWall"
+            if 'l' not in avatar.wall_params or 'r' not in avatar.wall_params:
+                return False, "l et r requis dans wall_params pour fineWall"
+            if avatar.wall_params['l'] <= 0 or avatar.wall_params['r'] <= 0:
+                return False, "l et r doivent être positifs"
+        
+        elif atype == AvatarType.SMOOTH_WALL:
+            if dimension != 2:
+                return False, "smoothWall est uniquement 2D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour smoothWall"
+            if 'l' not in avatar.wall_params or 'h' not in avatar.wall_params:
+                return False, "l et h requis dans wall_params pour smoothWall"
+            if avatar.wall_params['l'] <= 0 or avatar.wall_params['h'] <= 0:
+                return False, "l et h doivent être positifs"
+        
+        elif atype == AvatarType.GRANULO_WALL:
+            if dimension != 2:
+                return False, "granuloRoughWall est uniquement 2D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour granuloRoughWall"
+            required = ['l', 'rmin', 'rmax']
+            missing = [k for k in required if k not in avatar.wall_params]
+            if missing:
+                return False, f"Paramètres manquants pour granuloRoughWall: {', '.join(missing)}"
+            if avatar.wall_params['l'] <= 0:
+                return False, "l doit être positif"
+            if avatar.wall_params['rmin'] <= 0 or avatar.wall_params['rmax'] <= 0:
+                return False, "rmin et rmax doivent être positifs"
+            if avatar.wall_params['rmin'] > avatar.wall_params['rmax']:
+                return False, "rmin doit être <= rmax"
+        
+        elif atype == AvatarType.RIGID_SPHERE:
+            if dimension != 3:
+                return False, "rigidSphere est uniquement 3D"
+            if avatar.radius is None or avatar.radius <= 0:
+                return False, "Rayon positif requis pour rigidSphere"
+        
+        elif atype == AvatarType.RIGID_PLAN:
+            if dimension != 3:
+                return False, "rigidPlan est uniquement 3D"
+            if not avatar.axis:
+                return False, "Axes requis pour rigidPlan"
+            required_axes = ['axe1', 'axe2', 'axe3']
+            missing = [k for k in required_axes if k not in avatar.axis]
+            if missing:
+                return False, f"Axes manquants pour rigidPlan: {', '.join(missing)}"
+        
+        elif atype == AvatarType.RIGID_CYLINDER:
+            if dimension != 3:
+                return False, "rigidCylinder est uniquement 3D"
+            if avatar.radius is None or avatar.radius <= 0:
+                return False, "Rayon positif requis pour rigidCylinder"
+            if not avatar.wall_params or 'h' not in avatar.wall_params:
+                return False, "Hauteur h requise dans wall_params pour rigidCylinder"
+            if avatar.wall_params['h'] <= 0:
+                return False, "Hauteur h doit être positive"
+        
+        elif atype == AvatarType.RIGID_POLYHEDRON:
+            if dimension != 3:
+                return False, "rigidPolyhedron est uniquement 3D"
+            if avatar.generation_type == "regular":
+                if not avatar.nb_vertices or avatar.nb_vertices < 4:
+                    return False, "nb_vertices >= 4 requis pour polyèdre régulier"
+                if avatar.radius is None or avatar.radius <= 0:
+                    return False, "Rayon positif requis pour polyèdre régulier"
+            else:
+                if not avatar.vertices or len(avatar.vertices) < 4:
+                    return False, "Au moins 4 vertices requis pour polyèdre personnalisé"
+                if not avatar.wall_params or 'faces' not in avatar.wall_params:
+                    return False, "faces requis dans wall_params pour polyèdre personnalisé"
+        
+        elif atype == AvatarType.ROUGH_WALL_3D:
+            if dimension != 3:
+                return False, "roughWall3D est uniquement 3D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour roughWall3D"
+            required = ['lx', 'ly']
+            missing = [k for k in required if k not in avatar.wall_params]
+            if missing:
+                return False, f"Paramètres manquants pour roughWall3D: {', '.join(missing)}"
+            if avatar.wall_params['lx'] <= 0 or avatar.wall_params['ly'] <= 0:
+                return False, "lx et ly doivent être positifs"
+            if avatar.radius is None or avatar.radius <= 0:
+                return False, "Rayon r positif requis pour roughWall3D"
+        
+        elif atype == AvatarType.GRANULO_ROUGH_WALL_3D:
+            if dimension != 3:
+                return False, "granuloRoughWall3D est uniquement 3D"
+            if not avatar.wall_params:
+                return False, "wall_params requis pour granuloRoughWall3D"
+            required = ['lx', 'ly', 'rmin', 'rmax']
+            missing = [k for k in required if k not in avatar.wall_params]
+            if missing:
+                return False, f"Paramètres manquants pour granuloRoughWall3D: {', '.join(missing)}"
+            if avatar.wall_params['lx'] <= 0 or avatar.wall_params['ly'] <= 0:
+                return False, "lx et ly doivent être positifs"
+            if avatar.wall_params['rmin'] <= 0 or avatar.wall_params['rmax'] <= 0:
+                return False, "rmin et rmax doivent être positifs"
+            if avatar.wall_params['rmin'] > avatar.wall_params['rmax']:
+                return False, "rmin doit être <= rmax"
+        
+        elif atype == AvatarType.EMPTY_AVATAR:
+            if not avatar.contactors or len(avatar.contactors) == 0:
+                return False, "Au moins un contacteur requis pour emptyAvatar"
+            for i, cont in enumerate(avatar.contactors):
+                if 'shape' not in cont:
+                    return False, f"Contacteur {i+1}: 'shape' requis"
+        
+        elif atype == AvatarType.MESH_DEFORMABLE:
+            pass
         
         return True, ""
     
     @staticmethod
-    def validate_or_raise(avatar: Avatar, dimension: int) -> None:
+    def validate_or_raise(avatar: Avatar, model: Model) -> None:
         """Valide ou lève une exception"""
-        is_valid, error = AvatarValidator.validate(avatar, dimension)
+        is_valid, error = AvatarValidator.validate(avatar, model)
         if not is_valid:
             raise ValidationError(error)
 
@@ -144,7 +354,7 @@ class ContactLawValidator:
             return False, "Le nom de la loi ne peut pas être vide"
         
         from .models import ContactLawType
-        # Lois nécessitant une friction
+        
         friction_required = [
             ContactLawType.IQS_CLB, 
             ContactLawType.IQS_CLB_G0,
@@ -158,28 +368,24 @@ class ContactLawValidator:
                 return False, f"Friction requise pour {law.law_type.value}"
             if law.friction < 0:
                 return False, "Le coefficient de friction doit être positif"
-        # Validation des propriétés spécifiques
+        
         if law.law_type == ContactLawType.IQS_DS_CLB:
-            # Nécessite: Kn, Ks (rigidités normale et tangentielle)
             if 'stfr' not in law.properties or 'dyfr' not in law.properties:
                 return False, "IQS_DS_CLB nécessite stfr et dyfr"
         
         elif law.law_type == ContactLawType.IQS_MOHR_DS_CLB:
-            # Nécessite: Kn, Ks, cohesion, phi (angle de frottement interne)
             required = ['stfr', 'dyfr', 'cohn', 'coht']
             missing = [p for p in required if p not in law.properties]
             if missing:
                 return False, f"IQS_MOHR_DS_CLB nécessite: {', '.join(missing)}"
         
         elif law.law_type == ContactLawType.IQS_MAC_CZM:
-            # Nécessite: Kn, Ks, Gc (énergie de rupture), ft (résistance traction)
             required = ['stfr', 'dyfr', 'cn', 'ct', 'b', 'w']
             missing = [p for p in required if p not in law.properties]
             if missing:
                 return False, f"IQS_MAC_CZM nécessite: {', '.join(missing)}"
         
         elif law.law_type == ContactLawType.ELASTIC_WIRE:
-            # Nécessite: Kn, Kt (rigidité tangentielle)
             if 'stiffness' not in law.properties or 'prestrain' not in law.properties:
                 return False, "ELASTIC_WIRE nécessite stiffness et prestrain"
         
@@ -191,4 +397,3 @@ class ContactLawValidator:
         is_valid, error = ContactLawValidator.validate(law)
         if not is_valid:
             raise ValidationError(error)
-

@@ -197,7 +197,6 @@ class AvatarTab(BaseTab):
     def _update_avatar_types(self):
         """Met à jour les types selon dimension"""
         dim = self.controller.state.dimension
-        print(dim)
         types = self.AVATAR_TYPES_2D if dim == 2 else self.AVATAR_TYPES_3D
         
         self.type_combo.blockSignals(True)
@@ -631,6 +630,8 @@ class AvatarTab(BaseTab):
                 )
             avatar.wall_params = wall_params
 
+        
+        # 3D
         elif avatar_type == AvatarType.RIGID_SPHERE:
             avatar.radius = self.eval_float(
                 self.radius_input.text(), 

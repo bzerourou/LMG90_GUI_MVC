@@ -323,11 +323,11 @@ class ProjectController(QObject):
             ValidationError: Si validation échoue
             ValueError: Si matériau ou modèle introuvable
         """
-        AvatarValidator.validate_or_raise(avatar, self.state.dimension)
-        
         # Récupérer les objets pylmgc90
         mat_obj = self._pylmgc_materials.get(avatar.material_name)
         mod_obj = self._pylmgc_models.get(avatar.model_name)
+
+        AvatarValidator.validate_or_raise(avatar, mod_obj)
         
         if not mat_obj:
             raise ValueError(f"Matériau '{avatar.material_name}' introuvable")

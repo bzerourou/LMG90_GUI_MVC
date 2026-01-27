@@ -450,8 +450,6 @@ class MainWindow(QMainWindow):
         self.model_tab.dimension_changed.connect( self.avatar_library_tab.refresh)
 
 
-    
-        
         # ========== SLOTS MENU ==========
     
     def _on_new_project(self):
