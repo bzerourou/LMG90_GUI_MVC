@@ -1,0 +1,101 @@
+{
+  "project_name": "Mon_Projet",
+  "dimension": 2,
+  "units": {},
+  "preferences": {
+    "default_project_path": null,
+    "unit_system": "SI",
+    "auto_save": true,
+    "auto_save_interval": 300,
+    "backup_enabled": true,
+    "recent_projects": [],
+    "max_recent_projects": 10
+  },
+  "materials": [
+    {
+      "name": "TDURx",
+      "type": "RIGID",
+      "density": 2800.0,
+      "props": {}
+    }
+  ],
+  "models": [
+    {
+      "name": "rigid",
+      "physics": "MECAx",
+      "element": "Rxx2D",
+      "dimension": 2
+    }
+  ],
+  "avatars": [
+    {
+      "type": "rigidDisk",
+      "center": [
+        0.0,
+        0.0
+      ],
+      "material": "TDURx",
+      "model": "rigid",
+      "color": "BLUEx",
+      "__origin": "manual",
+      "r": 0.1
+    }
+  ],
+  "custom_templates": {},
+  "contact_laws": [],
+  "visibility_rules": [],
+  "operations": [
+    {
+      "type": "translate",
+      "target": "group",
+      "target_value": "circle_10disks",
+      "params": {
+        "dx": 0.0,
+        "dy": 2.0
+      }
+    }
+  ],
+  "loops": [
+    {
+      "type": "Cercle",
+      "model_avatar_index": 0,
+      "count": 10,
+      "radius": 2.0,
+      "step": 0.0,
+      "offset_x": 0.0,
+      "offset_y": 0.0,
+      "spiral_factor": 0.0,
+      "invert_axis": false,
+      "stored_in_group": "circle_10disks",
+      "generated_avatar_indices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    }
+  ],
+  "granulo_generations": [],
+  "postpro_creations": [],
+  "avatar_groups": {
+    "circle_10disks": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ]
+  },
+  "dynamic_vars": {}
+}

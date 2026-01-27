@@ -1,5 +1,5 @@
 # ============================================================================
-# Contrôleur principal (Controller dans MVC)
+# Contrôleur principal 
 # ============================================================================
 """
 Contrôleur principal gérant la logique métier.
@@ -323,11 +323,16 @@ class ProjectController(QObject):
             ValidationError: Si validation échoue
             ValueError: Si matériau ou modèle introuvable
         """
+        # Récupérer le modèle pour validation
+        model = next((m for m in self.state.models if m.name == avatar.model_name), None)
+        if not model:
+            raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
+        
+        AvatarValidator.validate_or_raise(avatar, model)
+        
         # Récupérer les objets pylmgc90
         mat_obj = self._pylmgc_materials.get(avatar.material_name)
         mod_obj = self._pylmgc_models.get(avatar.model_name)
-
-        AvatarValidator.validate_or_raise(avatar, mod_obj)
         
         if not mat_obj:
             raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
@@ -360,7 +365,12 @@ class ProjectController(QObject):
         if not (0 <= index < len(self.state.avatars)):
             raise ValueError(f"Index {index} invalide")
         
-        AvatarValidator.validate_or_raise(avatar, self.state.dimension)
+        # Récupérer le modèle pour validation
+        model = next((m for m in self.state.models if m.name == avatar.model_name), None)
+        if not model:
+            raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
+        
+        AvatarValidator.validate_or_raise(avatar, model)
         
         # Vérifier que matériau et modèle existent
         mat_obj = self._pylmgc_materials.get(avatar.material_name)

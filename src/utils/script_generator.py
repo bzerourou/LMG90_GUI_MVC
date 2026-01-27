@@ -57,6 +57,8 @@ class ScriptGenerator:
         f.write('tacts = pre.tact_behavs()\n')
         f.write('sees = pre.see_tables()\n')
         f.write('post = pre.postpro_commands()\n\n')
+        f.write('bodies_list = []\n\n')
+
     
     def _write_materials(self, f: TextIO):
         if not self.state.materials:
@@ -67,7 +69,7 @@ class ScriptGenerator:
             f.write(f"mat_{mat.name} = pre.material(\n")
             f.write(f"    name='{mat.name}',\n")
             f.write(f"    materialType='{mat.material_type.value}',\n")
-            f.write(f"    rho={mat.density}")
+            f.write(f"    density={mat.density}")
             
             if mat.properties:
                 for key, value in mat.properties.items():
@@ -89,7 +91,8 @@ class ScriptGenerator:
             f.write(f"mod_{mod.name} = pre.model(\n")
             f.write(f"    name='{mod.name}',\n")
             f.write(f"    physics='{mod.physics}',\n")
-            f.write(f"    element='{mod.element}'")
+            f.write(f"    element='{mod.element}',\n")
+            f.write(f"    dimension={mod.dimension}")
             
             if mod.options:
                 for key, value in mod.options.items():
@@ -168,13 +171,27 @@ class ScriptGenerator:
             f"color='{color}'"
         ]
         
+        
         # Arguments spécifiques selon le type
-        if avatar.radius is not None:
+        # D'abord ajouter wall_params (qui peut contenir 'r')
+        has_r_in_wall_params = False
+        if avatar.wall_params is not None:
+            for k, v in avatar.wall_params.items():
+                args.append(f"{k}={v}")
+                if k == 'r':
+                    has_r_in_wall_params = True
+        is_full_polygon = ((avatar.avatar_type == AvatarType.RIGID_POLYGON or 
+                           avatar.avatar_type == AvatarType.RIGID_POLYHEDRON) and 
+                          avatar.generation_type == 'full')
+        # Ensuite ajouter radius seulement si pas déjà dans wall_params
+        if not avatar.radius  and not has_r_in_wall_params and not is_full_polygon:
             args.append(f"r={avatar.radius}")
         
         if avatar.axis:
             args.append(f"axe1={avatar.axis['axe1']}")
             args.append(f"axe2={avatar.axis['axe2']}")
+            if 'axe3' in avatar.axis:
+                args.append(f"axe3={avatar.axis['axe3']}")
         
         if avatar.generation_type:
             args.append(f"generation_type='{avatar.generation_type}'")
@@ -187,10 +204,6 @@ class ScriptGenerator:
         
         if avatar.is_hollow:
             args.append("is_Hollow=True")
-        
-        if avatar.wall_params:
-            for k, v in avatar.wall_params.items():
-                args.append(f"{k}={v}")
         
         # Écrire
         f.write(f"body = pre.{atype}(\n")

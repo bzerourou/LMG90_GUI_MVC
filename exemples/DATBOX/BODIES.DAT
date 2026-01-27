@@ -1,0 +1,100 @@
+$bdyty
+ RBDY2      1
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1= 0.0000000E+00  coo2= 0.0000000E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      2
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1= 2.0000000E+00  coo2= 0.0000000E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      3
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1= 1.6180340E+00  coo2= 1.1755705E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      4
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1= 6.1803399E-01  coo2= 1.9021130E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      5
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1=-6.1803399E-01  coo2= 1.9021130E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      6
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1=-1.6180340E+00  coo2= 1.1755705E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      7
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1=-2.0000000E+00  coo2= 2.4492936E-16  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      8
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1=-1.6180340E+00  coo2=-1.1755705E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2      9
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1=-6.1803399E-01  coo2=-1.9021130E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2     10
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1= 6.1803399E-01  coo2=-1.9021130E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+$bdyty
+ RBDY2     11
+$blmty
+ PLAIN      1  behav  TDURx  avrd= 1.0000000E-01  gyrd= 7.0710678E-02
+$nodty
+ NO3xx      1                coo1= 1.6180340E+00  coo2=-1.1755705E+00  coo3= 0.0000000E+00  
+$tacty                                                                  
+ DISKx      1  color  BLUEx  byrd= 1.0000000E-01
+$$$$$$
+      

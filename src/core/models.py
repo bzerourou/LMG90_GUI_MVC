@@ -193,7 +193,7 @@ class Avatar:
         if self.axis:
             data['axe1'] = self.axis['axe1']
             data['axe2'] = self.axis['axe2']
-            if self.controller.state.dimension == 3 and 'axe3' in self.axis:
+            if 'axe3' in self.axis:
                 data['axe3'] = self.axis['axe3']
         
         if self.vertices:
@@ -223,9 +223,11 @@ class Avatar:
         axis = None
         if 'axe1' in data and 'axe2' in data:
             axis = {'axe1': data['axe1'], 'axe2': data['axe2']}
+            if 'axe3' in data : 
+                axis['axe3'] = data['axe3']
         
         # Reconstruire wall_params
-        wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg']
+        wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg','lx', 'ly', 'lz','ra', 'rb', 'faces']
         wall_params = {k: data[k] for k in wall_keys if k in data}
         
         return cls(
