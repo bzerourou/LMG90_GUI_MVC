@@ -68,7 +68,10 @@ LMGC90_GUI/
 ├── requirements-dev.txt
 ├── pytest.ini
 └── README.md
+
 ```
+
+![](docs/captures/UML_classes.png)
 
 ## Documentation (fr)
 [French documentation of LMGC90_GUI](docs/overview.md)

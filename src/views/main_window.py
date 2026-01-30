@@ -215,8 +215,8 @@ class MainWindow(QMainWindow):
             ("Ouvrir", self.style().StandardPixmap.SP_DirOpenIcon, self._on_open_project),
             ("Sauvegarder", self.style().StandardPixmap.SP_DriveHDIcon, self._on_save_project),
             ("DATBOX", self.style().StandardPixmap.SP_FileDialogStart, self._on_generate_datbox),
-            ("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
-            ("▶ Exécuter Script", self.style().StandardPixmap.SP_MediaPlay, self._on_run_script),
+            #("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
+            ("▶ Exécuter ", self.style().StandardPixmap.SP_MediaPlay, self._on_run_compute),
         ]
         
         for text, icon, slot in actions:
@@ -615,56 +615,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'exécution :\n{e}")
             self.statusBar().showMessage("Erreur", 5000)
     
-    def _on_run_script(self):
-        """Génère et exécute le script Python avec fenêtre de sortie"""
-        if not self.controller.project_path:
-            QMessageBox.warning(self, "Attention", "Enregistrez d'abord le projet")
-            return self._on_save_project_as()
-        
-        script_path = self.controller.project_path.parent / f"{self.controller.state.name}.py"
-        
-        try:
-            # Générer le script
-            self.statusBar().showMessage("Génération du script...", 2000)
-            QApplication.processEvents()
-            
-            from ..utils.script_generator import ScriptGenerator
-            generator = ScriptGenerator(self.controller)
-            generator.generate(script_path)
-            
-            # Dialogue de confirmation avec options
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Exécuter le Script")
-            msg.setText(f"Script généré : {script_path.name}\n\n"
-                    f"⚠️ Cela va exécuter le script et générer le DATBOX.")
-            msg.setIcon(QMessageBox.Icon.Question)
-            
-            run_btn = msg.addButton("▶ Exécuter", QMessageBox.ButtonRole.AcceptRole)
-            view_btn = msg.addButton("👁 Voir le Script", QMessageBox.ButtonRole.ActionRole)
-            cancel_btn = msg.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
-            
-            msg.exec()
-            
-            clicked = msg.clickedButton()
-            
-            if clicked == view_btn:
-                # Ouvrir le script dans l'éditeur
-                import subprocess
-                import sys
-                if sys.platform == 'win32':
-                    subprocess.Popen(['notepad', str(script_path)])
-                else:
-                    subprocess.Popen(['xdg-open', str(script_path)])
-                return
-            
-            if clicked != run_btn:
-                return
-            
-            # Exécuter
-            self._execute_script(script_path)
-        
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur :\n{e}")
+
 
     def _execute_script(self, script_path):
         """Exécute le script dans un processus séparé"""

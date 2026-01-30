@@ -8,6 +8,24 @@ from enum import Enum
 from pathlib import Path
 
 
+def convert_to_serializable(obj):
+    """
+    Convertit récursivement les objets non-sérialisables en types JSON.
+    Gère numpy.ndarray, numpy.integer, numpy.floating, etc.
+    """
+    import numpy as np
+    
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_serializable(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.floating)):
+        return obj.item()
+    else:
+        return obj
+
 # ============================================================================
 # EXCEPTIONS - Erreurs personnalisées
 # ============================================================================
@@ -179,7 +197,7 @@ class Avatar:
         """Convertit en dictionnaire pour sérialisation"""
         data = {
             'type': self.avatar_type.value,
-            'center': self.center,
+            'center': convert_to_serializable(self.center),
             'material': self.material_name,
             'model': self.model_name,
             'color': self.color,
@@ -188,7 +206,10 @@ class Avatar:
         
         # Ajouter les champs non-None
         if self.radius is not None:
-            data['r'] = self.radius
+            if self.avatar_type not in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON] :
+                data['r'] = self.radius
+            else : 
+                data['radius'] = self.radius
         
         if self.axis:
             data['axe1'] = self.axis['axe1']
@@ -209,10 +230,10 @@ class Avatar:
             data['is_Hollow'] = True
         
         if self.wall_params:
-            data.update(self.wall_params)
+            data.update(convert_to_serializable(self.wall_params))
         
         if self.contactors:
-            data['contactors'] = self.contactors
+            data['contactors'] = convert_to_serializable(self.contactors)
         
         return data
     
@@ -225,19 +246,20 @@ class Avatar:
             axis = {'axe1': data['axe1'], 'axe2': data['axe2']}
             if 'axe3' in data : 
                 axis['axe3'] = data['axe3']
-        
+        if isinstance(data['center'], list):
+            center = data['center']
         # Reconstruire wall_params
         wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg','lx', 'ly', 'lz','ra', 'rb', 'faces']
         wall_params = {k: data[k] for k in wall_keys if k in data}
         
         return cls(
             avatar_type=AvatarType(data['type']),
-            center=data['center'],
+            center=center,
             material_name=data['material'],
             model_name=data['model'],
             color=data.get('color', 'BLUEx'),
             origin=AvatarOrigin(data.get('__origin', 'manual')),
-            radius=data.get('r'),
+            radius=data.get('r') or data.get('radius'),
             axis=axis,
             vertices=data.get('vertices'),
             nb_vertices=data.get('nb_vertices'),
@@ -333,7 +355,7 @@ class DOFOperation:
             'type': self.operation_type,
             'target': self.target_type,
             'target_value': self.target_value,
-            'params': self.parameters
+            'params': convert_to_serializable(self.parameters)
         }
     
     @classmethod

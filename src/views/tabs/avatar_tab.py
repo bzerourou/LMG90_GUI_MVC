@@ -240,10 +240,10 @@ class AvatarTab(BaseTab):
             self.axes_input.setVisible(True)
         
         elif avatar_type == "rigidPolygon":
-            self.radius_label.setVisible(True)
-            self.radius_input.setVisible(True)
+            
             self.gen_type_label.setVisible(True)
             self.gen_type_combo.setVisible(True)
+
             self._on_gen_type_changed(self.gen_type_combo.currentText())
         
         elif avatar_type == "rigidOvoidPolygon":
@@ -326,12 +326,16 @@ class AvatarTab(BaseTab):
     def _on_gen_type_changed(self, gen_type):
         """Affiche vertices ou nb_vertices"""
         if gen_type == "regular":
+            self.radius_label.setVisible(True)
+            self.radius_input.setVisible(True)
             self.nb_vertices_label.setText("Nb vertices :")
             self.nb_vertices_label.setVisible(True)
             self.nb_vertices_input.setVisible(True)
             self.vertices_label.setVisible(False)
             self.vertices_input.setVisible(False)
         else:
+            self.radius_label.setVisible(False)
+            self.radius_input.setVisible(False)
             self.nb_vertices_label.setVisible(False)
             self.nb_vertices_input.setVisible(False)
             self.vertices_label.setVisible(True)
@@ -548,12 +552,7 @@ class AvatarTab(BaseTab):
             avatar.axis = {'axe1': axes[0], 'axe2': axes[1]}
         
         elif avatar_type == AvatarType.RIGID_POLYGON:
-            avatar.radius = float(self._eval_expression(self.radius_input.text()))
-            avatar.radius = self.eval_float(
-                self.radius_input.text(), 
-                default=0.1, 
-                field_name="Rayon"
-            )
+           
             avatar.generation_type = self.gen_type_combo.currentText()
             if avatar.generation_type == "regular":
                 avatar.nb_vertices = self.eval_int(
@@ -561,6 +560,12 @@ class AvatarTab(BaseTab):
                     default=5, 
                     field_name="Nb vertices"
                 )
+                avatar.radius = float(self._eval_expression(self.radius_input.text()))
+                avatar.radius = self.eval_float(
+                self.radius_input.text(), 
+                default=0.1, 
+                field_name="Rayon"
+            )
             else:
                 #Évaluer vertices
                 import ast

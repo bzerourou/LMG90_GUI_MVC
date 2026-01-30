@@ -56,7 +56,7 @@ class ScriptGenerator:
         f.write('bodies = pre.avatars()\n')
         f.write('tacts = pre.tact_behavs()\n')
         f.write('sees = pre.see_tables()\n')
-        f.write('post = pre.postpro_commands()\n\n')
+        f.write('posts = pre.postpro_commands()\n\n')
         f.write('bodies_list = []\n\n')
 
     
@@ -118,7 +118,7 @@ class ScriptGenerator:
     def _write_single_avatar(self, f, avatar, container="bodies"):
         """Écrit un avatar individuel"""
         atype = avatar.avatar_type.value
-        center = avatar.center
+        center = self._format_value( avatar.center)
         mat = avatar.material_name
         mod = avatar.model_name
         color = avatar.color
@@ -126,7 +126,7 @@ class ScriptGenerator:
         # emptyAvatar
         if atype == "emptyAvatar":
             f.write(f"# Avatar vide avec contacteurs personnalisés\n")
-            f.write(f"body = pre.avatar(dimension={len(center)})\n")
+            f.write(f"body = pre.avatar(dimension={self.state.dimension})\n")
             
             # Bulk
             if len(center) == 2:
@@ -171,21 +171,29 @@ class ScriptGenerator:
             f"color='{color}'"
         ]
         
-        
-        # Arguments spécifiques selon le type
-        # D'abord ajouter wall_params (qui peut contenir 'r')
+        # 1. Traiter wall_params d'abord (ex: r, thick, etc.)
         has_r_in_wall_params = False
-        if avatar.wall_params is not None:
+        if avatar.wall_params:
             for k, v in avatar.wall_params.items():
                 args.append(f"{k}={v}")
                 if k == 'r':
                     has_r_in_wall_params = True
-        is_full_polygon = ((avatar.avatar_type == AvatarType.RIGID_POLYGON or 
-                           avatar.avatar_type == AvatarType.RIGID_POLYHEDRON) and 
-                          avatar.generation_type == 'full')
-        # Ensuite ajouter radius seulement si pas déjà dans wall_params
-        if not avatar.radius  and not has_r_in_wall_params and not is_full_polygon:
-            args.append(f"r={avatar.radius}")
+        
+        # 2. Déterminer si on doit EXCLURE r (cas spécial polygone full/bevel)
+        exclude_r = False
+        if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
+            if avatar.generation_type in ["full", "bevel"]:
+                exclude_r = True
+        print(not exclude_r)
+        print(not has_r_in_wall_params)
+
+        # 3. Ajouter r seulement si :
+        #    - il existe,
+        #    - il n'est pas déjà dans wall_params,
+        #    - ET ce n'est PAS un polygone full/bevel
+        if avatar.radius and not has_r_in_wall_params and not exclude_r:
+
+            args.append(f"radius={avatar.radius}")
         
         if avatar.axis:
             args.append(f"axe1={avatar.axis['axe1']}")
@@ -197,7 +205,10 @@ class ScriptGenerator:
             args.append(f"generation_type='{avatar.generation_type}'")
         
         if avatar.nb_vertices:
-            args.append(f"nb_vertices={avatar.nb_vertices}")
+            if avatar.avatar_type == AvatarType.RIGID_CLUSTER:
+                args.append(f"nb_disk = {avatar.nb_vertices}")
+            else : 
+                args.append(f"nb_vertices={avatar.nb_vertices}")
         
         if avatar.vertices:
             args.append(f"vertices=np.array({avatar.vertices})")
@@ -208,11 +219,12 @@ class ScriptGenerator:
         # Écrire
         f.write(f"body = pre.{atype}(\n")
         for i, arg in enumerate(args):
-            f.write(f"    {arg}")
-            if i < len(args) - 1:
-                f.write(",\n")
-            else:
-                f.write("\n")
+            if "None" not in arg : 
+                f.write(f"    {arg}")
+                if i < len(args) - 1:
+                    f.write(",\n")
+                else:
+                    f.write("\n")
         f.write(")\n")
         f.write(f"{container}.addAvatar(body)\n")
         f.write("bodies_list.append(body)\n\n")
@@ -518,11 +530,11 @@ class ScriptGenerator:
             
             if op.target_type == 'avatar':
                 f.write(f"# DOF sur avatar #{op.target_value}\n")
-                f.write(f"# bodies.get({op.target_value}).{op.operation_type}({params_str})\n\n")
+                f.write(f"bodies.get({op.target_value}).{op.operation_type}({params_str})\n\n")
             elif op.target_type == 'group':
-                f.write(f"# DOF sur groupe '{op.target_value}'\n")
-                f.write(f"# for av in group_{op.target_value}:\n")
-                f.write(f"#     av.{op.operation_type}({params_str})\n\n")
+                f.write(f"DOF sur groupe '{op.target_value}'\n")
+                f.write(f"for av in group_{op.target_value}:\n")
+                f.write(f"    av.{op.operation_type}({params_str})\n\n")
     
     def _write_postpro(self, f: TextIO):
         if not self.state.postpro_commands:
@@ -536,15 +548,15 @@ class ScriptGenerator:
                 f.write(f"# post_cmd_{i} = pre.postpro_command(\n")
                 f.write(f"#     name='{cmd.name}',\n")
                 f.write(f"#     step={cmd.step},\n")
-                f.write(f"#     rigid_set=rigid_set\n")
+                f.write(f"#     rigid_set={cmd.target_value}n")
                 f.write(f"# )\n")
+                f.write(f"posts.addCommand(post_cmd_{i})\n")
             else:
-                f.write(f"post = pre.postpro_commands()")
                 f.write(f"post_cmd_{i} = pre.postpro_command(\n")
                 f.write(f"    name='{cmd.name}',\n")
                 f.write(f"    step={cmd.step}\n")
                 f.write(f")\n")
-                f.write(f"post.addCommand(post_cmd_{i})\n")
+                f.write(f"posts.addCommand(post_cmd_{i})\n")
             f.write('\n')
     
     def _write_datbox(self, f: TextIO):
@@ -556,7 +568,7 @@ class ScriptGenerator:
         f.write(f"    bodies=bodies,\n")
         f.write(f"    tacts=tacts,\n")
         f.write(f"    sees=sees,\n")
-        f.write(f"    post=post,\n")
+        f.write(f"    post=posts,\n")
         f.write(f"    datbox_path='DATBOX'\n")
         f.write(f")\n\n")
         f.write(f"print('DATBOX généré avec succès!')\n")
@@ -565,10 +577,10 @@ class ScriptGenerator:
     def _format_value(self, value):
         """Formate une valeur pour Python"""
         if isinstance(value, str):
-            return f"'{value}'"
+            return f"{value}"
         elif isinstance(value, (int, float)):
             return str(value)
         elif isinstance(value, bool):
             return "True" if value else "False"
         else:
-            return repr(value)
+            return value
