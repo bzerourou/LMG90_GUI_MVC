@@ -530,7 +530,7 @@ class ScriptGenerator:
             
             if op.target_type == 'avatar':
                 f.write(f"# DOF sur avatar #{op.target_value}\n")
-                f.write(f"bodies.get({op.target_value}).{op.operation_type}({params_str})\n\n")
+                f.write(f"bodies[{op.target_value}].{op.operation_type}({params_str})\n\n")
             elif op.target_type == 'group':
                 f.write(f"DOF sur groupe '{op.target_value}'\n")
                 f.write(f"for av in group_{op.target_value}:\n")
@@ -576,11 +576,14 @@ class ScriptGenerator:
     
     def _format_value(self, value):
         """Formate une valeur pour Python"""
+        import numpy as np
         if isinstance(value, str):
             return f"{value}"
         elif isinstance(value, (int, float)):
             return str(value)
         elif isinstance(value, bool):
             return "True" if value else "False"
-        else:
-            return value
+        elif isinstance(value, np.ndarray):
+            return value.tolist()
+        else :      
+            return value            

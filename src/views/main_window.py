@@ -215,8 +215,8 @@ class MainWindow(QMainWindow):
             ("Ouvrir", self.style().StandardPixmap.SP_DirOpenIcon, self._on_open_project),
             ("Sauvegarder", self.style().StandardPixmap.SP_DriveHDIcon, self._on_save_project),
             ("DATBOX", self.style().StandardPixmap.SP_FileDialogStart, self._on_generate_datbox),
-            #("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
-            ("▶ Exécuter ", self.style().StandardPixmap.SP_MediaPlay, self._on_run_compute),
+            ("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
+            ("▶ Exécuter Script", self.style().StandardPixmap.SP_MediaPlay, self._on_run_script),
         ]
         
         for text, icon, slot in actions:
