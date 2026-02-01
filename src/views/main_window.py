@@ -216,7 +216,7 @@ class MainWindow(QMainWindow):
             ("Sauvegarder", self.style().StandardPixmap.SP_DriveHDIcon, self._on_save_project),
             ("DATBOX", self.style().StandardPixmap.SP_FileDialogStart, self._on_generate_datbox),
             ("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
-            ("▶ Exécuter Script", self.style().StandardPixmap.SP_MediaPlay, self._on_run_script),
+   
         ]
         
         for text, icon, slot in actions:
@@ -529,6 +529,8 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Sauvegarde échouée :\n{e}")
     
+    #====== Génération DATBOX ==================
+    
     def _on_generate_datbox(self):
         """Génère le fichier DATBOX"""
         if not self.controller.project_path:
@@ -543,137 +545,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
-    def _on_run_script(self):
-        """Génère et exécute le script Python"""
-        if not self.controller.project_path:
-            QMessageBox.warning(self, "Attention", "Enregistrez d'abord le projet")
-            return self._on_save_project_as()
-        
-        script_path = self.controller.project_path.parent / f"{self.controller.state.name}.py"
-        
-        try:
-            # 1. Générer le script
-            self.statusBar().showMessage("Génération du script...", 2000)
-            QApplication.processEvents()
-            
-            from ..utils.script_generator import ScriptGenerator
-            generator = ScriptGenerator(self.controller)
-            generator.generate(script_path)
-            
-            # 2. Demander confirmation
-            reply = QMessageBox.question(
-                self, "Exécuter le Script",
-                f"Script généré :\n{script_path}\n\n"
-                f"⚠️ Cela va exécuter le script et générer le DATBOX.\n\n"
-                f"Continuer ?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-            
-            # 3. Exécuter le script
-            self.statusBar().showMessage("Exécution du script...", 0)
-            QApplication.processEvents()
-            
-            import subprocess
-            import sys
-            
-            # Exécuter dans le même environnement Python
-            result = subprocess.run(
-                [sys.executable, str(script_path)],
-                cwd=str(script_path.parent),
-                capture_output=True,
-                text=True,
-                timeout=60  # Timeout de 60 secondes
-            )
-            
-            # 4. Afficher les résultats
-            if result.returncode == 0:
-                QMessageBox.information(
-                    self, "✅ Succès",
-                    f"Script exécuté avec succès !\n\n"
-                    f"DATBOX généré dans :\n{script_path.parent / 'DATBOX'}\n\n"
-                    f"--- Sortie ---\n{result.stdout[:500]}"
-                )
-                self.statusBar().showMessage("Script exécuté avec succès", 5000)
-            else:
-                QMessageBox.critical(
-                    self, "❌ Erreur d'Exécution",
-                    f"Le script a échoué (code {result.returncode})\n\n"
-                    f"--- Erreur ---\n{result.stderr[:1000]}"
-                )
-                self.statusBar().showMessage("Échec de l'exécution", 5000)
-        
-        except subprocess.TimeoutExpired:
-            QMessageBox.critical(
-                self, "Timeout",
-                "Le script a pris trop de temps (> 60s).\n"
-                "Exécutez-le manuellement."
-            )
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'exécution :\n{e}")
-            self.statusBar().showMessage("Erreur", 5000)
-    
+ 
 
-
-    def _execute_script(self, script_path):
-        """Exécute le script dans un processus séparé"""
-        import subprocess
-        import sys
-        
-        # Créer une fenêtre de dialogue pour la sortie
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
-        
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Exécution du Script")
-        dialog.resize(700, 500)
-        
-        layout = QVBoxLayout()
-        
-        output_text = QTextEdit()
-        output_text.setReadOnly(True)
-        output_text.setStyleSheet("font-family: monospace; background-color: #1e1e1e; color: #d4d4d4;")
-        layout.addWidget(output_text)
-        
-        close_btn = QPushButton("Fermer")
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
-        
-        dialog.setLayout(layout)
-        
-        # Lancer le processus
-        output_text.append(f">>> Exécution de {script_path.name}...\n")
-        QApplication.processEvents()
-        
-        try:
-            process = subprocess.Popen(
-                [sys.executable, str(script_path)],
-                cwd=str(script_path.parent),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
-            
-            # Lire la sortie ligne par ligne
-            for line in process.stdout:
-                output_text.append(line.rstrip())
-                QApplication.processEvents()
-            
-            process.wait()
-            
-            if process.returncode == 0:
-                output_text.append("\n✅ SUCCÈS - DATBOX généré !")
-                self.statusBar().showMessage("Script exécuté avec succès", 5000)
-            else:
-                output_text.append(f"\n❌ ERREUR - Code de sortie : {process.returncode}")
-                self.statusBar().showMessage("Échec de l'exécution", 5000)
-        
-        except Exception as e:
-            output_text.append(f"\n❌ EXCEPTION : {e}")
-        
-        dialog.exec()
     # ======Tabs======================
 
     def _add_tab(self, tab_id: str):
