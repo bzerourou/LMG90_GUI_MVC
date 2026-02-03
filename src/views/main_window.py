@@ -4,11 +4,11 @@ Interface entre l'utilisateur et le contrôleur.
 """
 from PyQt6.QtWidgets import (
     QMainWindow, QToolBar, QPushButton, QDockWidget,
-    QTreeWidget, QTabWidget, QMessageBox, QFileDialog, QApplication,
-    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel
+    QTabWidget, QMessageBox, QFileDialog, QApplication,
+    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtGui import QAction, QKeySequence, QIcon
 from pathlib import Path
 
 from ..controllers.project_controller import ProjectController
@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         # Configuration fenêtre
         self.setWindowTitle(f"LMGC90_GUI v0.3.0 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
+        self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
         # Interface
         self._setup_ui()
