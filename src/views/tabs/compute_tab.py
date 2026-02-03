@@ -12,7 +12,7 @@ from io import StringIO
 
 
 class ComputeWorker(QThread):
-    """Thread pour exécuter le calcul - ULTRA-SÉCURISÉ"""
+    """Thread pour exécuter le calcul"""
     progress = pyqtSignal(str)
     finished = pyqtSignal(bool, str)
     
@@ -121,7 +121,7 @@ class ComputeWorker(QThread):
             # Sécurité supplémentaire : capturer même les erreurs de setup
             self.progress.emit("")
             self.progress.emit("=" * 60)
-            self.progress.emit(f"❌ ERREUR CRITIQUE AVANT L'EXÉCUTION")
+            self.progress.emit(f"❌ Erreur critique avant le calcul")
             self.progress.emit(f"{type(outer_e).__name__}: {str(outer_e)}")
             self.progress.emit("=" * 60)
             
@@ -258,7 +258,7 @@ class ComputeTab(QWidget):
         self.run_btn.clicked.connect(self.run_computation)
         btn_layout.addWidget(self.run_btn)
         
-        self.stop_btn = QPushButton("⏹️ Arrêter")
+        self.stop_btn = QPushButton("⏹️ Arrêter le calcul")
         self.stop_btn.setStyleSheet("padding: 10px; font-size: 11pt;")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop_computation)
