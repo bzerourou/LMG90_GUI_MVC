@@ -1,6 +1,6 @@
 # Granulométrie et Dépôt
 
-Cette section sert à génération de dépôts granulaires.
+Cette section sert à la génération de dépôts granulaires.
 
 ## Paramètres
 - Nombre de particules à générer
@@ -9,7 +9,7 @@ Cette section sert à génération de dépôts granulaires.
 - Type de conteneur : Box2D, Disk2D, Couette2D, Drum2D
 - Avatar modèle (sélectionné parmi les avatars manuels)
 - Couleur des particules
-- [x]Option : créer murs autour (Box2D)
+- [x]Option : créer murs autour (Box2D) (non impl)
 - Option : stocker dans groupe nommé
 
 ## Fonctionnement

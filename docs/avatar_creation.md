@@ -4,13 +4,21 @@ Un avatar représente vos objets numériques qui seront en interaction les uns d
 
 ## Types disponibles
 LMGC90_GUI vous liste un nombre d'avatars qui sont déjà définit dans LMGC90: 
-- rigidDisk
-- rigidJonc (fondation)
-- rigidPolygon (regular, full, bevel)
-- rigidOvoidPolygon
-- rigidDiscreteDisk
-- rigidCluster
-- roughWall, fineWall, smoothWall, granuloRoughWall (mur)
+- en 2D : 
+    - rigidDisk
+    - rigidJonc (fondation)
+    - rigidPolygon (regular, full, bevel)
+    - rigidOvoidPolygon
+    - rigidDiscreteDisk
+    - rigidCluster
+    - roughWall, fineWall, smoothWall, granuloRoughWall (mur)
+- en 3D : 
+    - rigidSphere
+    - rigidPlan (fondation)
+    - rigidCylinder
+    - rigidPolyhedron
+    - roughWall3D
+    - granuloRoughWall3D
 
 ## Champs communs
 Chaque avatar est caractérisé par son : 
@@ -22,20 +30,20 @@ Chaque avatar est caractérisé par son :
 
 ## Champs spécifiques par type
 
-- Disque : rayon, si il est creux ou non
-- Polygone : rayon + nb vertices OU liste de vertices
+- Disque : rayon, 
+- Polygone : rayon + nb vertices ou bien liste de vertices
 - Jonc : axe1, axe2
 - Mur : longueur, rayon/hauteur, nombre de vertices
 
 ## Exemple 
-Pour créer une avatar disque, il vous suffit seulement de préciser  : 
-- rayon : 0.5, 
+Pour créer un avatar de tyoe disque, il vous suffit seulement de préciser  : 
+- rayon : 0.25, 
 - coordonnées : [0.0, 0.0], 
 - le matériau et modèle sont chargés automatiquement
-- Cliquez ensuite sur le bouton *Créer*, 
+- Cliquez ensuite sur le bouton *Créer Avatar*, 
 
 ![](captures/avatar_disque.JPG)
 
 
 ## Astuces 
-Chochez l'option 'Avatar disque creux' pour le rendre creux.
+Chochez l'option 'Disque creux (hollow)' pour le rendre creux.

@@ -11,6 +11,6 @@ Application de conditions aux limites ( déplacements ou vitesses imposés) sur 
 Tous les groupes (boucles, granulométrie) apparaissent dans la liste
 
 ## Exemple
-Vous pour ouvrir l'exemple de bielle-manivelle fournit dans les exemples, 'slider_crank.lmgc90' dans lequel on avait appliué quatre différents DOFs, 
+Vous pouvez ouvrir l'exemple de bielle-manivelle fournit dans les exemples, 'slider_crank.lmgc90' dans lequel on applique quatre différents DOFs sur les avatars du modèles, 
 
 ![](captures/exemple_slider_crank.JPG)

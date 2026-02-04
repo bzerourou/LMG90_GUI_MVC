@@ -1,9 +1,10 @@
 # Documentation LMGC90_GUI
 
-Bienvenue dans la documentation de l’interface graphique pour LMGC90, qui n'est q'une brève introduction, 
+Bienvenue dans la documentation de l’interface graphique pour LMGC90_GUI v0.3.0, qui n'est q'une brève introduction, 
 
 ## Navigation
 - [Interface](interface.md)
+- [Assistant Projets](project_wizard.md)
 - [Création d'un matériau](material_creation.md)
 - [Création d'un modèle](model_creation.md)
 - [Création d'un avatar](avatar_creation.md)

@@ -4,11 +4,15 @@ Cet onglet vous permi de créer des corps rigides avec plusieurs contacteurs.
 
 ## Fonctionnalités
 - Ajout illimité de contacteurs
-- Types de contacteurs supportés : DISKx, xKSID, JONCx, POLYG, PT2Dx
+- Types de contacteurs supportés : 
+- en 2D:
+    - DISKx, xKSID, JONCx, POLYG, PT2Dx
+- en 3D:
+    - SPHER, PLANx, CYLND, POLYR, 
 - Paramètres libres avec support des variables dynamiques
 
 ## Étapes
-1. Choisir dimension (seulement en 2D)
+1. Choisir dimension (2D ou 3D)
 2. Définir centre et couleur globale
 3. Sélectionnez un matériau et un modèle
 4. Cliquez sur le bouton  *"Ajouter un contacteur"* pour en rajouter un nouveau contacteur
