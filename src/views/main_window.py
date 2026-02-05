@@ -201,10 +201,12 @@ class MainWindow(QMainWindow):
 
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
-        
+        aide_action = QAction("Aide en ligne ", self)
         about_action = QAction("À propos", self)
         about_action.triggered.connect(self._on_about)
+        aide_action.triggered.connect(self._on_help)
         help_menu.addAction(about_action)
+        help_menu.addAction(aide_action)
     
     def _create_toolbar(self):
         """Crée la barre d'outils"""
@@ -283,9 +285,10 @@ class MainWindow(QMainWindow):
 
         elif item_type == "loop":   
             loop = self.controller.get_loop(item_data)
+            print(item_data)
             if loop:
                 self.tabs.setCurrentWidget(self.loop_tab)
-                self.loop_tab.load_for_edit(item_data, loop)
+                self.loop_tab.load_for_edit(item_data)
 
         elif item_type == "granulo":
             granulo = self.controller.get_granulo(item_data)
@@ -416,6 +419,7 @@ class MainWindow(QMainWindow):
         #loops
         self.loop_tab.loop_generated.connect(self._refresh_all)
         self.loop_tab.loop_deleted.connect(self._refresh_all)
+        self.loop_tab.loop_updated.connect(self._refresh_all)
         #granulo
         self.granulo_tab.granulo_generated.connect(self._refresh_all)
         self.granulo_tab.granulo_deleted.connect(self._refresh_all)
@@ -636,6 +640,10 @@ class MainWindow(QMainWindow):
             "par Zerourou B.\n\n"
             "© 2025 - Open Source"
         )
+
+    def _on_help(self) :
+        import webbrowser
+        webbrowser.open("https://github.com/bzerourou/LMG90_GUI_MVC/blob/main/docs/granulometry.md")
 
     def _on_preferences(self):
         """Ouvre le dialogue de préférences"""
