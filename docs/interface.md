@@ -43,8 +43,8 @@ L'interface est divisée en **quatre zones principales** :
 - **Help** :
   - À propos
 
-#### Barre d'outils
-Une barre d'outils pour  les actions les plus fréquentes :
+### Barre d'outils
+I'interface comporte une barre d'outils pour  les actions les plus fréquentes :
 - Nouveau projet
 - Ouvrir projet
 - Sauvegarder projet
@@ -57,7 +57,7 @@ Zone fixe en forme de dock contenant l’**arborescence complète du modèle en 
 
 #### Sections affichées :
 - **Matériaux** 
-- **Modèles** )
+- **Modèles** 
 - **Avatars** 
 - **Groupes d'avatars** (boucles, granulométrie)
 - **Lois de contact**
@@ -65,8 +65,7 @@ Zone fixe en forme de dock contenant l’**arborescence complète du modèle en 
 - **PostPro**
 
 Fonctionnalités :
-- Cliquez sur un élément → pointe sur l’onglet correspondant avec les valeurs chargées dans le cas ouvert
-- Permet la sélection rapide pour ajouter/modification/suppression
+- Cliquez sur un élément → pointe sur l’onglet correspondant dans le cas ouvert en _mode édition_
 - Vue hiérarchique claire de tous  les éléments du projet
 
 
@@ -80,12 +79,12 @@ Zone principale de travail avec des onglets dédiés à chaque étape de modéli
 - **Matériau** : création et gestion des matériaux
 - **Modèle** : définition des modèles physiques et éléments
 - **Avatar** : création de corps rigides simples (disque, polygone, mur, etc.)
-- **Avatar vide** : création avancée avec contacteurs multiples
+- **Avatar vide** : création d'avatars vides avec contacteurs multiples
 - **Bibliothèques** : contients des avatars déjà personnalisés, 
 - **Boucles** : génération paramétrique (cercle, grille, ligne, spirale, manuel)
-- **Granulométrie** : génération de dépôts avec distribution de tailles
+- **Granulométrie** : génération de dépôts avec distribution
 - **DOF** : conditions aux limites (translation, rotation, vitesses imposées)
-- **Contact** : lois d’interaction
+- **Contact** : lois de contacts
 - **Visibilité** : tables de détection
 - **Postpro** : commandes de sortie (énergie, suivi de corps, etc.)
 - **Visualisation** : Ouvre un onglet pour visualisation des avatars de vos modèles
@@ -113,5 +112,3 @@ Affiche des messages d'information sur l'état des opérations en cours.
 ---
 
 LMGC90_GUI est conçue pour être **intuitive**,  et **entièrement visuelle**, tout en conservant la pleine compatibilité avec les scripts Python traditionnels de LMGC90.
-
-Prochaines sections : guide détaillé pour chaque onglet.

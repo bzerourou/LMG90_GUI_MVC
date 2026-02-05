@@ -47,4 +47,5 @@ IL ne vous reste de cliquer sur le bouton 'Générer de dépôt'
 ![](captures/depot_granulo_disk_jonc.JPG)
 
 Le rendu de mon modèle, 
+
 ![](captures/rendu_depot_granulo_disk_jonc.JPG)
