@@ -8,7 +8,7 @@ Vous avez plusieurs formes :
 - Grille
 - Ligne
 - Spirale
-- Manuel (création progressive)
+- For
 
 ## Paramètres
 Il vous suffit seulement de remplir les champs pour chaque forme :  
