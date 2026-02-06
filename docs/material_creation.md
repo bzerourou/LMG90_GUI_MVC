@@ -62,6 +62,12 @@ Vous avez aussi la possibilité de modifier ou de supprimer un matériau, pour c
 
 ![](captures/materiau_steel_modification.JPG)
 
+## Variables dynamiques 
 
+Il est tout à fait possible de créer des variables dynamiques ainsi que des expressions pour pouvoir les utilisés dans les champs des onglets afin d'automatiser vos valeurs.
+Dans le menu "Outils"-> "Variables dynamiques", vous aurez cette boite de dialogue,
 
+![](captures/variables.JPG)
 
+### Exemples et expressions
+Si je clique sur le premier exemple, et je modifie le nom de la variable à "radius ", je lui attribut la valeur de 0.25, puis de cliquer sur le bouton "Ajouter ou modifier", puis sur "OK", vous aurez la possibilité cette variable dans tous les champs.
