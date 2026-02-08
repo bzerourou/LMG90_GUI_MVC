@@ -23,12 +23,23 @@ L'interface est divisée en **quatre zones principales** :
 
 #### Menu
 - **Fichier** :
-  - Nouveau (Ctrl+N)
+  - Nouveau  (Ctrl+N) : 
+  Sert  à créer un nouveau projet, vous cliquez sur le bouton "nouveau" de la barre d'outils, ou de cliquer sur le menu "Fichier" -> "Nouveau", ou avec le raccourci clavier "Ctrl+N", une petit boite de dialogue s'ouvre pour renseigner le nom de votre projet
+
+  ![](captures/nouveau_projet.JPG)
+
   - Ouvrir (Ctrl+O)
+  Sert à ouvrir vos projets existants pour pouvoir leurs apportés des modifications,  cliquez simplement sur le bouton "Ouvrir" de la barre d'outils, ou cliquez sur le menu "Fichier"->"Ouvrir", sinon avec me raccouri clavier "Ctrl+O", ensuite il vous restera seulement de spécifier le chemin et nom de votre projet
+
+  ![](captures/ouvrir_projet.JPG)
+
   - Sauvegarder (Ctrl+S)
+  Sert à sauvegarder vos projets dans votre disque dur, cliquez sur le bouton "sauvegarder" de la barre d'outils, ou de cliquez sur le menu "Fichier"-> "Sauvegarder", ou avec le raccourci clavier "Ctrl+S",
   - Sauvegarder sous... (Ctrl+Shift+S)
   - Assistant de configuration de projets (Ctrl+Shift+N)
+  Est un assistant qui vous guidera pas à pas pour créer et configurer votre projet
   - Assistant de granulométrie (Ctrl+Shift+G)
+  Est un assistant pour générer une granulométrie rapidement
   - Quitter (Ctrl+Q)
 - **Outils** :
   - Préférences (Ctrl+,)
@@ -53,7 +64,7 @@ I'interface comporte une barre d'outils pour  les actions les plus fréquentes :
 
 ### 2. Arbre du modèle (à gauche)
 
-Zone fixe en forme de dock contenant l’**arborescence complète du modèle en cours**.
+Zone fixe en forme d'arbre contenant l’**arborescence complète du modèle en cours**.
 
 #### Sections affichées :
 - **Matériaux** 
@@ -101,13 +112,23 @@ Partie dédiée à la visualisation et aux sorties.
 - **LMGC90 visualisation** : lance la visualisation intégrée avec `pre.visuAvatars()`
 - **ParaView** : ouvre automatiquement les fichiers de sortie dans ParaView (par défaut rigids.pvd)
 
-Cette zone s’active après exécution d’une simulation.
+**Paraview** s'ouvre seulement s'il est installé dans votre machine, et seulement si vous avez déjà un résultat d'un calcul (simulation).
 
 
-### 5. Barre d'état (en bas)
+### 5. Préférences
+Vous pouvez personnalisé LMGC90_GUI à travers le menu "Outils " -> "Préférences", ou bien avec le raccouri clavier "ctrl+,", une boite de dialogue s'ouvrira sur votre écran, 
+Vous avez la possibilité de spécifier quatre choses : 
+- Un chemin pour vos projets en cliquant sur le bouton "Parcourir"
+- Choisir un système d'unités (SI ou CSG), il n'est pas encore implémenter
+- Automatiser vos sauvegardes en cochant les options 
+- Préciser nombre de projets de votre historique
 
-Affiche des messages d'information sur l'état des opérations en cours.
+![](captures/preferences.JPG)
 
+
+### 6. Barre d'état (en bas)
+
+Affiche des messages d'informations sur l'état des opérations en cours.
 
 ---
 
