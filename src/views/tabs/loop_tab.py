@@ -80,7 +80,7 @@ class LoopTab(BaseTab):
         form = QFormLayout()
 
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["Cercle", "Grille", "Ligne", "Spirale", "Manuel", "For"])
+        self.type_combo.addItems(["Cercle", "Grille", "Ligne", "Spirale", "For"])
         self.type_combo.currentTextChanged.connect(self._on_type_changed)
         form.addRow("Type de boucle :", self.type_combo)
 

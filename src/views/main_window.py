@@ -643,7 +643,7 @@ class MainWindow(QMainWindow):
 
     def _on_help(self) :
         import webbrowser
-        webbrowser.open("https://github.com/bzerourou/LMG90_GUI_MVC/blob/main/docs/granulometry.md")
+        webbrowser.open("https://github.com/bzerourou/LMG90_GUI_MVC/blob/main/docs/overview.md")
 
     def _on_preferences(self):
         """Ouvre le dialogue de préférences"""

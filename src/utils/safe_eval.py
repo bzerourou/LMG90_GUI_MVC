@@ -9,6 +9,7 @@ import ast
 import math
 import numpy as np
 from typing import Dict, Any
+from ..core.models import AvatarType
 
 
 class SafeEvaluator:
@@ -30,6 +31,7 @@ class SafeEvaluator:
             'pi': math.pi,
             'e': math.e,
             'str': str, 'int': int, 'float': float, 'list': list, 'dict': dict, 'tuple': tuple,
+            'AvatarType': AvatarType,
             #'avatar', avatar.nodes[1].coor
         })
     

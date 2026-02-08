@@ -10,7 +10,7 @@ from pathlib import Path
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from ..core.models import (
-    ProjectState, Material, Model, Avatar, ContactLaw, VisibilityRule,
+    AvatarType, ProjectState, Material, Model, Avatar, ContactLaw, VisibilityRule,
     DOFOperation, Loop, ForLoop, GranuloGeneration, PostProCommand, AvatarOrigin
 )
 from ..core.validators import (
@@ -20,6 +20,7 @@ from ..core.validators import (
 from ..core.generators import LoopGenerator, GranuloGenerator
 from ..core.serializers import ProjectSerializer
 from ..core.pylmgc_bridge import LMGC90Bridge
+import math
 from pylmgc90 import pre
 
 
@@ -862,9 +863,109 @@ class ProjectController(QObject):
         Returns:
             Liste des indices des éléments créés
         """
-        from ..core.generators import ForLoopGenerator
+        from ..utils.safe_eval import SafeEvaluator
+        import math
         
-        generated_indices = ForLoopGenerator.generate(for_loop, self)
+        generated_indices = []
+        
+        # Créer l'évaluateur
+        evaluator = SafeEvaluator()
+        
+        # Contexte de base
+        base_context = {
+            'math': math,
+            'sqrt': math.sqrt,
+            'pi': math.pi,
+            'e': math.e,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'len': len,
+            'str': str,
+            'int': int,
+            'float': float,
+        }
+        
+        # Évaluer start, end, step
+        evaluator.allowed_names = base_context
+        start = evaluator.eval_expression(for_loop.start_expr)
+        end = evaluator.eval_expression(for_loop.end_expr)
+        step = evaluator.eval_expression(for_loop.step_expr)
+        
+        # Boucle For
+        loop_var = for_loop.loop_var
+        current = start
+        
+        while (step > 0 and current < end) or (step < 0 and current > end):
+            # Contexte avec variable de boucle
+            context = {**base_context, loop_var: current}
+            evaluator.allowed_names = context
+            
+            # Évaluer le template
+            evaluated_config = {}
+            for key, value in for_loop.template_config.items():
+                if isinstance(value, str):
+                    try:
+                        evaluated_config[key] = evaluator.eval_expression(value)
+                    except (ValueError, NameError, SyntaxError):
+                        # Chaîne littérale ou expression?
+                        if any(op in value for op in ['+', '-', '*', '/', '(', '[', 'str(', 'int(', 'float(', 'math.']):
+                            raise  # C'est une expression avec erreur
+                        else:
+                            evaluated_config[key] = value  # Chaîne littérale
+                else:
+                    evaluated_config[key] = value
+            
+            # Créer l'élément selon le type
+            if for_loop.target_type == 'avatar':
+                avatar = Avatar(
+                    avatar_type=AvatarType(evaluated_config['avatar_type']),
+                    center=evaluated_config['center'],
+                    material_name=evaluated_config.get('material_name', 'TDURx'),
+                    model_name=evaluated_config.get('model_name', 'rigid'),
+                    color=evaluated_config.get('color', 'BLUEx'),
+                    origin=AvatarOrigin.LOOP,
+                    radius=evaluated_config.get('radius'),
+                    axis=evaluated_config.get('axis'),
+                    vertices=evaluated_config.get('vertices'),
+                    nb_vertices=evaluated_config.get('nb_vertices'),
+                    generation_type=evaluated_config.get('generation_type'),
+                    is_hollow=evaluated_config.get('is_hollow', False),
+                    wall_params=evaluated_config.get('wall_params'),
+                    contactors=evaluated_config.get('contactors')
+                )
+                idx = self.add_avatar(avatar)
+                generated_indices.append(idx)
+            
+            elif for_loop.target_type == 'material':
+                from ..core.models import Material, MaterialType
+                material = Material(
+                    name=evaluated_config['name'],
+                    material_type=MaterialType(evaluated_config.get('material_type', 'RIGID')),
+                    density=evaluated_config.get('density', 2800),
+                    properties=evaluated_config.get('properties', {})
+                )
+                self.add_material(material)
+                # Pour les matériaux, on stocke l'index dans la liste
+                idx = len(self.state.materials) - 1
+                generated_indices.append(idx)
+            
+            elif for_loop.target_type == 'model':
+                from ..core.models import Model
+                model = Model(
+                    name=evaluated_config['name'],
+                    physics=evaluated_config.get('physics', 'MECAx'),
+                    element=evaluated_config.get('element', 'Rxx2D'),
+                    dimension=evaluated_config.get('dimension', 2),
+                    options=evaluated_config.get('options', {})
+                )
+                self.add_model(model)
+                # Pour les modèles, on stocke l'index dans la liste
+                idx = len(self.state.models) - 1
+                generated_indices.append(idx)
+            
+            current += step
         
         for_loop.generated_indices = generated_indices
         if not self._is_loading:
@@ -872,8 +973,8 @@ class ProjectController(QObject):
                 self.state.for_loops = []
             self.state.for_loops.append(for_loop)
         
-        # Ajouter au groupe si spécifié
-        if for_loop.group_name:
+        # Ajouter au groupe si spécifié (uniquement pour avatars)
+        if for_loop.group_name and for_loop.target_type == 'avatar':
             if for_loop.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[for_loop.group_name] = []
             self.state.avatar_groups[for_loop.group_name].extend(generated_indices)
@@ -916,12 +1017,108 @@ class ProjectController(QObject):
         # Mettre à jour la boucle
         self.state.for_loops[index] = for_loop
         
-        # Régénérer les éléments
-        from ..core.generators import ForLoopGenerator
-        generated_indices = ForLoopGenerator.generate(for_loop, self)
+        # Régénérer les éléments avec la même logique que generate_for_loop
+        from ..utils.safe_eval import SafeEvaluator
+        import math
+        
+        generated_indices = []
+        
+        # Créer l'évaluateur
+        evaluator = SafeEvaluator()
+        
+        # Contexte de base
+        base_context = {
+            'math': math,
+            'sqrt': math.sqrt,
+            'pi': math.pi,
+            'e': math.e,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'len': len,
+            'str': str,
+            'int': int,
+            'float': float,
+        }
+        
+        # Évaluer start, end, step
+        evaluator.allowed_names = base_context
+        start = evaluator.eval_expression(for_loop.start_expr)
+        end = evaluator.eval_expression(for_loop.end_expr)
+        step = evaluator.eval_expression(for_loop.step_expr)
+        
+        # Boucle For
+        loop_var = for_loop.loop_var
+        current = start
+        
+        while (step > 0 and current < end) or (step < 0 and current > end):
+            # Contexte avec variable de boucle
+            context = {**base_context, loop_var: current}
+            evaluator.allowed_names = context
+            
+            # Évaluer le template
+            evaluated_config = {}
+            for key, value in for_loop.template_config.items():
+                if isinstance(value, str):
+                    # Évaluer l'expression
+                    evaluated_config[key] = evaluator.eval_expression(value)
+                else:
+                    evaluated_config[key] = value
+            
+            # Créer l'élément selon le type
+            if for_loop.target_type == 'avatar':
+                avatar = Avatar(
+                    avatar_type=AvatarType(evaluated_config['avatar_type']),
+                    center=evaluated_config['center'],
+                    material_name=evaluated_config.get('material_name', 'TDURx'),
+                    model_name=evaluated_config.get('model_name', 'rigid'),
+                    color=evaluated_config.get('color', 'BLUEx'),
+                    origin=AvatarOrigin.LOOP,
+                    radius=evaluated_config.get('radius'),
+                    axis=evaluated_config.get('axis'),
+                    vertices=evaluated_config.get('vertices'),
+                    nb_vertices=evaluated_config.get('nb_vertices'),
+                    generation_type=evaluated_config.get('generation_type'),
+                    is_hollow=evaluated_config.get('is_hollow', False),
+                    wall_params=evaluated_config.get('wall_params'),
+                    contactors=evaluated_config.get('contactors')
+                )
+                idx = self.add_avatar(avatar)
+                generated_indices.append(idx)
+            
+            elif for_loop.target_type == 'material':
+                from ..core.models import Material, MaterialType
+                material = Material(
+                    name=evaluated_config['name'],
+                    material_type=MaterialType(evaluated_config.get('material_type', 'RIGID')),
+                    density=evaluated_config.get('density', 2800),
+                    properties=evaluated_config.get('properties', {})
+                )
+                self.add_material(material)
+                # Pour les matériaux, on stocke l'index dans la liste
+                idx = len(self.state.materials) - 1
+                generated_indices.append(idx)
+            
+            elif for_loop.target_type == 'model':
+                from ..core.models import Model
+                model = Model(
+                    name=evaluated_config['name'],
+                    physics=evaluated_config.get('physics', 'MECAx'),
+                    element=evaluated_config.get('element', 'Rxx2D'),
+                    dimension=evaluated_config.get('dimension', 2),
+                    options=evaluated_config.get('options', {})
+                )
+                self.add_model(model)
+                # Pour les modèles, on stocke l'index dans la liste
+                idx = len(self.state.models) - 1
+                generated_indices.append(idx)
+            
+            current += step
+        
         for_loop.generated_indices = generated_indices
         
-        # Mettre à jour le groupe si spécifié
+        # Mettre à jour le groupe si spécifié (uniquement pour avatars)
         if old_for_loop.group_name and old_for_loop.group_name in self.state.avatar_groups:
             # Retirer les anciens indices du groupe
             self.state.avatar_groups[old_for_loop.group_name] = [
@@ -929,7 +1126,7 @@ class ProjectController(QObject):
                 if i not in old_for_loop.generated_indices
             ]
         
-        if for_loop.group_name:
+        if for_loop.group_name and for_loop.target_type == 'avatar':
             if for_loop.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[for_loop.group_name] = []
             self.state.avatar_groups[for_loop.group_name].extend(generated_indices)
@@ -979,7 +1176,6 @@ class ProjectController(QObject):
         if 0 <= index < len(self.state.for_loops):
             return self.state.for_loops[index]
         return None
-    
     # ========== POST-TRAITEMENT ==========
     def add_postpro_command(self, command: PostProCommand) -> None:
         """Ajoute une commande post-pro"""
