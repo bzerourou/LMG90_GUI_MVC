@@ -6,6 +6,17 @@ L'interface est organisée de manière claire et ergonomique pour accompagner l'
 
 Voici une vue d'ensemble des différentes parties de l'interface.
 
+<iframe 
+  width="560" 
+  height="315" 
+  src="https://www.youtube.com/watch?v=2lVIGg3VboA" 
+  title="YouTube video player" 
+  frameborder="0" 
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+  referrerpolicy="strict-origin-when-cross-origin" 
+  allowfullscreen>
+</iframe>
+
 ## Fenêtre principale
 
 ![Vue globale de l'interface](captures/interface_sections.jpg)
