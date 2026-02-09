@@ -2,6 +2,9 @@
 
 Cette section explique comment créer et configurer un matériau dans LMGC90_GUI.
 
+[![Introduction LMGC90_GUI](https://img.youtube.com/vi/6OiwBiSzL_E/0.jpg)](https://www.youtube.com/watch?v=6OiwBiSzL_E)
+
+
 ## Interface
 - Onglet **Matériau** vous sert à créer votre matériau,
 - Champs principaux :
