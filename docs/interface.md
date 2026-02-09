@@ -6,16 +6,8 @@ L'interface est organisée de manière claire et ergonomique pour accompagner l'
 
 Voici une vue d'ensemble des différentes parties de l'interface.
 
-<iframe 
-  width="560" 
-  height="315" 
-  src="https://www.youtube.com/watch?v=2lVIGg3VboA" 
-  title="YouTube video player" 
-  frameborder="0" 
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-  referrerpolicy="strict-origin-when-cross-origin" 
-  allowfullscreen>
-</iframe>
+[![Introduction LMGC90_GUI](https://img.youtube.com/vi/2lVIGg3VboA/0.jpg)](https://www.youtube.com/watch?v=2lVIGg3VboA)
+
 
 ## Fenêtre principale
 
