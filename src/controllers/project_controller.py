@@ -852,6 +852,60 @@ class ProjectController(QObject):
             return self.state.granulo_generations[index]
         return None
     
+    
+    def create_granulo_avatar(self, center: list, radius: float, config: GranuloGeneration) -> int:
+        """
+        Crée un seul avatar pour la granulométrie (appelé depuis le worker thread).
+        Thread-safe car n'appelle que des méthodes qui créent des objets.
+        
+        Args:
+            center: Position [x, y] ou [x, y, z]
+            radius: Rayon de la particule
+            config: Configuration de la granulométrie
+            
+        Returns:
+            int: Index de l'avatar créé
+        """
+        from ..core.models import AvatarType
+        
+        # Créer l'avatar
+        avatar = Avatar(
+            avatar_type=AvatarType(config.avatar_type),
+            center=center,
+            material_name=config.material_name,
+            model_name=config.model_name,
+            color=config.color,
+            origin=AvatarOrigin.GRANULO,
+            radius=radius
+        )
+        
+        # L'ajouter au state via add_avatar (thread-safe)
+        idx = self.add_avatar(avatar)
+        
+        return idx
+    
+    def finalize_granulo(self, config: GranuloGeneration, indices: List[int]) -> None:
+        """
+        Finalise la génération granulo après que les avatars sont créés.
+        DOIT être appelé depuis le thread principal (UI thread).
+        
+        Args:
+            config: Configuration de la granulométrie
+            indices: Liste des indices d'avatars créés
+        """
+        # Mettre à jour les indices dans la config
+        config.generated_indices = indices
+        
+        # Ajouter la config aux granulo_generations
+        if not self._is_loading:
+            self.state.granulo_generations.append(config)
+        
+        # Ajouter au groupe si spécifié
+        if config.group_name:
+            if config.group_name not in self.state.avatar_groups:
+                self.state.avatar_groups[config.group_name] = []
+            self.state.avatar_groups[config.group_name].extend(indices)
+
     # ========== BOUCLES FOR ==========
     def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
         """
