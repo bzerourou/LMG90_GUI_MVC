@@ -36,11 +36,7 @@ class GranuloWorker(QThread):
             
             self.progress_updated.emit(0, nb, "Calcul du dépôt granulométrique...")
             
-            # ===== UTILISER LE VRAI GÉNÉRATEUR =====
-            # Cette méthode fait:
-            # - Détection de collisions
-            # - Dépôt gravitaire réaliste
-            # - Empilement correct des particules
+            # ===== GÉNÉRATEUR =====
             nb_generated, coordinates, radii = GranuloGenerator.generate(self.config)
             
             self.progress_updated.emit(nb_generated, nb, "Dépôt calculé avec succès")

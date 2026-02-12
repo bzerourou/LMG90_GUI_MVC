@@ -46,9 +46,10 @@ class GranuloTab(BaseTab):
         self.created_indices = []
         self.current_particle_index = 0
         self.current_config = None
+        self.batch_size = 50  # Taille du batch (adaptative)
         
-        # UI
-        self.progress_dialog = None
+        # Flag d'annulation
+        self._user_canceled = False
         
         self._setup_ui()
         self._connect_signals()
@@ -159,11 +160,11 @@ class GranuloTab(BaseTab):
         
         # Avertissement
         warning_label = QLabel(
-            "<i>ℹ️ Génération avec VRAI dépôt gravitaire (détection collisions).<br>"
-            "Phase 1: Calcul dépôt (peut être long selon nb particules)<br>"
-            "Phase 2: Création avatars (~5ms/particule)</i>"
+            "<i>⚡ Génération avec dépôt granuloRandom.<br>"
+            "Création par batches adaptatifs (10-100 selon volume).<br>"
+            "Temps: ~0.5-1s/100 particules en affichage </i>"
         )
-        warning_label.setStyleSheet("color: #0066CC; padding: 5px;")
+        warning_label.setStyleSheet("color: #00AA00; padding: 5px; font-weight: bold;")
         layout.addWidget(warning_label)
         
         btn_layout = QHBoxLayout()
@@ -232,6 +233,9 @@ class GranuloTab(BaseTab):
         try:
             # Validation
             nb = self.eval_int(self.nb_input.text(), default=50, field_name="Nombre de particules")
+            if nb> 1500: 
+                QMessageBox.information(self, "Attention", "⚠️ Actuellement LMGC90_GUI ne peut générer plus de 1500 particules ")
+                return
             rmin = self.eval_float(self.rmin_input.text(), default=0.05, field_name="Rayon min")
             rmax = self.eval_float(self.rmax_input.text(), default=2*rmin, field_name="Rayon max")
             
@@ -281,19 +285,27 @@ class GranuloTab(BaseTab):
             # Stocker la config
             self.current_config = config
             
-            # Dialogue de progression
-            self.progress_dialog = QProgressDialog(
-                "Phase 1/2: Calcul du dépôt granulométrique...\n"
-                "(détection collisions + gravité)",
-                "Annuler",
-                0,
-                nb,
-                self
+            # Réinitialiser le flag d'annulation
+            self._user_canceled = False
+            
+            # Créer un label de progression au lieu du dialogue
+            if not hasattr(self, 'progress_label'):
+                self.progress_label = QLabel(self)
+                self.progress_label.setStyleSheet(
+                    "QLabel { background-color: #E3F2FD; border: 2px solid #2196F3; "
+                    "border-radius: 5px; padding: 10px; font-weight: bold; }"
+                )
+                self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            self.progress_label.setText("⏳ Phase 1/2: Calcul du dépôt granulométrique...)")
+            self.progress_label.setGeometry(
+                self.width() // 2 - 200,
+                self.height() // 2 - 50,
+                400,
+                100
             )
-            self.progress_dialog.setWindowTitle("Génération granulométrique")
-            self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-            self.progress_dialog.setMinimumDuration(0)
-            self.progress_dialog.canceled.connect(self._cancel_generation)
+            self.progress_label.show()
+            self.progress_label.raise_()
             
             # Désactiver le bouton
             self.gen_btn.setEnabled(False)
@@ -312,38 +324,30 @@ class GranuloTab(BaseTab):
     
     def _on_calc_progress(self, current, total, message):
         """Progression des calculs"""
-        if self.progress_dialog and not self.progress_dialog.wasCanceled():
+        if hasattr(self, 'progress_label') and self.progress_label.isVisible():
             try:
-                self.progress_dialog.setMaximum(total)
-                self.progress_dialog.setValue(current)
-                self.progress_dialog.setLabelText(message)
-            except (RuntimeError, AttributeError):
-                # Dialogue fermé, ignorer
+                percent = int(current * 100 / total) if total > 0 else 0
+                self.progress_label.setText(
+                    f"⏳ Phase 1/2: Calcul du dépôt...\n"
+                    f"{message}\n"
+                    f"Progression: {percent}%"
+                )
+            except:
                 pass
     
     def _on_data_ready(self, particles_data):
-        """Les positions sont calculées, lancer la création progressive"""
-        # Vérifier si l'utilisateur a annulé
-        if self.progress_dialog and self.progress_dialog.wasCanceled():
-            self._cancel_generation()
-            return
-        
+        """Les positions sont calculées, lancer la création par batches"""
         # Stocker les données
         self.pending_particles = particles_data
         self.created_indices = []
         self.current_particle_index = 0
         
-        # Mettre à jour le dialogue
-        if self.progress_dialog and not self.progress_dialog.wasCanceled():
-            try:
-                self.progress_dialog.setLabelText(
-                    "Phase 2/2: Création des avatars...\n"
-                    "(empilement réaliste calculé)"
-                )
-                self.progress_dialog.setValue(0)
-                self.progress_dialog.setMaximum(len(particles_data))
-            except (RuntimeError, AttributeError):
-                pass
+        # Mettre à jour le label
+        if hasattr(self, 'progress_label') and self.progress_label.isVisible():
+            self.progress_label.setText(
+                "⚡ Phase 2/2: Création des avatars...\n"
+                "0%"
+            )
         
         # Nettoyer le worker
         if self.worker:
@@ -354,58 +358,89 @@ class GranuloTab(BaseTab):
         # Forcer garbage collection
         gc.collect()
         
-        # Démarrer le timer de création (1 avatar toutes les 5ms)
-        # Plus lent mais ultra-stable
-        self.creation_timer.start(5)  # 5ms entre chaque avatar
+        # OPTIMISATION CRITIQUE : Bloquer TOUTES les mises à jour UI
+        # Sauvegarder l'état actuel des updates
+        self._old_updates_enabled = self.updatesEnabled()
+        self.setUpdatesEnabled(False)  # Bloquer le rendu de l'onglet
+        
+        # Bloquer aussi le tree pour éviter tout rafraîchissement
+        if hasattr(self, 'tree'):
+            self._old_tree_updates = self.tree.updatesEnabled()
+            self.tree.setUpdatesEnabled(False)
+        
+        # OPTIMISATION : Créer par BATCHES au lieu d'un par un
+        # Taille du batch adaptative selon le nombre total
+        total = len(particles_data)
+        if total < 200:
+            self.batch_size = 10      # Petit nombre : batches de 10
+        elif total < 1000:
+            self.batch_size = 50      # Moyen : batches de 50
+        else:
+            self.batch_size = 100     # Gros volume : batches de 100
+        
+        # Démarrer le timer de création par batches
+        # Intervalle 0 = aussi rapide que possible mais UI reste réactive
+        self.creation_timer.start(0)
     
     def _create_next_avatar(self):
-        """Crée le prochain avatar (appelé par le timer)"""
+        """Crée un BATCH d'avatars (au lieu d'un seul) pour accélérer"""
         if self.current_particle_index >= len(self.pending_particles):
             # Terminé !
             self.creation_timer.stop()
             self._on_creation_completed()
             return
         
-        # Vérifier si annulé
-        if self.progress_dialog and self.progress_dialog.wasCanceled():
-            self.creation_timer.stop()
-            self._cancel_generation()
-            return
-        
         try:
-            # Créer UN avatar
-            particle = self.pending_particles[self.current_particle_index]
-            
-            avatar = Avatar(
-                avatar_type=AvatarType(self.current_config.avatar_type),
-                center=particle['center'],
-                material_name=self.current_config.material_name,
-                model_name=self.current_config.model_name,
-                color=self.current_config.color,
-                origin=AvatarOrigin.GRANULO,
-                radius=particle['radius']
+            # OPTIMISATION : Créer un BATCH d'avatars d'un coup
+            batch_end = min(
+                self.current_particle_index + self.batch_size,
+                len(self.pending_particles)
             )
             
-            # Ajouter au controller (DANS LE THREAD PRINCIPAL)
-            idx = self.controller.add_avatar(avatar)
-            self.created_indices.append(idx)
+            # Désactiver temporairement les signaux state_changed pour accélérer
+            # (un seul signal à la fin du batch au lieu d'un par avatar)
+            old_block_state = self.controller.blockSignals(True)
+            
+            for i in range(self.current_particle_index, batch_end):
+                particle = self.pending_particles[i]
+                
+                avatar = Avatar(
+                    avatar_type=AvatarType(self.current_config.avatar_type),
+                    center=particle['center'],
+                    material_name=self.current_config.material_name,
+                    model_name=self.current_config.model_name,
+                    color=self.current_config.color,
+                    origin=AvatarOrigin.GRANULO,
+                    radius=particle['radius']
+                )
+                
+                # Ajouter au controller (sans émettre de signaux)
+                idx = self.controller.add_avatar(avatar)
+                self.created_indices.append(idx)
+            
+            # Réactiver les signaux
+            self.controller.blockSignals(old_block_state)
+            
+            # Mettre à jour l'index
+            self.current_particle_index = batch_end
             
             # Mettre à jour la progression
-            self.current_particle_index += 1
-            
-            if self.progress_dialog and not self.progress_dialog.wasCanceled():
+            if hasattr(self, 'progress_label') and self.progress_label.isVisible():
                 try:
-                    self.progress_dialog.setValue(self.current_particle_index)
-                    if self.current_particle_index % 10 == 0:  # Toutes les 10 particules
-                        self.progress_dialog.setLabelText(
-                            f"Création: {self.current_particle_index}/{len(self.pending_particles)} particules"
+                    total = len(self.pending_particles)
+                    percent = int(self.current_particle_index * 100 / total) if total > 0 else 0
+                    # Mettre à jour moins souvent pour accélérer
+                    if self.current_particle_index % 50 == 0 or self.current_particle_index == total:
+                        self.progress_label.setText(
+                            f"⚡ Phase 2/2: Création des avatars...\n"
+                            f"Création: {self.current_particle_index}/{total} particules\n"
+                            f"Progression: {percent}%"
                         )
-                except (RuntimeError, AttributeError):
-                    # Dialogue fermé, ignorer
+                except:
                     pass
             
-            # Garbage collection tous les 100 avatars
-            if self.current_particle_index % 100 == 0:
+            # Garbage collection tous les 500 avatars (moins fréquent)
+            if self.current_particle_index % 500 == 0:
                 gc.collect()
                 
         except Exception as e:
@@ -414,12 +449,16 @@ class GranuloTab(BaseTab):
     
     def _on_creation_completed(self):
         """Création terminée avec succès"""
-        if self.progress_dialog:
-            try:
-                self.progress_dialog.close()
-            except (RuntimeError, AttributeError):
-                pass
-            self.progress_dialog = None
+        # Fermer le label de progression
+        if hasattr(self, 'progress_label'):
+            self.progress_label.hide()
+        
+        # RÉACTIVER les updates UI (une seule fois)
+        if hasattr(self, '_old_updates_enabled'):
+            self.setUpdatesEnabled(self._old_updates_enabled)
+        
+        if hasattr(self, '_old_tree_updates'):
+            self.tree.setUpdatesEnabled(self._old_tree_updates)
         
         self.gen_btn.setEnabled(True)
         
@@ -434,14 +473,27 @@ class GranuloTab(BaseTab):
                     self.controller.state.avatar_groups[self.current_config.group_name] = []
                 self.controller.state.avatar_groups[self.current_config.group_name].extend(self.created_indices)
             
+            # Émettre le signal UNE SEULE FOIS
             self.granulo_generated.emit()
-            self.refresh()
             
-            msg = f"✅ {len(self.created_indices)} particules générées!"
-            if self.current_config.group_name:
-                msg += f"\n\nGroupe: {self.current_config.group_name}"
+            # Refresh UNE SEULE FOIS - SANS rafraîchir les combos (optimisation)
+            self.refresh(full_refresh=False)
             
-            QMessageBox.information(self, "Succès", msg)
+            # Message de succès NON-BLOQUANT avec label au lieu de QMessageBox
+            if hasattr(self, 'progress_label'):
+                self.progress_label.setStyleSheet(
+                    "QLabel { background-color: #C8E6C9; border: 2px solid #4CAF50; "
+                    "border-radius: 5px; padding: 10px; font-weight: bold; }"
+                )
+                msg = f"✅ {len(self.created_indices)} particules générées!"
+                if self.current_config.group_name:
+                    msg += f"\nGroupe: {self.current_config.group_name}"
+                self.progress_label.setText(msg)
+                self.progress_label.show()
+                
+                # Faire disparaître le message après 3 secondes
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(3000, self.progress_label.hide)
         
         # Nettoyer
         self.pending_particles = []
@@ -453,19 +505,33 @@ class GranuloTab(BaseTab):
         """Gestion des erreurs"""
         self.creation_timer.stop()
         
-        if self.progress_dialog:
-            try:
-                self.progress_dialog.close()
-            except (RuntimeError, AttributeError):
-                pass
-            self.progress_dialog = None
+        # Réactiver les updates UI
+        if hasattr(self, '_old_updates_enabled'):
+            self.setUpdatesEnabled(self._old_updates_enabled)
+        
+        if hasattr(self, '_old_tree_updates'):
+            self.tree.setUpdatesEnabled(self._old_tree_updates)
+        
+        # Fermer le label de progression
+        if hasattr(self, 'progress_label'):
+            self.progress_label.hide()
         
         self.gen_btn.setEnabled(True)
         
-        if "Annulé" not in error_message:
-            QMessageBox.critical(self, "Erreur", error_message)
-        else:
-            QMessageBox.information(self, "Annulé", "Génération annulée")
+        # Ne pas afficher de message si l'utilisateur a déjà annulé
+        if not self._user_canceled:
+            # Message NON-BLOQUANT avec label
+            if hasattr(self, 'progress_label'):
+                self.progress_label.setStyleSheet(
+                    "QLabel { background-color: #FFCDD2; border: 2px solid #F44336; "
+                    "border-radius: 5px; padding: 10px; font-weight: bold; }"
+                )
+                self.progress_label.setText(f"❌ Erreur:\n{error_message[:100]}")
+                self.progress_label.show()
+                
+                # Disparaît après 5 secondes
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(5000, self.progress_label.hide)
         
         # Nettoyer
         self.pending_particles = []
@@ -480,22 +546,36 @@ class GranuloTab(BaseTab):
         gc.collect()
     
     def _cancel_generation(self):
-        """Annule la génération"""
+        """Annule la génération (si on veut ajouter un bouton Cancel plus tard)"""
+        # Marquer comme annulé
+        self._user_canceled = True
+        
         self.creation_timer.stop()
         
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.worker.wait()
         
-        # Fermer le dialogue proprement
-        if self.progress_dialog:
-            try:
-                self.progress_dialog.close()
-            except (RuntimeError, AttributeError):
-                pass
-            self.progress_dialog = None
+        # Fermer le label
+        if hasattr(self, 'progress_label'):
+            self.progress_label.hide()
         
-        self._on_error("Annulé par l'utilisateur")
+        # Afficher le message d'annulation
+        QMessageBox.information(self, "Annulé", "Génération annulée par l'utilisateur")
+        
+        # Réactiver le bouton
+        self.gen_btn.setEnabled(True)
+        
+        # Nettoyer
+        self.pending_particles = []
+        self.created_indices = []
+        self.current_config = None
+        
+        if self.worker:
+            self.worker.deleteLater()
+            self.worker = None
+        
+        gc.collect()
     
     # ========== AUTRES MÉTHODES (identiques) ==========
     
@@ -606,41 +686,69 @@ class GranuloTab(BaseTab):
         self.group_name_input.setText("depot_granulo")
         self.store_check.setChecked(True)
     
-    def refresh(self):
-        """Rafraîchit l'affichage"""
-        self.tree.clear()
+    def refresh(self, full_refresh=False):
+        """
+        Rafraîchit l'affichage de manière optimisée.
         
-        self.material_combo.clear()
-        materials = self.controller.get_materials()
-        self.material_combo.addItems([m.name for m in materials])
+        Args:
+            full_refresh: Si True, rafraîchit aussi les combos (lent)
+        """
+        # OPTIMISATION : Bloquer tous les signaux et updates pendant refresh
+        old_block_tree = self.tree.blockSignals(True)
+        old_tree_updates = self.tree.updatesEnabled()
+        self.tree.setUpdatesEnabled(False)
         
-        self.model_combo.clear()
-        models = self.controller.get_models()
-        self.model_combo.addItems([m.name for m in models])
+        try:
+            # Rafraîchir le tree (toujours nécessaire)
+            self.tree.clear()
+            
+            granulos = self.controller.state.granulo_generations
+            for i, gen in enumerate(granulos):
+                nb_generated = len(gen.generated_indices)
+                item = QTreeWidgetItem([
+                    str(i + 1),
+                    gen.container_type,
+                    f"{nb_generated}/{gen.nb_particles}",
+                    f"[{gen.radius_min:.3f}, {gen.radius_max:.3f}]",
+                    gen.group_name or "N/A"
+                ])
+                item.setData(0, Qt.ItemDataRole.UserRole, i)
+                if nb_generated < gen.nb_particles:
+                    item.setForeground(2, QBrush(QColor(255, 100, 0)))
+                self.tree.addTopLevelItem(item)
+            
+            # OPTIMISATION : Ne rafraîchir les combos QUE si demandé explicitement
+            # (les combos ne changent pas à chaque génération granulo)
+            if full_refresh:
+                self.material_combo.blockSignals(True)
+                self.model_combo.blockSignals(True)
+                self.avatar_combo.blockSignals(True)
+                
+                self.material_combo.clear()
+                materials = self.controller.get_materials()
+                self.material_combo.addItems([m.name for m in materials])
+                
+                self.model_combo.clear()
+                models = self.controller.get_models()
+                self.model_combo.addItems([m.name for m in models])
+                
+                self.avatar_combo.clear()
+                dim = self.controller.state.dimension
+                if dim == 2:
+                    avatar_types = ["rigidDisk"]
+                else:
+                    avatar_types = ["rigidSphere", "rigidCylinder"]
+                for avatar_type in avatar_types:
+                    self.avatar_combo.addItem(avatar_type, avatar_type)
+                
+                self.material_combo.blockSignals(False)
+                self.model_combo.blockSignals(False)
+                self.avatar_combo.blockSignals(False)
         
-        self.avatar_combo.clear()
-        dim = self.controller.state.dimension
-        if dim == 2:
-            avatar_types = ["rigidDisk"]
-        else:
-            avatar_types = ["rigidSphere", "rigidCylinder"]
-        for avatar_type in avatar_types:
-            self.avatar_combo.addItem(avatar_type, avatar_type)
-        
-        granulos = self.controller.state.granulo_generations
-        for i, gen in enumerate(granulos):
-            nb_generated = len(gen.generated_indices)
-            item = QTreeWidgetItem([
-                str(i + 1),
-                gen.container_type,
-                f"{nb_generated}/{gen.nb_particles}",
-                f"[{gen.radius_min:.3f}, {gen.radius_max:.3f}]",
-                gen.group_name or "N/A"
-            ])
-            item.setData(0, Qt.ItemDataRole.UserRole, i)
-            if nb_generated < gen.nb_particles:
-                item.setForeground(2, QBrush(QColor(255, 100, 0)))
-            self.tree.addTopLevelItem(item)
+        finally:
+            # Restaurer les signaux et updates
+            self.tree.setUpdatesEnabled(old_tree_updates)
+            self.tree.blockSignals(old_block_tree)
     
     def closeEvent(self, event):
         """Nettoyage à la fermeture"""

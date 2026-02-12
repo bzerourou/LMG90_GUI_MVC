@@ -938,4 +938,6 @@ class MainWindow(QMainWindow):
                    self.dof_tab, self.contact_tab, self.visibility_tab,
                    self.postpro_tab]:
             if hasattr(tab, 'refresh'):
+                if tab is self.granulo_tab :
+                    tab.refresh(full_refresh=True)
                 tab.refresh()
