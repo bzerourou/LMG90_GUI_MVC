@@ -762,10 +762,19 @@ class AvatarTab(BaseTab):
         self.model_combo.addItems([m.name for m in models])
         
         self._update_avatar_types()
+        # activer/désactiver l'affichage 
+        show_granulo_individually = getattr(
+            getattr(self.controller.state, 'preferences', None),
+            'show_granulo_individually', True
+        )
         
         all_avatars = self.controller.state.avatars
         
         for real_index, avatar in enumerate(all_avatars):
+           # Masquer les avatars granulo si la préférence est désactivée
+            if avatar.origin == AvatarOrigin.GRANULO and not show_granulo_individually:
+                continue
+
             center_str = ', '.join(f"{x:.2f}" for x in avatar.center)
             
             origin_str = ""

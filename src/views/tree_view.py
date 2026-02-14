@@ -7,6 +7,7 @@ Affiche la structure du projet dans un QTreeWidget.
 """
 from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem
 from PyQt6.QtCore import Qt, QObject
+from PyQt6.QtGui import QBrush, QColor
 
 from ..controllers.project_controller import ProjectController
 from ..core.models import AvatarOrigin
@@ -24,6 +25,8 @@ class ModelTreeView(QObject):
         self.tree.setHeaderLabels(["Élément", "Type", "Détails"])
         self.tree.setColumnWidth(0, 320)
         self.tree.setColumnWidth(1, 100)
+        #affichage
+        self.show_granulo_individually = True
 
         #connecter le signal de sélection
         self.tree.itemClicked.connect(self._on_item_clicked)
@@ -38,6 +41,13 @@ class ModelTreeView(QObject):
     def refresh(self):
         """Rafraîchit l'arbre complet"""
         self.tree.clear()
+
+        # Lire la préférence une seule fois pour tout le refresh
+        self.show_granulo_individually = getattr(
+            getattr(self.controller.state, 'preferences', None),
+            'show_granulo_individually',
+            True  # défaut : comportement original (tout afficher)
+        )
         
         root = QTreeWidgetItem(["Modèle LMGC90", "", ""])
         self.tree.addTopLevelItem(root)
@@ -111,33 +121,50 @@ class ModelTreeView(QObject):
             mod_node.setExpanded(True)
     
     def _add_avatars_node(self, parent: QTreeWidgetItem):
-        """Ajoute le nœud Avatars"""
+        """
+        Ajoute le nœud Avatars.
+        Si show_granulo_individually est False, les avatars générés par GRANULO sont masqués :
+        ils sont représentés uniquement via leurs groupes (nœud _add_groups_node).
+        """
         avatars = self.controller.get_avatars(include_generated=True)
-        av_node = QTreeWidgetItem(parent, ["Avatars", "", f"{len(avatars)}"])
-        
-        for i, avatar in enumerate(avatars):
+        total = len(avatars)
+
+        # filtrer : si préférence désactivée, exclure les granulo
+        visible = [
+            (i, av) for i, av in enumerate(avatars)
+            if self.show_granulo_individually or av.origin != AvatarOrigin.GRANULO
+        ]
+
+        if self.show_granulo_individually:
+            count_label = str(total)
+        else:
+            hidden = total - len(visible)
+            count_label = f"{len(visible)} affichés / {total}"
+            if hidden:
+                count_label += f" ({hidden} granulo → Groupes)"
+
+        av_node = QTreeWidgetItem(parent, ["Avatars", "", count_label])
+
+        for i, avatar in visible:
             center_str = ', '.join(f"{x:.2f}" for x in avatar.center)
-            
-            # Marqueur d'origine
             origin_mark = ""
             if avatar.origin == AvatarOrigin.LOOP:
                 origin_mark = " [L]"
             elif avatar.origin == AvatarOrigin.GRANULO:
                 origin_mark = " [G]"
-            
+
             item = QTreeWidgetItem([
                 f"{avatar.avatar_type.value} — {avatar.color} — ({center_str}){origin_mark}",
                 "Avatar",
                 str(i)
             ])
             item.setData(0, Qt.ItemDataRole.UserRole, "avatar")
-            item.setData(1, Qt.ItemDataRole.UserRole, i)  # index
+            item.setData(1, Qt.ItemDataRole.UserRole, i)
             if avatar.origin == AvatarOrigin.MANUAL:
-                from PyQt6.QtGui import QBrush, QColor
                 item.setForeground(0, QBrush(QColor("green")))
             av_node.addChild(item)
-        
-        if len(avatars) <= 20:
+
+        if len(visible) <= 20:
             av_node.setExpanded(True)
     
     def _add_groups_node(self, parent: QTreeWidgetItem):

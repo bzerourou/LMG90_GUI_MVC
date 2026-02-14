@@ -233,7 +233,7 @@ class GranuloTab(BaseTab):
         try:
             # Validation
             nb = self.eval_int(self.nb_input.text(), default=50, field_name="Nombre de particules")
-            if nb> 1500: 
+            if nb> 2000: 
                 QMessageBox.information(self, "Attention", "⚠️ Actuellement LMGC90_GUI ne peut générer plus de 1500 particules ")
                 return
             rmin = self.eval_float(self.rmin_input.text(), default=0.05, field_name="Rayon min")
@@ -245,6 +245,22 @@ class GranuloTab(BaseTab):
             if not material or not model:
                 QMessageBox.warning(self, "Erreur", "Veuillez créer un matériau et un modèle d'abord")
                 return
+
+            # Si l'affichage individuel est désactivé, le groupe est OBLIGATOIRE
+            show_individually = getattr(
+                getattr(self.controller.state, 'preferences', None),
+                'show_granulo_individually', True
+            )
+            if not show_individually:
+                group_name = self.group_name_input.text().strip()
+                if not group_name:
+                    QMessageBox.warning(
+                        self, "Groupe obligatoire",
+                        "L'affichage individuel est désactivé dans les Préférences.\n"
+                        "Vous devez entrer un nom de groupe avant de générer."
+                    )
+                    self.group_name_input.setFocus()
+                    return
             
             # Paramètres conteneur
             shape = self.shape_combo.currentText()
@@ -357,17 +373,12 @@ class GranuloTab(BaseTab):
         
         # Forcer garbage collection
         gc.collect()
-        
-        # OPTIMISATION CRITIQUE : Bloquer TOUTES les mises à jour UI
-        # Sauvegarder l'état actuel des updates
-        self._old_updates_enabled = self.updatesEnabled()
-        self.setUpdatesEnabled(False)  # Bloquer le rendu de l'onglet
-        
-        # Bloquer aussi le tree pour éviter tout rafraîchissement
+
+        # Bloquer uniquement le tree (pas tout l'onglet — sinon l'UI fige)
         if hasattr(self, 'tree'):
-            self._old_tree_updates = self.tree.updatesEnabled()
-            self.tree.setUpdatesEnabled(False)
-        
+            self._old_updates_enabled = self.updatesEnabled()
+            self.setUpdatesEnabled(False)  # Bloquer le rendu de l'onglet
+
         # OPTIMISATION : Créer par BATCHES au lieu d'un par un
         # Taille du batch adaptative selon le nombre total
         total = len(particles_data)
@@ -397,9 +408,8 @@ class GranuloTab(BaseTab):
                 len(self.pending_particles)
             )
             
-            # Désactiver temporairement les signaux state_changed pour accélérer
-            # (un seul signal à la fin du batch au lieu d'un par avatar)
-            old_block_state = self.controller.blockSignals(True)
+            # Désactiver temporairement les signaux state_changed via flag interne
+            self.controller._batch_mode = True
             
             for i in range(self.current_particle_index, batch_end):
                 particle = self.pending_particles[i]
@@ -419,7 +429,7 @@ class GranuloTab(BaseTab):
                 self.created_indices.append(idx)
             
             # Réactiver les signaux
-            self.controller.blockSignals(old_block_state)
+            self.controller._batch_mode = False
             
             # Mettre à jour l'index
             self.current_particle_index = batch_end
@@ -453,13 +463,13 @@ class GranuloTab(BaseTab):
         if hasattr(self, 'progress_label'):
             self.progress_label.hide()
         
-        # RÉACTIVER les updates UI (une seule fois)
+        # réactiver les updates du tree
         if hasattr(self, '_old_updates_enabled'):
             self.setUpdatesEnabled(self._old_updates_enabled)
         
-        if hasattr(self, '_old_tree_updates'):
-            self.tree.setUpdatesEnabled(self._old_tree_updates)
-        
+        # S'assurer que le batch_mode est bien désactivé
+        self.controller._batch_mode = False
+
         self.gen_btn.setEnabled(True)
         
         # Finaliser
@@ -477,7 +487,7 @@ class GranuloTab(BaseTab):
             self.granulo_generated.emit()
             
             # Refresh UNE SEULE FOIS - SANS rafraîchir les combos (optimisation)
-            self.refresh(full_refresh=False)
+            self.refresh(full_refresh=True)
             
             # Message de succès NON-BLOQUANT avec label au lieu de QMessageBox
             if hasattr(self, 'progress_label'):
@@ -509,8 +519,8 @@ class GranuloTab(BaseTab):
         if hasattr(self, '_old_updates_enabled'):
             self.setUpdatesEnabled(self._old_updates_enabled)
         
-        if hasattr(self, '_old_tree_updates'):
-            self.tree.setUpdatesEnabled(self._old_tree_updates)
+        # S'assurer que le batch_mode est bien désactivé
+        self.controller._batch_mode = False
         
         # Fermer le label de progression
         if hasattr(self, 'progress_label'):
@@ -643,7 +653,7 @@ class GranuloTab(BaseTab):
         if reply == QMessageBox.StandardButton.Yes:
             if self.controller.remove_granulo(granulo_idx):
                 self.granulo_deleted.emit()
-                self.refresh()
+                self.refresh(full_refresh=True)
                 QMessageBox.information(self, "Succès", "✅ Dépôt et avatars supprimés")
     
     def _show_info(self):
@@ -693,6 +703,21 @@ class GranuloTab(BaseTab):
         Args:
             full_refresh: Si True, rafraîchit aussi les combos (lent)
         """
+        # Lire la préférence
+        show_individually = getattr(
+            getattr(self.controller.state, 'preferences', None),
+            'show_granulo_individually', True
+        )
+
+        # Si l'affichage individuel est désactivé : forcer + verrouiller le groupe
+        if not show_individually:
+            self.store_check.setChecked(True)
+            self.store_check.setEnabled(False)
+            #self.group_required_label.setVisible(True)
+        else:
+            self.store_check.setEnabled(True)
+            #self.group_required_label.setVisible(False)
+
         # OPTIMISATION : Bloquer tous les signaux et updates pendant refresh
         old_block_tree = self.tree.blockSignals(True)
         old_tree_updates = self.tree.updatesEnabled()
@@ -718,7 +743,6 @@ class GranuloTab(BaseTab):
                 self.tree.addTopLevelItem(item)
             
             # OPTIMISATION : Ne rafraîchir les combos QUE si demandé explicitement
-            # (les combos ne changent pas à chaque génération granulo)
             if full_refresh:
                 self.material_combo.blockSignals(True)
                 self.model_combo.blockSignals(True)
@@ -746,7 +770,6 @@ class GranuloTab(BaseTab):
                 self.avatar_combo.blockSignals(False)
         
         finally:
-            # Restaurer les signaux et updates
             self.tree.setUpdatesEnabled(old_tree_updates)
             self.tree.blockSignals(old_block_tree)
     

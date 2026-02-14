@@ -567,6 +567,7 @@ class ProjectPreferences:
     backup_enabled: bool = True
     recent_projects: List[Path] = field(default_factory=list)
     max_recent_projects: int = 10
+    show_granulo_individually: bool = True
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
@@ -577,7 +578,8 @@ class ProjectPreferences:
             'auto_save_interval': self.auto_save_interval,
             'backup_enabled': self.backup_enabled,
             'recent_projects': [str(p) for p in self.recent_projects],
-            'max_recent_projects': self.max_recent_projects
+            'max_recent_projects': self.max_recent_projects,
+            'show_granulo_individually': self.show_granulo_individually,
         }
     
     @classmethod
@@ -590,7 +592,8 @@ class ProjectPreferences:
             auto_save_interval=data.get('auto_save_interval', 300),
             backup_enabled=data.get('backup_enabled', True),
             recent_projects=[Path(p) for p in data.get('recent_projects', [])],
-            max_recent_projects=data.get('max_recent_projects', 10)
+            max_recent_projects=data.get('max_recent_projects', 10),
+            show_granulo_individually=data.get('show_granulo_individually', True),
         )
     
     def get_unit_labels(self) -> Dict[str, str]:

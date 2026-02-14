@@ -262,9 +262,17 @@ class DOFTab(BaseTab):
     def refresh(self):
         current_target = self.target_combo.currentData() if self.target_combo.count() > 0 else None
 
+        # affichage
+        show_individually = getattr(
+            getattr(self.controller.state, 'preferences', None),
+            'show_granulo_individually', True
+        )
+
         self.target_combo.clear()
 
         for i, avatar in enumerate(self.controller.state.avatars):
+            if avatar.origin == AvatarOrigin.GRANULO and not show_individually:
+                continue
             origin_mark = ""
             if avatar.origin == AvatarOrigin.LOOP:
                 origin_mark = " [Boucle]"

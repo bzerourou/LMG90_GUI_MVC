@@ -509,6 +509,35 @@ class PreferencesDialog(QDialog):
         recent_group.setLayout(recent_layout)
         layout.addWidget(recent_group)
         
+        # ========== GROUPE 5 : Performance / Affichage Granulométrie ==========
+        perf_group = QGroupBox("⚡ Performance — Affichage Granulométrie")
+        perf_layout = QVBoxLayout()
+
+        self.show_granulo_check = QCheckBox(
+            "Afficher les avatars granulométriques individuellement"
+        )
+        self.show_granulo_check.setToolTip(
+            "Coché : chaque avatars apparaît dans l'arbre, les listes DOF et PostPro.\n"
+            "Décoché (recommandé avec >500 particules) : seuls les GROUPES sont visibles.\n"
+            "Si décoché, le stockage dans un groupe devient obligatoire lors de la génération."
+        )
+        perf_layout.addWidget(self.show_granulo_check)
+
+        self._perf_info = QLabel(
+            "ℹ️  Quand cette option est décochée :\n"
+            "  • Les  avatars ne s'affichent pas une par une dans l'arbre\n"
+            "  • Les listes DOF et Post-Pro ne montrent que les groupes\n"
+        )
+        self._perf_info.setWordWrap(True)
+        self._perf_info.setStyleSheet(
+            "color: #555; font-size: 9pt; padding: 6px; "
+            "background-color: #f5f5f5; border-radius: 4px;"
+        )
+        perf_layout.addWidget(self._perf_info)
+
+        perf_group.setLayout(perf_layout)
+        layout.addWidget(perf_group)
+        
         # Boutons OK/Annuler
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | 
@@ -587,6 +616,11 @@ class PreferencesDialog(QDialog):
         
         # Projets récents
         self.max_recent_spin.setValue(self.preferences.max_recent_projects)
+
+        # Performance granulo
+        self.show_granulo_check.setChecked(
+            getattr(self.preferences, 'show_granulo_individually', True)
+        )
         
         # Mise à jour de l'aperçu
         self._update_unit_preview()
@@ -604,5 +638,7 @@ class PreferencesDialog(QDialog):
         self.preferences.auto_save_interval = self.auto_save_interval.value()
         self.preferences.backup_enabled = self.backup_check.isChecked()
         self.preferences.max_recent_projects = self.max_recent_spin.value()
+
+        self.preferences.show_granulo_individually = self.show_granulo_check.isChecked()
         
         return self.preferences

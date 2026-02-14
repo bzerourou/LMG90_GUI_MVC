@@ -44,7 +44,6 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._connect_signals()
         self._update_recent_menu()
-        self._refresh_all()
         
         # État initial
         self.statusBar().showMessage("Prêt", 3000)
@@ -614,7 +613,7 @@ class MainWindow(QMainWindow):
 
     def _reopen_default_tabs(self):
         """Rouvre les onglets par défaut"""
-        default_tabs = ['material', 'model', 'avatar', 'library', 'compute', 'viewer']
+        default_tabs = ['material', 'model', 'avatar', 'dof', 'visibility', 'postpro']
         
         for tab_id in default_tabs:
             self._add_tab(tab_id)

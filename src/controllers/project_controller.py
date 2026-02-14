@@ -32,6 +32,7 @@ class ProjectController(QObject):
         self.state = state or ProjectState(name="Nouveau_Projet")
         self.project_path: Optional[Path] = None
         self._is_loading = False 
+        self._batch_mode = False
         
         # Conteneurs pylmgc90
         self._materials_container = pre.materials()
@@ -347,7 +348,8 @@ class ProjectController(QObject):
         
         # Ajouter au modèle
         self.state.avatars.append(avatar)
-        self.state_changed.emit()
+        if not self._batch_mode : 
+            self.state_changed.emit()
         
         return len(self.state.avatars) - 1
     

@@ -12,6 +12,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from ...core.models import PostProCommand
 from ...controllers.project_controller import ProjectController
+from ...core.models import AvatarOrigin
 
 
 class PostProTab(QWidget):
@@ -187,11 +188,18 @@ class PostProTab(QWidget):
     def refresh(self):
         """Rafraîchit le combo des cibles"""
         self.target_combo.clear()
+        # affichage 
+        show_individually = getattr(
+            getattr(self.controller.state, 'preferences', None),
+            'show_granulo_individually', True
+        )
         
         # Avatars
         avatars = self.controller.state.avatars
         for i, avatar in enumerate(avatars):
-            from ...core.models import AvatarOrigin
+            if avatar.origin == AvatarOrigin.GRANULO and not show_individually:
+                continue
+
             origin_mark = ""
             if avatar.origin == AvatarOrigin.LOOP:
                 origin_mark = " [L]"
