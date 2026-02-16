@@ -568,6 +568,7 @@ class ProjectPreferences:
     recent_projects: List[Path] = field(default_factory=list)
     max_recent_projects: int = 10
     show_granulo_individually: bool = True
+    create_pylmgc_on_generate: bool = True
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
@@ -580,6 +581,7 @@ class ProjectPreferences:
             'recent_projects': [str(p) for p in self.recent_projects],
             'max_recent_projects': self.max_recent_projects,
             'show_granulo_individually': self.show_granulo_individually,
+            'create_pylmgc_on_generate': self.create_pylmgc_on_generate,
         }
     
     @classmethod
@@ -594,6 +596,7 @@ class ProjectPreferences:
             recent_projects=[Path(p) for p in data.get('recent_projects', [])],
             max_recent_projects=data.get('max_recent_projects', 10),
             show_granulo_individually=data.get('show_granulo_individually', True),
+            create_pylmgc_on_generate=data.get('create_pylmgc_on_generate', True),
         )
     
     def get_unit_labels(self) -> Dict[str, str]:

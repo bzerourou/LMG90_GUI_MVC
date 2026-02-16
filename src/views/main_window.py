@@ -19,6 +19,8 @@ from .tabs import (
 )
 from .tree_view import ModelTreeView
 from ..core.models import UnitSystem
+from ..gui.dialogs.fast_granulo_dialg import GranuloFastDialog
+
 
 class MainWindow(QMainWindow):
     """Fenêtre principale de l'application"""
@@ -47,6 +49,8 @@ class MainWindow(QMainWindow):
         
         # État initial
         self.statusBar().showMessage("Prêt", 3000)
+
+        self._refresh_all()
     
     def _setup_ui(self):
         """Configure l'interface utilisateur"""
@@ -105,6 +109,10 @@ class MainWindow(QMainWindow):
         wizard_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
         wizard_action.triggered.connect(self._on_granulo_wizard)
         file_menu.addAction(wizard_action)
+
+        fast_granulo = QAction(" ⚡ Génération granulométrie numpy... (bêta)", self)
+        fast_granulo.triggered.connect(self._open_fast_granulo)
+        file_menu.addAction(fast_granulo)
 
         #wizard_action = QAction("🧙 Assistant de déformable...", self)
         #wizard_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
@@ -790,8 +798,11 @@ class MainWindow(QMainWindow):
             self._refresh_all()
             self.statusBar().showMessage("✅ Distribution granulométrique générée", 5000)
 
+    def _open_fast_granulo(self):
+        dlg = GranuloFastDialog(self.controller, parent=self)
+        dlg.granulo_generated.connect(self._refresh_all)
+        dlg.exec()
         
-    
     # ========== VISUALISATION ET GÉNÉRATION ==========
     
     def _on_generate_script(self):

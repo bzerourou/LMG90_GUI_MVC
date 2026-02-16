@@ -425,7 +425,12 @@ class GranuloTab(BaseTab):
                 )
                 
                 # Ajouter au controller (sans émettre de signaux)
-                idx = self.controller.add_avatar(avatar)
+                # Respecter la préférence : créer ou non les objets pylmgc lors d'une génération massive
+                create_pylmgc = getattr(
+                    getattr(self.controller.state, 'preferences', None),
+                    'create_pylmgc_on_generate', True
+                )
+                idx = self.controller.add_avatar(avatar, create_pylmgc=create_pylmgc)
                 self.created_indices.append(idx)
             
             # Réactiver les signaux

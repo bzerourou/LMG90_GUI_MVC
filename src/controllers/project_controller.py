@@ -311,7 +311,7 @@ class ProjectController(QObject):
     
     # ========== AVATARS ==========
     
-    def add_avatar(self, avatar: Avatar) -> int:
+    def add_avatar(self, avatar: Avatar, create_pylmgc: bool = True) -> int:
         """
         Ajoute un avatar au projet.
         
@@ -332,25 +332,30 @@ class ProjectController(QObject):
         
         AvatarValidator.validate_or_raise(avatar, model)
         
-        # Récupérer les objets pylmgc90
-        mat_obj = self._pylmgc_materials.get(avatar.material_name)
-        mod_obj = self._pylmgc_models.get(avatar.model_name)
-        
-        if not mat_obj:
-            raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
-        if not mod_obj:
-            raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
-        
-        # Créer l'objet pylmgc90
-        body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
-        self._bodies_container.addAvatar(body_obj)
-        self._pylmgc_bodies.append(body_obj)
-        
-        # Ajouter au modèle
+        # Récupérer les objets pylmgc90 uniquement si demandé
+        if create_pylmgc:
+            mat_obj = self._pylmgc_materials.get(avatar.material_name)
+            mod_obj = self._pylmgc_models.get(avatar.model_name)
+
+            if not mat_obj:
+                raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
+            if not mod_obj:
+                raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
+
+            # Créer l'objet pylmgc90
+            body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
+            self._bodies_container.addAvatar(body_obj)
+            self._pylmgc_bodies.append(body_obj)
+        else:
+            # Ne pas créer l'objet pylmgc (optimisation pour génération massive)
+            # Conserver l'alignement des indices en ajoutant un placeholder
+            self._pylmgc_bodies.append(None)
+
+        # Ajouter au modèle (toujours)
         self.state.avatars.append(avatar)
-        if not self._batch_mode : 
+        if not self._batch_mode:
             self.state_changed.emit()
-        
+
         return len(self.state.avatars) - 1
     
     def update_avatar(self, index: int, avatar: Avatar) -> None:
@@ -421,12 +426,19 @@ class ProjectController(QObject):
     def remove_avatar(self, index: int) -> bool:
         """Supprime un avatar par index"""
         if 0 <= index < len(self.state.avatars):
-            avatar = self.state.avatars[index]
-            body = self._pylmgc_bodies[index]
-            
+            # Retirer l'avatar du state
             self.state.avatars.pop(index)
-            self._bodies_container.remove(body)
-            self._pylmgc_bodies.pop(index)
+
+            # Retirer l'objet pylmgc si présent
+            body = None
+            if index < len(self._pylmgc_bodies):
+                body = self._pylmgc_bodies.pop(index)
+            if body is not None:
+                try:
+                    self._bodies_container.remove(body)
+                except Exception:
+                    # Ignorer si le container ne contient pas l'objet
+                    pass
             return True
         return False
     
@@ -583,9 +595,10 @@ class ProjectController(QObject):
             idx = operation.target_value
             if 0 <= idx < len(self._pylmgc_bodies):
                 body = self._pylmgc_bodies[idx]
-                LMGC90Bridge.apply_dof_operation(operation, body)
-                #synchroniser la position 
-                self._sync_avatar_position(idx, body)
+                if body is not None:
+                    LMGC90Bridge.apply_dof_operation(operation, body)
+                    # synchroniser la position
+                    self._sync_avatar_position(idx, body)
         
         elif operation.target_type == 'group':
             group_name = operation.target_value
@@ -593,9 +606,10 @@ class ProjectController(QObject):
             for idx in indices:
                 if 0 <= idx < len(self._pylmgc_bodies):
                     body = self._pylmgc_bodies[idx]
-                    LMGC90Bridge.apply_dof_operation(operation, body)
-                    #synchroniser la position 
-                    self._sync_avatar_position(idx, body)
+                    if body is not None:
+                        LMGC90Bridge.apply_dof_operation(operation, body)
+                        # synchroniser la position
+                        self._sync_avatar_position(idx, body)
 
 
     def add_dof_operation(self, operation: DOFOperation) -> None:
@@ -1241,13 +1255,15 @@ class ProjectController(QObject):
         if command.target_type == 'avatar':
             idx = command.target_value
             if 0 <= idx < len(self._pylmgc_bodies):
-                rigid_set = [self._pylmgc_bodies[idx]]
+                body = self._pylmgc_bodies[idx]
+                if body is not None:
+                    rigid_set = [body]
         
         elif command.target_type == 'group':
             group_name = command.target_value
             indices = self.state.avatar_groups.get(group_name, [])
-            rigid_set = [self._pylmgc_bodies[i] for i in indices 
-                        if 0 <= i < len(self._pylmgc_bodies)]
+            rigid_set = [self._pylmgc_bodies[i] for i in indices
+                        if 0 <= i < len(self._pylmgc_bodies) and self._pylmgc_bodies[i] is not None]
         
         # Créer la commande
         if rigid_set:

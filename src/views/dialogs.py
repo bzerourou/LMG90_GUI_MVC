@@ -523,6 +523,17 @@ class PreferencesDialog(QDialog):
         )
         perf_layout.addWidget(self.show_granulo_check)
 
+        # Option: créer ou non les objets pylmgc lors d'une génération massive
+        self.create_pylmgc_check = QCheckBox(
+            "Créer les objets pylmgc lors de la génération massive (lent)"
+        )
+        self.create_pylmgc_check.setToolTip(
+            "Coché : les objets pylmgc (corps) sont créés immédiatement lors de la génération.\n"
+            "Décoché : optimisation pour génération massive — les objets pylmgc ne sont pas créés,\n"
+            "ce qui accélère fortement la génération (vous pourrez les créer plus tard si nécessaire)."
+        )
+        perf_layout.addWidget(self.create_pylmgc_check)
+
         self._perf_info = QLabel(
             "ℹ️  Quand cette option est décochée :\n"
             "  • Les  avatars ne s'affichent pas une par une dans l'arbre\n"
@@ -621,6 +632,10 @@ class PreferencesDialog(QDialog):
         self.show_granulo_check.setChecked(
             getattr(self.preferences, 'show_granulo_individually', True)
         )
+        # Création pylmgc lors de génération massive
+        self.create_pylmgc_check.setChecked(
+            getattr(self.preferences, 'create_pylmgc_on_generate', True)
+        )
         
         # Mise à jour de l'aperçu
         self._update_unit_preview()
@@ -640,5 +655,7 @@ class PreferencesDialog(QDialog):
         self.preferences.max_recent_projects = self.max_recent_spin.value()
 
         self.preferences.show_granulo_individually = self.show_granulo_check.isChecked()
+        # Sauvegarder préférence création pylmgc lors de génération
+        self.preferences.create_pylmgc_on_generate = self.create_pylmgc_check.isChecked()
         
         return self.preferences
