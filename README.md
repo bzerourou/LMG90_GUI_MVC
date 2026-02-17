@@ -1,15 +1,16 @@
 
-# LMGC90_GUI — Architecture MVC Refactorisée
+# LMGC90_GUI — Architecture MVC 
 
 ![Version](https://img.shields.io/badge/version-0.3.0)
 ![Python](https://img.shields.io/badge/python-3.8%2B-brightgreen)
 ![License](https://img.shields.io/badge/license-Open%20Source-green)
 
-**LMGC90_GUI** est une interface graphique moderne en architecture **MVC** (Model-View-Controller) pour le préprocesseur `pre` de [LMGC90](https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/-/wikis/home).
-
-
+**LMGC90_GUI** est une interface graphique moderne en architecture **MVC** (Model-View-Controller) pour le solveur [LMGC90](https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/-/wikis/home).
 
 ![](docs/captures/interface2.JPG)
+
+## Documentation (fr)
+[French documentation of LMGC90_GUI](docs/overview.md)
 
 ## 🎯 Points Clés de la Refactorisation
 
@@ -19,14 +20,13 @@
 - **Validation centralisée** dans des classes dédiées
 
 ### ✅ Sécurité Améliorée
-- ❌ **Fini `eval()` dangereux** → `SafeEvaluator` avec AST
 - ✅ Validation stricte des entrées utilisateur
 - ✅ Gestion d'erreurs robuste
 
 ### ✅ Testabilité
 - 🧪 **Tests unitaires** pour toute la logique métier
 - 🧪 **Tests d'intégration** avec pytest-qt
-- 📊 Coverage > 80%
+- 📊 Coverage > 40%
 
 ### ✅ Maintenabilité
 - 📝 Docstrings complètes
@@ -71,10 +71,9 @@ LMGC90_GUI/
 
 ```
 
+## Diagramme de classes
 ![](docs/captures/UML_classes.png)
 
-## Documentation (fr)
-[French documentation of LMGC90_GUI](docs/overview.md)
 
 ## 🚀 Installation
 
