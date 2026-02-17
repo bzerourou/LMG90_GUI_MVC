@@ -12,6 +12,28 @@ from ..core.models import (
 )
 
 
+# Correspondance conteneur → fonction de dépôt pylmgc90
+_DEPOSIT_FUNC = {
+    "Box2D":      "depositInBox2D",
+    "Disk2D":     "depositInDisk2D",
+    "Couette2D":  "depositInCouette2D",
+    "Drum2D":     "depositInDrum2D",
+    "Box3D":      "depositInBox3D",
+    "Sphere3D":   "depositInSphere3D",
+    "Cylinder3D": "depositInCylinder3D",
+}
+
+# Correspondance conteneur → clés de paramètres attendus par la fonction de dépôt
+_DEPOSIT_PARAMS = {
+    "Box2D":      ["lx", "ly"],
+    "Disk2D":     ["r"],
+    "Couette2D":  ["rint", "rext"],
+    "Drum2D":     ["r"],
+    "Box3D":      ["lx", "ly", "lz"],
+    "Sphere3D":   ["r"],
+    "Cylinder3D": ["r"],
+}
+
 class ScriptGenerator:
     """Génère un script Python reproductible du projet"""
     
@@ -36,7 +58,7 @@ class ScriptGenerator:
             self._write_dof_operations(f)
             self._write_postpro(f)
             self._write_datbox(f)
-    
+    # ── En-tête ───────────────────────────────────────────────────────────────
     def _write_header(self, f: TextIO):
         f.write(f'"""\n')
         f.write(f'Script généré automatiquement par LMGC90_GUI\n')
@@ -59,7 +81,7 @@ class ScriptGenerator:
         f.write('posts = pre.postpro_commands()\n\n')
         f.write('bodies_list = []\n\n')
 
-    
+    # ── Matériaux ─────────────────────────────────────────────────────────────
     def _write_materials(self, f: TextIO):
         if not self.state.materials:
             return
@@ -72,16 +94,13 @@ class ScriptGenerator:
             f.write(f"    density={mat.density}")
             
             if mat.properties:
-                for key, value in mat.properties.items():
+                for key, value in (mat.properties).items():
                     f.write(',\n    ')
-                    if isinstance(value, str):
-                        f.write(f"{key}='{value}'")
-                    else:
-                        f.write(f"{key}={value}")
-            
-            f.write('\n)\n')
-            f.write(f"mats.addMaterial(mat_{mat.name})\n\n")
+                    f.write(f"{key}='{value}'" if isinstance(value, str) else f"{key}={value}")
+                f.write('\n)\n')
+                f.write(f"mats.addMaterial(mat_{mat.name})\n\n")
     
+    # ── Modèles ───────────────────────────────────────────────────────────────
     def _write_models(self, f: TextIO):
         if not self.state.models:
             return
@@ -95,16 +114,13 @@ class ScriptGenerator:
             f.write(f"    dimension={mod.dimension}")
             
             if mod.options:
-                for key, value in mod.options.items():
+                for key, value in (mod.options).items():
                     f.write(',\n    ')
-                    if isinstance(value, str):
-                        f.write(f"{key}='{value}'")
-                    else:
-                        f.write(f"{key}={value}")
-            
+                    f.write(f"{key}='{value}'" if isinstance(value, str) else f"{key}={value}")
             f.write('\n)\n')
             f.write(f"mods.addModel(mod_{mod.name})\n\n")
-    
+
+    # ── Avatars manuels ───────────────────────────────────────────────────────
     def _write_avatars_manual(self, f: TextIO):
         manual_avatars = [a for a in self.state.avatars if a.origin == AvatarOrigin.MANUAL]
         if not manual_avatars:
@@ -229,6 +245,7 @@ class ScriptGenerator:
         f.write(f"{container}.addAvatar(body)\n")
         f.write("bodies_list.append(body)\n\n")
     
+    # ── Boucles géométriques (Cercle, Grille, Ligne, Spirale) ────────────────
     def _write_loops(self, f: TextIO):
         if not self.state.loops:
             return
@@ -293,10 +310,7 @@ class ScriptGenerator:
             f.write(f"\n{indent})\n")
             f.write(f"{indent}bodies.addAvatar(av)\n\n")
     
-    # =====================
-    #  for loops génériques 
-    # ======================
-    
+    # ── Boucles for génériques ────────────────────────────────────────────────
     def _write_for_loops(self, f):
         """Boucles For génériques"""
         if not hasattr(self.state, 'for_loops') or not self.state.for_loops:
@@ -447,18 +461,24 @@ class ScriptGenerator:
             f.write(f"    bodies_list[{target_expr}].{template['operation_type']}({params_str})\n")
     
     # =======Fin loops génériques
-
+    # ── Granulométrie ─────────────────────────────────────────────────────────
     def _write_granulo(self, f: TextIO):
         if not self.state.granulo_generations:
             return
         
+        # Préférence : affichage individuel ou groupes seulement
+        show_individually = getattr(
+            getattr(self.state, 'preferences', None),
+            'show_granulo_individually', True
+        )
+
         f.write('# Génération granulométrique\n')
         for i, gen in enumerate(self.state.granulo_generations):
-            f.write(f"# Dépôt granulo {i+1}\n")
+            f.write(f"# Dépôt granulo {i+1}  : {gen.color}----\n")
             
             container_params_str = ', '.join(f"{k}={v}" for k, v in gen.container_params.items())
             
-            f.write(f"nb_particles_{i}, coords_{i}, radii_{i} = pre.{gen.container_type}(\n")
+            f.write(f"radii_{i}, coords_{i} = pre.pre.granuloRandom(\n")
             f.write(f"    nb={gen.nb_particles},\n")
             f.write(f"    rmin={gen.radius_min},\n")
             f.write(f"    rmax={gen.radius_max}")
@@ -467,17 +487,51 @@ class ScriptGenerator:
             if container_params_str:
                 f.write(f",\n    {container_params_str}")
             f.write(f"\n)\n\n")
-            
-            f.write(f"for j in range(nb_particles_{i}):\n")
-            f.write(f"    av = pre.{gen.avatar_type}(\n")
-            f.write(f"        center=coords_{i}[j].tolist(),\n")
-            f.write(f"        material=mat_{gen.material_name},\n")
-            f.write(f"        model=mod_{gen.model_name},\n")
-            f.write(f"        color='{gen.color}',\n")
-            f.write(f"        r=float(radii_{i}[j])\n")
-            f.write(f"    )\n")
-            f.write(f"    bodies.addAvatar(av)\n\n")
-    
+            # 2. Dépôt dans le conteneur
+            deposit_func = _DEPOSIT_FUNC.get(gen.container_type, "depositInBox2D")
+            deposit_keys = _DEPOSIT_PARAMS.get(gen.container_type, ["lx", "ly"])
+
+            f.write(f"_coords_{i} = pre.{deposit_func}(\n")
+            f.write(f"    radii=_radii_{i},\n")
+            for key in deposit_keys:
+                val = gen.container_params.get(key, 1.0)
+                f.write(f"    {key}={val},\n")
+            f.write(f")\n\n")
+
+            # 3. Boucle for de création des avatars
+            f.write(f"# Création des avatars — dépôt {i+1}\n")
+
+            if not show_individually:
+                # Pas de stockage individuel : avatars non indexés
+                f.write(f"# (avatars non indexés — préférence 'affichage groupes uniquement')\n")
+                f.write(f"for j in range(len(_radii_{i})):\n")
+                f.write(f"    av = pre.{gen.avatar_type}(\n")
+                f.write(f"        center=_coords_{i}[j],\n")
+                f.write(f"        model=mod_{gen.model_name},\n")
+                f.write(f"        material=mat_{gen.material_name},\n")
+                f.write(f"        color='{gen.color}',\n")
+                f.write(f"        r=float(_radii_{i}[j])\n")
+                f.write(f"    )\n")
+                f.write(f"    bodies.addAvatar(av)\n\n")
+            else:
+                # Stockage individuel + groupe optionnel
+                if gen.group_name:
+                    f.write(f"group_{gen.group_name} = []\n")
+                f.write(f"for j in range(len(_radii_{i})):\n")
+                f.write(f"    av = pre.{gen.avatar_type}(\n")
+                f.write(f"        center=_coords_{i}[j],\n")
+                f.write(f"        model=mod_{gen.model_name},\n")
+                f.write(f"        material=mat_{gen.material_name},\n")
+                f.write(f"        color='{gen.color}',\n")
+                f.write(f"        r=float(_radii_{i}[j])\n")
+                f.write(f"    )\n")
+                f.write(f"    bodies.addAvatar(av)\n")
+                f.write(f"    bodies_list.append(av)\n")
+                if gen.group_name:
+                    f.write(f"    group_{gen.group_name}.append(av)\n")
+                f.write(f"\n")
+
+    # ── Lois de contact ───────────────────────────────────────────────────────
     def _write_contact_laws(self, f: TextIO):
         if not self.state.contact_laws:
             return
@@ -501,7 +555,7 @@ class ScriptGenerator:
             
             f.write('\n)\n')
             f.write(f"tacts.addBehav(law_{law.name})\n\n")
-    
+    # ── Tables de visibilité ──────────────────────────────────────────────────
     def _write_visibility(self, f: TextIO):
         if not self.state.visibility_rules:
             return
@@ -519,7 +573,7 @@ class ScriptGenerator:
             f.write(f"    alert={rule.alert}\n")
             f.write(f")\n")
             f.write(f"sees.addSeeTable(see_{i})\n\n")
-    
+    # ── Opérations DOF ────────────────────────────────────────────────────────
     def _write_dof_operations(self, f: TextIO):
         if not self.state.operations:
             return
@@ -535,7 +589,7 @@ class ScriptGenerator:
                 f.write(f"DOF sur groupe '{op.target_value}'\n")
                 f.write(f"for av in group_{op.target_value}:\n")
                 f.write(f"    av.{op.operation_type}({params_str})\n\n")
-    
+    # ── Post-traitement ───────────────────────────────────────────────────────
     def _write_postpro(self, f: TextIO):
         if not self.state.postpro_commands:
             return
@@ -558,7 +612,7 @@ class ScriptGenerator:
                 f.write(f")\n")
                 f.write(f"posts.addCommand(post_cmd_{i})\n")
             f.write('\n')
-    
+    # ── DATBOX ────────────────────────────────────────────────────────────────
     def _write_datbox(self, f: TextIO):
         f.write('# Génération DATBOX\n')
         f.write(f"pre.writeDatbox(\n")
@@ -573,7 +627,7 @@ class ScriptGenerator:
         f.write(f")\n\n")
         f.write(f"print('DATBOX généré avec succès!')\n")
    
-    
+    #── Utilitaire ────────────────────────────────────────────────────────────
     def _format_value(self, value):
         """Formate une valeur pour Python"""
         import numpy as np

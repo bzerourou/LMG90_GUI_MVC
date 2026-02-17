@@ -12,136 +12,85 @@ from io import StringIO
 
 
 class ComputeWorker(QThread):
-    """Thread pour exécuter le calcul"""
+    """Thread pour exécuter le calcul dans un subprocess externe sans fenêtre"""
     progress = pyqtSignal(str)
     finished = pyqtSignal(bool, str)
-    
-    def __init__(self, script_path, work_dir):  
+
+    def __init__(self, script_path, work_dir):
         super().__init__()
         self.script_path = script_path
         self.work_dir = work_dir
+        self._process = None
         self._stop_requested = False
-    
+
     def run(self):
-        """Exécute le script Python avec capture TOTALE des sorties et erreurs"""
-        old_dir = os.getcwd()
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        
+        """Lance command.py dans un subprocess sans fenêtre (Windows-safe)"""
+        import subprocess
+
+        self.progress.emit(f"📁 Répertoire de travail : {self.work_dir}")
+        self.progress.emit(f"📄 Script : {self.script_path}")
+        self.progress.emit("=" * 60)
+
         try:
-            # Changer le répertoire de travail
-            os.chdir(str(self.work_dir))
-            self.progress.emit(f"📁 Répertoire de travail : {self.work_dir}")
-            self.progress.emit(f"📄 Exécution du script : {self.script_path}")
+            # Kwargs spécifiques Windows pour éviter la fenêtre console
+            kwargs = {}
+            if sys.platform == "win32":
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
+            self._process = subprocess.Popen(
+                [sys.executable, "-u", str(self.script_path)],
+                cwd=str(self.work_dir),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                **kwargs
+            )
+
+            # Lire en temps réel
+            for line in iter(self._process.stdout.readline, ''):
+                if self._stop_requested:
+                    self._process.terminate()
+                    try:
+                        self._process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        self._process.kill()
+                    self.finished.emit(False, "Interrompu par l'utilisateur")
+                    return
+                stripped = line.rstrip()
+                if stripped:
+                    self.progress.emit(stripped)
+
+            self._process.wait()
+            returncode = self._process.returncode
+
             self.progress.emit("=" * 60)
-            
-            # Vérifier que le script existe
-            if not os.path.exists(self.script_path):
-                raise FileNotFoundError(f"Script introuvable : {self.script_path}")
-            
-            # Lire le script
-            with open(self.script_path, 'r', encoding='utf-8') as f:
-                script_code = f.read()
-            
-            # Créer des buffers pour capturer TOUTES les sorties
-            stdout_buffer = StringIO()
-            stderr_buffer = StringIO()
-            
-            # Classe personnalisée pour capturer print() en temps réel
-            class OutputCapture:
-                def __init__(self, emit_func, original):
-                    self.emit_func = emit_func
-                    self.original = original
-                    self.buffer = []
-                
-                def write(self, text):
-                    if text and not text.isspace():
-                        self.emit_func(text.rstrip())
-                    # Écrire aussi dans l'original pour le debug
-                    try:
-                        self.original.write(text)
-                    except:
-                        pass
-                    return len(text)
-                
-                def flush(self):
-                    try:
-                        self.original.flush()
-                    except:
-                        pass
-            
-            # Remplacer stdout et stderr
-            sys.stdout = OutputCapture(self.progress.emit, old_stdout)
-            sys.stderr = OutputCapture(self.progress.emit, old_stderr)
-            
-            # Créer un environnement d'exécution ISOLÉ
-            script_globals = {
-                '__name__': '__main__',
-                '__file__': str(self.script_path),
-                '__builtins__': __builtins__,
-            }
-            
-            try:
-                # EXÉCUTER LE SCRIPT avec protection totale
-                exec(script_code, script_globals)
-                
-                self.progress.emit("")
-                self.progress.emit("=" * 60)
+
+            if returncode == 0:
                 self.finished.emit(True, "✅ Calcul terminé avec succès")
-                
-            except KeyboardInterrupt:
-                self.progress.emit("")
-                self.progress.emit("⚠️ Calcul interrompu par l'utilisateur")
-                self.finished.emit(False, "Interrompu")
-                
-            except Exception as e:
-                # Capturer TOUTES les erreurs sans crasher
-                self.progress.emit("")
-                self.progress.emit("=" * 60)
-                self.progress.emit(f"❌ ERREUR DURANT L'EXÉCUTION")
-                self.progress.emit("=" * 60)
-                self.progress.emit(f"Type: {type(e).__name__}")
-                self.progress.emit(f"Message: {str(e)}")
-                self.progress.emit("")
-                
-                # Afficher la traceback complète
-                import traceback
-                self.progress.emit("📋 Traceback détaillée :")
-                self.progress.emit("-" * 60)
-                
-                tb_lines = traceback.format_exc().split('\n')
-                for line in tb_lines:
-                    if line.strip():
-                        self.progress.emit(line)
-                
-                self.progress.emit("=" * 60)
-                self.finished.emit(False, f"❌ {type(e).__name__}: {str(e)}")
-        
-        except Exception as outer_e:
-            # Sécurité supplémentaire : capturer même les erreurs de setup
-            self.progress.emit("")
-            self.progress.emit("=" * 60)
-            self.progress.emit(f"❌ Erreur critique avant le calcul")
-            self.progress.emit(f"{type(outer_e).__name__}: {str(outer_e)}")
-            self.progress.emit("=" * 60)
-            
+            else:
+                # Abort Fortran (STOP 1) → returncode != 0
+                self.progress.emit(f"⚠️ Le calcul s'est arrêté (code retour : {returncode})")
+                self.progress.emit("Consultez les messages ci-dessus pour le détail de l'erreur.")
+                self.finished.emit(False, f"Arrêt anormal (code {returncode})")
+
+        except Exception as e:
+            self.progress.emit(f"❌ Erreur lancement : {type(e).__name__}: {e}")
             import traceback
             for line in traceback.format_exc().split('\n'):
                 if line.strip():
                     self.progress.emit(line)
-            
-            self.finished.emit(False, f"❌ Erreur critique: {outer_e}")
-        
-        finally:
-            # TOUJOURS restaurer l'état original
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-            os.chdir(old_dir)
-    
+            self.finished.emit(False, f"❌ {e}")
+
     def stop(self):
-        """Demande l'arrêt du calcul"""
+        """Arrête le calcul"""
         self._stop_requested = True
-        self.terminate()
+        if self._process and self._process.poll() is None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=3)
+            except Exception:
+                self._process.kill()
 
 
 class ComputeTab(QWidget):
