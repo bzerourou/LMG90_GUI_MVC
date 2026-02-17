@@ -36,7 +36,7 @@ Chaque avatar est caractérisé par son :
 - Mur : longueur, rayon/hauteur, nombre de vertices
 
 ## Exemple 
-Pour créer un avatar de tyoe disque, il vous suffit seulement de préciser  : 
+Pour créer un avatar de type disque, il vous suffit seulement de préciser  : 
 - rayon : 0.25, 
 - coordonnées : [0.0, 0.0], 
 - le matériau et modèle sont chargés automatiquement

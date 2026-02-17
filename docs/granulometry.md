@@ -49,3 +49,36 @@ IL ne vous reste de cliquer sur le bouton 'Générer de dépôt'
 Le rendu de mon modèle, 
 
 ![](captures/rendu_depot_granulo_disk_jonc.JPG)
+
+## Assistant de granulométrie 
+Vous pouvez aussi utiliser l'assistant de granulométrie afin de générer facilement vos dépôts, cet assistant fait appel aux routines de LMGC90, cela pourra ralentir considérablement votre interface, il n'est pas idéal pour une génération de plus de 2000 avatars (particules).
+Pour cela il vous suffit de cliquer sur le menu "Fichier" puis "Assistant de granulométrie " ou avec le raccourci clavier "ctr+ shift+ G". L'assistant s'ouvrira, cliquez sur le bouton "suivant"
+
+![](captures/assistant_granulo_page1.JPG)
+
+Choisissez la dimension de votre modèle numérique, dans mon cas je vais dire en 3D, puis cliqez sur "suivant"
+
+![](captures/assistant_granulo_page2.JPG)
+
+L'assistant vous propesera de créer un matériau simple de type rigide, j'opte pour les valeurs par défauts, ensuite sur "suivant"
+
+![](captures/assistant_granulo_page3.JPG)
+
+L'assistant vous propesera de créer un modèle rigide de type "Rxx2D"/"Rxx3D" pour la 2D/3D, je laisse tout par défaut, et cliquez sur "suivant", 
+![](captures/assistant_granulo_page4.JPG)
+
+On arrive maintenant au dialogue de génération, pour mon cas je vais générer 500 avatars, le rayon minimal et maximal respectivement à 0.05 et 0.06, puis cliquez sur "suivant", 
+
+![](captures/assistant_granulo_page5.JPG)
+
+Le type de dépôt est sur une Boxe3D, puis "suivant",
+
+![](captures/assistant_granulo_page6.JPG)
+
+Enfin on est arrivé au récapitulatif, on termine par cliquer sur le bouton "générer"
+
+![](captures/assistant_granulo_page7.JPG)
+
+## Génaration avec numpy
+Il est possible d'utiliser un générateur d'avatars avec numpy, adapter pour les très grande génération, plus de 5000 avatars, pour cela cliquez sur le menu "fichier" -> "Génerateur granulométrie numpy...(bétâ)", 
+![](captures/assistant_granulo_numpy.JPG)

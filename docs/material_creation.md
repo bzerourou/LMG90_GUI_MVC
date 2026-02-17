@@ -14,15 +14,15 @@ Cette section explique comment créer et configurer un matériau dans LMGC90_GUI
   - **Propriétés** : Champ texte pour paramètres avancés pour chaque type de matériau
 
 ## Types de matériaux disponibles
-Vous pourriez créer différents types de matériaux, ce tabelau comprenne tous les paramères pour chaque matériau: 
+Vous pourriez créer différents types de matériaux, ce tabelau comprenne tous les paramères pour chaque matériau:  
 
 | Code matériau | Nom complet | Nombre de paramètres | Paramètres principaux | Modèles compatibles |
 |---------------|-------------|----------------------|-----------------------|---------------------|
 | **RIGID** | Corps rigide | 1 | density | MECAx, THERx |
 | **THERMO_RIGID** | Corps rigide thermique | 6 | density, anisotropy, thermal_conductivity, specific_heat, thermal_young, thermal_nu | MECAx, THERx |
 | **DISCRETE** | Éléments discrets | 3 | masses, stiffnesses, viscosities | MECAx, THERx |
-| x**USER_MAT** | Matériau utilisateur | 2 | density, file_mat | MECAx |
-| x**EXTERNAL** | Matériau externe | 0 | *(aucun)* | MECAx |
+| (x)**USER_MAT** | Matériau utilisateur | 2 | density, file_mat | MECAx |
+| (x)**EXTERNAL** | Matériau externe | 0 | *(aucun)* | MECAx |
 | **ELAS** | Élastique linéaire | 6 | elas, young, nu, anisotropy, density, G | MECAx, THERx |
 | **VISCO_ELAS** | Visco-élastique | 8 | elas, young, nu, anisotropy, density, viscous_model, viscous_young, viscous_nu | MECAx, THERx |
 | **ELAS_PLAS** | Élasto-plastique | 11 | critere, iso_hard, isoh_coeff, young, nu, anisotropy, elas, density, isoh, cinh, visc | MECAx |
@@ -30,14 +30,15 @@ Vous pourriez créer différents types de matériaux, ce tabelau comprenne tous 
 | **THERMO_ELAS** | Thermo-élastique | 10 | elas, young, nu, anisotropy, conductivity, dilatation, T_ref_meca, specific_capacity, therm_cpl, density | MECAx, THERx |
 | **PORO_ELAS** | Poro-élastique | 8 | elas, young, nu, anisotropy, hydro_cpl, conductivity, specific_capacity, density | POROx |
 
+
 Par cas d'usage
 | Matériau | Applications typiques | Exemples concrets | Domaines |
 |----------|----------------------|-------------------|----------|
 | **RIGID** | Méthode des éléments discrets (DEM) | Empilement de grains, écoulements granulaires, assemblages de particules rigides | Génie civil, pharmacie, agroalimentaire |
 | **THERMO_RIGID** | DEM avec transferts thermiques | Particules chaudes, réacteurs à lit fluidisé, procédés thermiques | Chimie, métallurgie |
 | **DISCRETE** | Systèmes masse-ressort-amortisseur | Isolateurs sismiques, suspensions, liaisons élastiques | Génie parasismique, automobile |
-| x**USER_MAT** | Lois de comportement personnalisées | Matériaux spécifiques, lois expérimentales | Recherche, matériaux innovants |
-| x**EXTERNAL** | Interfaces avec codes externes | Couplage avec autres logiciels | Multi-physique |
+| (x)**USER_MAT** | Lois de comportement personnalisées | Matériaux spécifiques, lois expérimentales | Recherche, matériaux innovants |
+| (x)**EXTERNAL** | Interfaces avec codes externes | Couplage avec autres logiciels | Multi-physique |
 | **ELAS** | Structures en régime élastique | Bâtiments, ponts, pièces mécaniques, structures métalliques | Génie civil, mécanique |
 | **VISCO_ELAS** | Matériaux visqueux | Polymères, asphalte, matériaux amortissants, joints | Routes, automobile, aéronautique |
 | **ELAS_PLAS** | Déformations plastiques permanentes | Formage des métaux, crash, endommagement, usinage | Métallurgie, automobile, aéronautique |
@@ -73,4 +74,4 @@ Dans le menu "Outils"-> "Variables dynamiques", vous aurez cette boite de dialog
 ![](captures/variables.JPG)
 
 ### Exemples et expressions
-Si je clique sur le premier exemple, et je modifie le nom de la variable à "radius ", je lui attribut la valeur de 0.25, puis de cliquer sur le bouton "Ajouter ou modifier", puis sur "OK", vous aurez la possibilité cette variable dans tous les champs.
+Si je clique sur le premier exemple (Constante simple thickness = 0.5), et je modifie le nom de la variable à "radius ", je lui attribut la valeur de 0.25, puis de cliquer sur le bouton "Ajouter ou modifier", puis sur "OK", vous aurez la possibilité de l'utiliser dans tous les champs.

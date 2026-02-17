@@ -1,5 +1,5 @@
 # Assistant de projet 
-L'Assistant de Configuration de Projet est un outil qui vous guidera pas à pas afin de créer rapidement un projet LMGC90 complet avec tous les éléments de vos modèles numériques.
+L'Assistant de Configuration de Projet est un outil qui vous guidera pas à pas afin de créer rapidement un projet LMGC90 complet avec  les éléments essentiaux de vos modèles numériques.
 
 ## 🎯 Objectif
 
@@ -48,3 +48,5 @@ Je poursuie avec la dernière étape, créer une table de visibilité pour la ge
 Nous arriverons enfin au récapulatif de notre assistant, en cliquant sur le bouton "Créer projet", tous éléments seront crées automatiquement. 
 
 ![](captures/projet_assistant_recap.JPG)
+
+Une fois la boite de dialgue valider, tous vos éléments seront crées, après vous pouvez apporté des modifications.

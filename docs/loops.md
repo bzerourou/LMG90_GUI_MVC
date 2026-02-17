@@ -37,3 +37,8 @@ _Remarque_ : Pour avoir le rendu de mon modèle je clique simplement sur le bout
 ## Utilisation
 Idéal pour générer des murs, empilement régulier d'avatars,
 
+## Boucle sur vos éléments
+Il est tout à fait possible de créer des boucles **for** comme dans python sur vos éléments, pour cela il faudra choisir le  type de boucle à **For**, ensuite de préciser la configuration de votre boucle, le type de l'élément pour lequel vous souhaiterai faire une boucle et donner les détails de vos éléments dans une template JSON
+
+![](captures/for_generique.JPG)
+

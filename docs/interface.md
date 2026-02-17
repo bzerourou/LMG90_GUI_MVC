@@ -2,9 +2,11 @@
 
 LMGC90_GUI est une interface graphique moderne et intuitive conçue pour faciliter la création de vos modèles numériques avec le module **pre** (pré-processeur) de **LMGC90**.
 
+Il aussi possible de lancer vos calculs seulement sur les rigides.
+
 L'interface est organisée de manière claire et ergonomique pour accompagner l'utilisateur du début à la fin du processus de modélisation : création des éléments, conditions aux limites, post-traitement, puis génération des fichiers de simulation et enfin calculs.
 
-Voici une vue d'ensemble des différentes parties de l'interface.
+Voici cette vidéo qui explique la vue d'ensemble des différentes parties de l'interface.
 
 [![Introduction LMGC90_GUI](https://img.youtube.com/vi/2lVIGg3VboA/0.jpg)](https://www.youtube.com/watch?v=2lVIGg3VboA)
 
@@ -41,8 +43,20 @@ L'interface est divisée en **quatre zones principales** :
   - Sauvegarder sous... (Ctrl+Shift+S)
   - Assistant de configuration de projets (Ctrl+Shift+N)
   Est un assistant qui vous guidera pas à pas pour créer et configurer votre projet
+
+  ![](captures/assistant_projet.JPG)
+
   - Assistant de granulométrie (Ctrl+Shift+G)
-  Est un assistant pour générer une granulométrie rapidement
+  Est un assistant pour générer une granulométrie rapidement avec les routines liées à pylmgc90, idéal pour les dépôt qui ne dépasse pas 2000 avatars, sinon l'application prend beaucoup plus de temps afin de rafraichir l'UI, parfois plante complètement.
+
+  ![](captures/assistant_granulo_pylmgc90.JPG)
+
+  - Génération granulométrie numpy... (bêta)
+  Est une boite de dialogue qui génère et dépose des avatars à base de numpy sans passer par les routines pylmgc90, idéal pour la génération plus de 5000 avatars 
+
+  ![](captures/assistant_granulo_numpy.JPG) 
+
+
   - Quitter (Ctrl+Q)
 - **Outils** :
   - Préférences (Ctrl+,)
@@ -125,6 +139,7 @@ Vous avez la possibilité de spécifier quatre choses :
 - Choisir un système d'unités (SI ou CSG), il n'est pas encore implémenter
 - Automatiser vos sauvegardes en cochant les options 
 - Préciser nombre de projets de votre historique
+- Activer/désactiver l'affichage des avatars dans l'arbre de création et dans le tableau qui liste les avatars dans l'onglet avatars.
 
 ![](captures/preferences.JPG)
 
