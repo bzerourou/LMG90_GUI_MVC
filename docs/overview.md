@@ -15,3 +15,5 @@ Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI
 - [Lois de contact](contact_laws.md)
 - [Tables de visibilité](visibility.md)
 - [Post-traitement](postpro.md)
+- [Calcul](calculs.md) 
+- [Visualisation](visualisation.md)
