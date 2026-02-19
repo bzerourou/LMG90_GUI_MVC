@@ -20,7 +20,7 @@ from .compute_tab import ComputeTab
 from .viewer_tab import ViewerTab
 
 __all__ = [
-    'MaterialTab', 'ModelTab', 'AvatarTab', 'EmptyAvatarTab', 'AvatarLibraryTab'
+    'MaterialTab', 'ModelTab', 'AvatarTab', 'EmptyAvatarTab', 'AvatarLibraryTab',
     'LoopTab', 'GranuloTab', 'DOFTab', 'ContactTab',
     'VisibilityTab', 'PostProTab', 'ComputeTab', 'ViewerTab'
 ]

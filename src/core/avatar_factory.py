@@ -22,7 +22,7 @@ class AvatarTemplate:
                color: str = "BLUEx", **custom_params) -> Avatar:
         """Crée un avatar depuis le template"""
         params = self.default_params.copy()
-        #params.update(custom_params)
+        params.update(custom_params)
         
         return Avatar(
             avatar_type=self.avatar_type,

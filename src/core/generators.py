@@ -126,7 +126,7 @@ class ForLoopGenerator:
         return items
     
     @staticmethod
-    def _build_context(controller) -> Dict[str, Any]:
+    def _build_context(controller, evaluator=None) -> Dict[str, Any]:
         """Construit le contexte d'évaluation"""
         context = {
             'math': math,
@@ -144,8 +144,9 @@ class ForLoopGenerator:
         if hasattr(controller.state, 'dynamic_vars'):
             for var_name, var_expr in controller.state.dynamic_vars.items():
                 try:
-                    if isinstance(var_expr, str):
-                        context[var_name] = eval(var_expr, {"__builtins__": {}}, context)
+                    if isinstance(var_expr, str) and evaluator is not None:
+                        evaluator.allowed_names = context                  
+                        context[var_name] = evaluator.eval_expression(var_expr, context)
                     else:
                         context[var_name] = var_expr
                 except:

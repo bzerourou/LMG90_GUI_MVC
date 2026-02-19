@@ -296,7 +296,7 @@ class LMGC90Bridge:
         
         elif atype == AvatarType.GRANULO_ROUGH_WALL_3D:
             return pre.granuloRoughWall3D(
-                lx=avatar.wall_params['ly'],
+                lx=avatar.wall_params['lx'],
                 ly=avatar.wall_params['ly'],
                 rmin=avatar.wall_params['rmin'],
                 rmax=avatar.wall_params['rmax'],

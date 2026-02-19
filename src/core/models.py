@@ -1,6 +1,5 @@
 """
 Modèles de données pour LMGC90_GUI.
-Représentation pure des objets sans logique UI (Model dans MVC).
 """
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
@@ -9,12 +8,7 @@ from pathlib import Path
 
 
 def convert_to_serializable(obj):
-    """
-    Convertit récursivement les objets non-sérialisables en types JSON.
-    Gère numpy.ndarray, numpy.integer, numpy.floating, etc.
-    """
     import numpy as np
-    
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     elif isinstance(obj, dict):
@@ -26,24 +20,12 @@ def convert_to_serializable(obj):
     else:
         return obj
 
-# ============================================================================
-# EXCEPTIONS - Erreurs personnalisées
-# ============================================================================
 
 class ValidationError(Exception):
-    """
-    Exception levée lors d'une erreur de validation de données.
-    Utilisée par les validateurs pour signaler des données invalides.
-    """
     pass
 
 
-# ============================================================================
-# ENUMS - Types énumérés
-# ============================================================================
-
 class MaterialType(Enum):
-    """Types de matériaux supportés par LMGC90"""
     RIGID = "RIGID"
     ELAS = "ELAS"
     ELAS_DILA = "ELAS_DILA"
@@ -54,7 +36,6 @@ class MaterialType(Enum):
 
 
 class AvatarType(Enum):
-    """Types d'avatars (corps rigides) supportés"""
     RIGID_DISK = "rigidDisk"
     RIGID_JONC = "rigidJonc"
     RIGID_POLYGON = "rigidPolygon"
@@ -67,63 +48,53 @@ class AvatarType(Enum):
     GRANULO_WALL = "granuloRoughWall"
     EMPTY_AVATAR = "emptyAvatar"
     MESH_DEFORMABLE = "mesh"
-    # 3D
     RIGID_SPHERE = "rigidSphere"
     RIGID_PLAN = "rigidPlan"
     RIGID_CYLINDER = "rigidCylinder"
     RIGID_POLYHEDRON = "rigidPolyhedron"
     ROUGH_WALL_3D = "roughWall3D"
     GRANULO_ROUGH_WALL_3D = "granuloRoughWall3D"
-    
+
+
 class ContactLawType(Enum):
-    """Types de lois de contact"""
     IQS_CLB = "IQS_CLB"
     IQS_CLB_G0 = "IQS_CLB_g0"
     COUPLED_DOF = "COUPLED_DOF"
-    IQS_DS_CLB = "IQS_DS_CLB"                    
-    IQS_MOHR_DS_CLB = "IQS_MOHR_DS_CLB"          
-    IQS_MAC_CZM = "IQS_MAC_CZM"                  
-    ELASTIC_WIRE = "ELASTIC_WIRE"                
-    ELASTIC_REPELL_CLB = "ELASTIC_REPELL_CLB"    
-
+    IQS_DS_CLB = "IQS_DS_CLB"
+    IQS_MOHR_DS_CLB = "IQS_MOHR_DS_CLB"
+    IQS_MAC_CZM = "IQS_MAC_CZM"
+    ELASTIC_WIRE = "ELASTIC_WIRE"
+    ELASTIC_REPELL_CLB = "ELASTIC_REPELL_CLB"
 
 
 class AvatarOrigin(Enum):
-    """Origine de création d'un avatar"""
-    MANUAL = "manual"      # Créé manuellement
-    LOOP = "loop"          # Généré par une boucle
-    GRANULO = "granulo"    # Généré par granulométrie
+    MANUAL = "manual"
+    LOOP = "loop"
+    GRANULO = "granulo"
 
 
 class UnitSystem(Enum):
-    """Système d'unités"""
-    SI = "SI"      # International System (m, kg, s, N, Pa, J)
-    CGS = "CGS"    # Centimeter-Gram-Second (cm, g, s, dyn, Ba, erg)
+    SI = "SI"
+    CGS = "CGS"
 
-# ============================================================================
-# DATACLASSES - Modèles de données
-# ============================================================================
 
 @dataclass
 class Material:
-    """Représente un matériau LMGC90"""
     name: str
     material_type: MaterialType
     density: float
     properties: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire pour sérialisation JSON"""
         return {
             'name': self.name,
             'type': self.material_type.value,
             'density': self.density,
             'props': self.properties
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'Material':
-        """Crée un Material depuis un dictionnaire"""
         return cls(
             name=data['name'],
             material_type=MaterialType(data['type']),
@@ -134,32 +105,26 @@ class Material:
 
 @dataclass
 class Model:
-    """Représente un modèle physique (éléments finis ou corps rigides)"""
     name: str
-    physics: str  # MECAx, THERx, HYDRx
-    element: str  # Rxx2D, T3xxx, Q4xxx, etc.
-    dimension: int  # 2 ou 3
+    physics: str
+    element: str
+    dimension: int
     options: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
         result = {
             'name': self.name,
             'physics': self.physics,
             'element': self.element,
             'dimension': self.dimension
         }
-        # Ajouter les options au même niveau
         result.update(self.options)
         return result
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'Model':
-        """Crée un Model depuis un dictionnaire"""
-        # Extraire les champs principaux
         base_keys = ['name', 'physics', 'element', 'dimension']
         options = {k: v for k, v in data.items() if k not in base_keys}
-        
         return cls(
             name=data['name'],
             physics=data['physics'],
@@ -171,30 +136,24 @@ class Model:
 
 @dataclass
 class Avatar:
-    """
-    Représente un avatar (corps rigide).
-    Contient tous les champs possibles pour tous les types.
-    """
     avatar_type: AvatarType
     center: List[float]
     material_name: str
     model_name: str
     color: str = "BLUEx"
     origin: AvatarOrigin = AvatarOrigin.MANUAL
-    controller: Any = field(repr=False, default=None)  # Référence au contrôleur (non sérialisé)
-    
-    # Champs spécifiques selon le type
+    controller: Any = field(repr=False, default=None)
+
     radius: Optional[float] = None
-    axis: Optional[Dict[str, float]] = None  # {'axe1': float, 'axe2': float}
+    axis: Optional[Dict[str, float]] = None
     vertices: Optional[List[List[float]]] = None
     nb_vertices: Optional[int] = None
-    generation_type: Optional[str] = None  # regular, full, bevel
+    generation_type: Optional[str] = None
     is_hollow: bool = False
-    wall_params: Optional[Dict[str, Any]] = None  # l, h, r, rmin, rmax, nb_vertex, nb_polyg
+    wall_params: Optional[Dict[str, Any]] = None
     contactors: List[Dict[str, Any]] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire pour sérialisation"""
         data = {
             'type': self.avatar_type.value,
             'center': convert_to_serializable(self.center),
@@ -203,55 +162,46 @@ class Avatar:
             'color': self.color,
             '__origin': self.origin.value
         }
-        
-        # Ajouter les champs non-None
         if self.radius is not None:
-            if self.avatar_type not in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON] :
+            if self.avatar_type not in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
                 data['r'] = self.radius
-            else : 
+            else:
                 data['radius'] = self.radius
-        
         if self.axis:
             data['axe1'] = self.axis['axe1']
             data['axe2'] = self.axis['axe2']
             if 'axe3' in self.axis:
                 data['axe3'] = self.axis['axe3']
-        
         if self.vertices:
             data['vertices'] = self.vertices
-        
         if self.nb_vertices is not None:
             data['nb_vertices'] = self.nb_vertices
-        
         if self.generation_type:
             data['gen_type'] = self.generation_type
-        
         if self.is_hollow:
             data['is_Hollow'] = True
-        
         if self.wall_params:
             data.update(convert_to_serializable(self.wall_params))
-        
         if self.contactors:
             data['contactors'] = convert_to_serializable(self.contactors)
-        
         return data
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'Avatar':
-        """Crée un Avatar depuis un dictionnaire"""
-        # Reconstruire axis si présent
         axis = None
         if 'axe1' in data and 'axe2' in data:
             axis = {'axe1': data['axe1'], 'axe2': data['axe2']}
-            if 'axe3' in data : 
+            if 'axe3' in data:
                 axis['axe3'] = data['axe3']
-        if isinstance(data['center'], list):
-            center = data['center']
-        # Reconstruire wall_params
-        wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg','lx', 'ly', 'lz','ra', 'rb', 'faces']
+
+        # FIX: center peut ne pas être une liste
+        center = data['center']
+        if not isinstance(center, list):
+            center = list(center)
+
+        wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg', 'lx', 'ly', 'lz', 'ra', 'rb', 'faces']
         wall_params = {k: data[k] for k in wall_keys if k in data}
-        
+
         return cls(
             avatar_type=AvatarType(data['type']),
             center=center,
@@ -272,26 +222,20 @@ class Avatar:
 
 @dataclass
 class ContactLaw:
-    """Représente une loi de contact entre corps"""
     name: str
     law_type: ContactLawType
     friction: Optional[float] = None
     properties: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
-        data = {
-            'name': self.name,
-            'law': self.law_type.value
-        }
+        data = {'name': self.name, 'law': self.law_type.value}
         if self.friction is not None:
             data['fric'] = self.friction
         data.update(self.properties)
         return data
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'ContactLaw':
-        """Crée un ContactLaw depuis un dictionnaire"""
         props = {k: v for k, v in data.items() if k not in ['name', 'law', 'fric']}
         return cls(
             name=data['name'],
@@ -303,7 +247,6 @@ class ContactLaw:
 
 @dataclass
 class VisibilityRule:
-    """Règle de visibilité pour la détection de contacts"""
     candidate_body: str
     candidate_contactor: str
     candidate_color: str
@@ -312,9 +255,8 @@ class VisibilityRule:
     antagonist_color: str
     behavior_name: str
     alert: float = 0.1
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
         return {
             'CorpsCandidat': self.candidate_body,
             'candidat': self.candidate_contactor,
@@ -325,10 +267,9 @@ class VisibilityRule:
             'behav': self.behavior_name,
             'alert': self.alert
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'VisibilityRule':
-        """Crée depuis un dictionnaire"""
         return cls(
             candidate_body=data['CorpsCandidat'],
             candidate_contactor=data['candidat'],
@@ -343,25 +284,21 @@ class VisibilityRule:
 
 @dataclass
 class DOFOperation:
-    """Opération sur les degrés de liberté (conditions aux limites)"""
-    operation_type: str  # translate, rotate, imposeDrivenDof, imposeInitValue
-    target_type: str  # 'avatar' ou 'group'
-    target_value: Any  # index d'avatar ou nom de groupe
+    operation_type: str
+    target_type: str
+    target_value: Any
     parameters: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
         return {
             'type': self.operation_type,
             'target': self.target_type,
             'target_value': self.target_value,
             'params': convert_to_serializable(self.parameters)
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'DOFOperation':
-        """Crée depuis un dictionnaire (compatible ancien format)"""
-        # Compatibilité ancien format
         if 'body_index' in data:
             return cls(
                 operation_type=data['type'],
@@ -387,8 +324,7 @@ class DOFOperation:
 
 @dataclass
 class Loop:
-    """Configuration d'une boucle de génération d'avatars"""
-    loop_type: str  # Cercle, Grille, Ligne, Spirale, Manuel
+    loop_type: str
     model_avatar_index: int
     count: int
     radius: float = 0.0
@@ -399,9 +335,8 @@ class Loop:
     invert_axis: bool = False
     group_name: Optional[str] = None
     generated_indices: List[int] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
         return {
             'type': self.loop_type,
             'model_avatar_index': self.model_avatar_index,
@@ -415,10 +350,9 @@ class Loop:
             'stored_in_group': self.group_name,
             'generated_avatar_indices': self.generated_indices
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'Loop':
-        """Crée depuis un dictionnaire"""
         return cls(
             loop_type=data['type'],
             model_avatar_index=data['model_avatar_index'],
@@ -433,9 +367,9 @@ class Loop:
             generated_indices=data.get('generated_avatar_indices', [])
         )
 
+
 @dataclass
 class ForLoop:
-    """Configuration d'une boucle for générique"""
     loop_var: str
     start_expr: str
     end_expr: str
@@ -444,7 +378,7 @@ class ForLoop:
     template_config: dict = field(default_factory=dict)
     group_name: str = None
     generated_indices: list = field(default_factory=list)
-    
+
     def to_dict(self) -> dict:
         return {
             'loop_var': self.loop_var,
@@ -456,7 +390,7 @@ class ForLoop:
             'group_name': self.group_name,
             'generated_indices': self.generated_indices
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> 'ForLoop':
         return cls(
@@ -470,13 +404,13 @@ class ForLoop:
             generated_indices=data.get('generated_indices', [])
         )
 
+
 @dataclass
 class GranuloGeneration:
-    """Configuration d'une génération granulométrique"""
     nb_particles: int
     radius_min: float
     radius_max: float
-    container_type: str  # Box2D, Disk2D, Couette2D, Drum2D
+    container_type: str
     container_params: Dict[str, float]
     model_name: str
     material_name: str
@@ -485,9 +419,8 @@ class GranuloGeneration:
     seed: Optional[int] = None
     group_name: Optional[str] = None
     generated_indices: List[int] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
         return {
             'nb': self.nb_particles,
             'rmin': self.radius_min,
@@ -504,10 +437,9 @@ class GranuloGeneration:
             'stored_in_group': self.group_name,
             'avatar_indices': self.generated_indices
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'GranuloGeneration':
-        """Crée depuis un dictionnaire"""
         container = data.get('container_params', {})
         return cls(
             nb_particles=data['nb'],
@@ -527,28 +459,22 @@ class GranuloGeneration:
 
 @dataclass
 class PostProCommand:
-    """Commande de post-traitement"""
     name: str
     step: int
-    target_type: Optional[str] = None  # None, 'avatar', 'group'
-    target_value: Optional[Any] = None  # index ou nom
-    
+    target_type: Optional[str] = None
+    target_value: Optional[Any] = None
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
-        data = {
-            'name': self.name,
-            'step': self.step
-        }
+        data = {'name': self.name, 'step': self.step}
         if self.target_type and self.target_value is not None:
             data['target_info'] = {
                 'type': self.target_type,
                 'value': self.target_value
             }
         return data
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'PostProCommand':
-        """Crée depuis un dictionnaire"""
         target_info = data.get('target_info')
         return cls(
             name=data['name'],
@@ -557,21 +483,20 @@ class PostProCommand:
             target_value=target_info['value'] if target_info else None
         )
 
+
 @dataclass
 class ProjectPreferences:
-    """Préférences du projet"""
     default_project_path: Optional[Path] = None
     unit_system: UnitSystem = UnitSystem.SI
     auto_save: bool = True
-    auto_save_interval: int = 300  # secondes
+    auto_save_interval: int = 300
     backup_enabled: bool = True
     recent_projects: List[Path] = field(default_factory=list)
     max_recent_projects: int = 10
     show_granulo_individually: bool = True
     create_pylmgc_on_generate: bool = True
-    
+
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire"""
         return {
             'default_project_path': str(self.default_project_path) if self.default_project_path else None,
             'unit_system': self.unit_system.value,
@@ -583,10 +508,9 @@ class ProjectPreferences:
             'show_granulo_individually': self.show_granulo_individually,
             'create_pylmgc_on_generate': self.create_pylmgc_on_generate,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'ProjectPreferences':
-        """Crée depuis un dictionnaire"""
         return cls(
             default_project_path=Path(data['default_project_path']) if data.get('default_project_path') else None,
             unit_system=UnitSystem(data.get('unit_system', 'SI')),
@@ -598,44 +522,28 @@ class ProjectPreferences:
             show_granulo_individually=data.get('show_granulo_individually', True),
             create_pylmgc_on_generate=data.get('create_pylmgc_on_generate', True),
         )
-    
+
     def get_unit_labels(self) -> Dict[str, str]:
-        """Retourne les labels d'unités selon le système"""
         if self.unit_system == UnitSystem.SI:
             return {
-                'length': 'm',
-                'mass': 'kg',
-                'time': 's',
-                'force': 'N',
-                'pressure': 'Pa',
-                'energy': 'J',
-                'density': 'kg/m³',
-                'velocity': 'm/s',
-                'acceleration': 'm/s²',
+                'length': 'm', 'mass': 'kg', 'time': 's',
+                'force': 'N', 'pressure': 'Pa', 'energy': 'J',
+                'density': 'kg/m³', 'velocity': 'm/s', 'acceleration': 'm/s²',
             }
-        else:  # CGS
+        else:
             return {
-                'length': 'cm',
-                'mass': 'g',
-                'time': 's',
-                'force': 'dyn',
-                'pressure': 'Ba',
-                'energy': 'erg',
-                'density': 'g/cm³',
-                'velocity': 'cm/s',
-                'acceleration': 'cm/s²',
+                'length': 'cm', 'mass': 'g', 'time': 's',
+                'force': 'dyn', 'pressure': 'Ba', 'energy': 'erg',
+                'density': 'g/cm³', 'velocity': 'cm/s', 'acceleration': 'cm/s²',
             }
+
 
 @dataclass
 class ProjectState:
-    """
-    État complet du projet.
-    Contient toutes les données du modèle LMGC90.
-    """
     name: str
     dimension: int = 2
     units: Dict[str, str] = field(default_factory=dict)
-    preferences: ProjectPreferences = field(default_factory= ProjectPreferences)   
+    preferences: ProjectPreferences = field(default_factory=ProjectPreferences)
     materials: List[Material] = field(default_factory=list)
     models: List[Model] = field(default_factory=list)
     avatars: List[Avatar] = field(default_factory=list)
@@ -644,15 +552,14 @@ class ProjectState:
     visibility_rules: List[VisibilityRule] = field(default_factory=list)
     operations: List[DOFOperation] = field(default_factory=list)
     loops: List[Loop] = field(default_factory=list)
+    for_loops: List[ForLoop] = field(default_factory=list)  # FIX: champ manquant
     granulo_generations: List[GranuloGeneration] = field(default_factory=list)
     postpro_commands: List[PostProCommand] = field(default_factory=list)
     avatar_groups: Dict[str, List[int]] = field(default_factory=dict)
     dynamic_vars: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
-        """Convertit l'état complet en dictionnaire pour sauvegarde JSON"""
         manual_avatars = [a for a in self.avatars if a.origin == AvatarOrigin.MANUAL]
-        
         return {
             'project_name': self.name,
             'dimension': self.dimension,
@@ -666,15 +573,15 @@ class ProjectState:
             'visibility_rules': [v.to_dict() for v in self.visibility_rules],
             'operations': [o.to_dict() for o in self.operations],
             'loops': [l.to_dict() for l in self.loops],
+            'for_loops': [fl.to_dict() for fl in self.for_loops],  # FIX: persisté
             'granulo_generations': [g.to_dict() for g in self.granulo_generations],
             'postpro_creations': [p.to_dict() for p in self.postpro_commands],
             'avatar_groups': self.avatar_groups,
             'dynamic_vars': self.dynamic_vars
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'ProjectState':
-        """Crée un état complet depuis un dictionnaire"""
         prefs_data = data.get('preferences', {})
         preferences = ProjectPreferences.from_dict(prefs_data) if prefs_data else ProjectPreferences()
         return cls(
@@ -689,9 +596,9 @@ class ProjectState:
             visibility_rules=[VisibilityRule.from_dict(v) for v in data.get('visibility_rules', [])],
             operations=[DOFOperation.from_dict(o) for o in data.get('operations', [])],
             loops=[Loop.from_dict(l) for l in data.get('loops', [])],
+            for_loops=[ForLoop.from_dict(fl) for fl in data.get('for_loops', [])],  # FIX
             granulo_generations=[GranuloGeneration.from_dict(g) for g in data.get('granulo_generations', [])],
             postpro_commands=[PostProCommand.from_dict(p) for p in data.get('postpro_creations', [])],
             avatar_groups=data.get('avatar_groups', {}),
             dynamic_vars=data.get('dynamic_vars', {})
         )
-    
