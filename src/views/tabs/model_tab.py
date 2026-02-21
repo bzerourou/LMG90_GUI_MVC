@@ -25,15 +25,21 @@ class ModelTab(QWidget):
     model_deleted = pyqtSignal()
     
     ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
+    ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx"]
     
     ELEMENT_OPTIONS = {
         "T3xxx": ["kinematic", "formulation", "mass_storage"],
         "Q4xxx": ["kinematic", "formulation", "mass_storage"],
         "T6xxx": ["kinematic", "formulation", "mass_storage"],
         "Q8xxx": ["kinematic", "formulation", "mass_storage"],
-        "Q9xxx": ["kinematic", "formulation"],
+        "Q9xxx": ["kinematic", "formulation", "mass_storage"],
         "BARxx": ["kinematic", "formulation", "mass_storage"],
+        "H8xxx": ["kinematic", "formulation", "mass_storage"],
+        "SHB8x": ["kinematic", "formulation", "mass_storage"],  
+        "H20xx": ["kinematic", "formulation", "mass_storage"], 
+        "SHB6x": ["kinematic", "formulation", "mass_storage"],
+        "TE4xx": ["kinematic", "formulation", "mass_storage"],
+        "TE10x": ["kinematic", "formulation", "mass_storage"],
     }
     
     OPTION_VALUES = {

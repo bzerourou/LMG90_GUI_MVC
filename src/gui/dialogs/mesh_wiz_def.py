@@ -24,7 +24,7 @@ from ...controllers.project_controller import ProjectController
 
 # Types d'éléments disponibles par dimension
 _ELEMENTS_2D = ["T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx"]
-_ELEMENTS_3D = ["H8xxx", "H20xx", "TE10x", "SHB8x", "SHB6x"]
+_ELEMENTS_3D = ["H8xxx", "H20xx", "TE4xx", "TE10x", "SHB8x", "SHB6x"]
 
 # Descriptions des éléments
 _ELEMENT_INFO = {
@@ -36,6 +36,7 @@ _ELEMENT_INFO = {
     "H8xxx": "Hexaèdre trilinéaire à 8 nœuds",
     "H20xx": "Hexaèdre triquadratique à 20 nœuds",
     "TE10x": "Tétraèdre quadratique à 10 nœuds",
+    "TE4xx": "Tétraèdre linéaire à 4 nœuds",
     "SHB8x": "Solide-coque hexaédrique SHB8 à 8 nœuds",
     "SHB6x": "Solide-coque prismatique SHB6 à 6 nœuds",
 }
@@ -301,12 +302,11 @@ class MeshWizard(QWizard):
             if not filepath:
                 raise ValueError("Aucun fichier de maillage sélectionné.")
             from pylmgc90 import pre as pre_mod
-            surf_mesh = pre_mod.readMesh(filepath)
-            avatar = pre_mod.buildMesh2D(
+            surf_mesh = pre_mod.readMesh(filepath, dim=2)
+            avatar = pre_mod.buildMeshedAvatar(
                 mesh=surf_mesh,
                 model=mod_obj,
-                material=mat_obj,
-                color="CYANx"
+                material=mat_obj
             )
             return avatar
 
@@ -352,12 +352,11 @@ class MeshWizard(QWizard):
             filepath = geom_page.file_path_input.text().strip()
             if not filepath:
                 raise ValueError("Aucun fichier de maillage sélectionné.")
-            vol_mesh = pre_mod.readMesh(filepath)
+            vol_mesh = pre_mod.readMesh(filepath, dim=3)
             avatar = pre_mod.buildMeshedAvatar(
                 mesh=vol_mesh,
                 model=mod_obj,
-                material=mat_obj,
-                color="CYANx"
+                material=mat_obj
             )
             return avatar
 
