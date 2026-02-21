@@ -331,7 +331,7 @@ class MaterialTab(BaseTab):
         self.update_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
         
-        self._clear_form()
+        #self._clear_form()
     
     def _clear_form(self):
         self.name_input.clear()

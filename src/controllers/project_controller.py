@@ -159,7 +159,6 @@ class ProjectController(QObject):
         # Mettre à jour dans l'état
         idx = self.state.materials.index(old_mat)
         self.state.materials[idx] = material
-        self.state_changed.emit()
     
     def remove_material(self, name: str) -> bool:
         """
@@ -274,7 +273,6 @@ class ProjectController(QObject):
         # Mettre à jour état
         idx = self.state.models.index(old_mod)
         self.state.models[idx] = model
-        self.state_changed.emit()
 
     def get_model(self, name: str) -> Optional[Model]:
         """Retourne un modèle par son nom"""
@@ -282,8 +280,11 @@ class ProjectController(QObject):
 
     def is_model_used(self, name: str) -> tuple[bool, list[str]]:
         """Vérifie si un modèle est utilisé"""
-        refs = [f"Avatar #{i} ({av.avatar_type.value})"
-                for i, av in enumerate(self.state.avatars) if av.model_name == name]
+        refs = []
+        for i, avatar in enumerate(self.state.avatars):
+            if avatar.model_name == name:
+                refs.append(f"Avatar #{i} ({avatar.avatar_type.value})")
+        
         return len(refs) > 0, refs
     
     def remove_model(self, name: str) -> bool:
@@ -424,58 +425,22 @@ class ProjectController(QObject):
     
     def remove_avatar(self, index: int) -> bool:
         """Supprime un avatar par index"""
-        if not (0 <= index < len(self.state.avatars)):
-            return False
+        if 0 <= index < len(self.state.avatars):
+            # Retirer l'avatar du state
+            self.state.avatars.pop(index)
 
-        self.state.avatars.pop(index)
-
-        body = None
-        if index < len(self._pylmgc_bodies):
-            body = self._pylmgc_bodies.pop(index)
-        if body is not None:
-            try:
-                self._bodies_container.remove(body)
-            except Exception:
-                pass
-
-        # Mettre à jour les groupes
-        new_groups = {}
-        for group_name, indices in self.state.avatar_groups.items():
-            new_indices = []
-            for i in indices:
-                if i < index:
-                    new_indices.append(i)
-                elif i > index:
-                    new_indices.append(i - 1)
-                # i == index: avatar supprimé, on l'exclut
-            new_groups[group_name] = new_indices
-        self.state.avatar_groups = new_groups
-
-        # Mettre à jour les boucles
-        for loop in self.state.loops:
-            if loop.model_avatar_index > index:
-                loop.model_avatar_index -= 1
-            loop.generated_indices = [
-                i - 1 if i > index else i
-                for i in loop.generated_indices if i != index
-            ]
-
-        # Mettre à jour les granulos
-        for granulo in self.state.granulo_generations:
-            granulo.generated_indices = [
-                i - 1 if i > index else i
-                for i in granulo.generated_indices if i != index
-            ]
-
-        # Mettre à jour les opérations DOF
-        for op in self.state.operations:
-            if op.target_type == 'avatar':
-                if op.target_value == index:
-                    op.target_value = -1  # invalide
-                elif op.target_value > index:
-                    op.target_value -= 1
-
-        return True
+            # Retirer l'objet pylmgc si présent
+            body = None
+            if index < len(self._pylmgc_bodies):
+                body = self._pylmgc_bodies.pop(index)
+            if body is not None:
+                try:
+                    self._bodies_container.remove(body)
+                except Exception:
+                    # Ignorer si le container ne contient pas l'objet
+                    pass
+            return True
+        return False
     
     def get_avatars(self, include_generated: bool = True) -> List[Avatar]:
         """
@@ -533,7 +498,6 @@ class ProjectController(QObject):
         # Mettre à jour état
         idx = self.state.contact_laws.index(old_law)
         self.state.contact_laws[idx] = law
-        self.state_changed.emit()
 
     def get_contact_law(self, name: str) -> Optional[ContactLaw]:
         """Retourne une loi par son nom"""
@@ -541,9 +505,12 @@ class ProjectController(QObject):
 
     def is_contact_law_used(self, name: str) -> tuple[bool, list[str]]:
         """Vérifie si une loi est utilisée"""
-        refs = [f"Règle de visibilité #{i+1}"
-                for i, rule in enumerate(self.state.visibility_rules) if rule.behavior_name == name]
-        return len(refs) > 0, re
+        refs = []
+        for i, rule in enumerate(self.state.visibility_rules):
+            if rule.behavior_name == name:
+                refs.append(f"Règle de visibilité #{i+1}")
+        
+        return len(refs) > 0, refs
     
     def remove_contact_law(self, name: str) -> bool:
         """Supprime une loi de contact"""
@@ -688,27 +655,7 @@ class ProjectController(QObject):
             print(f"⚠️ Erreur synchronisation position avatar {index}: {e}")
 
     # ========== BOUCLES ==========
-    
-    def _make_loop_avatar(self, model_avatar: Avatar, center: list) -> Avatar:
-        return Avatar(
-            avatar_type=model_avatar.avatar_type,
-            center=center,
-            material_name=model_avatar.material_name,
-            model_name=model_avatar.model_name,
-            color=model_avatar.color,
-            origin=AvatarOrigin.LOOP,
-            radius=model_avatar.radius,
-            axis=model_avatar.axis,
-            vertices=model_avatar.vertices,
-            nb_vertices=model_avatar.nb_vertices,
-            generation_type=model_avatar.generation_type,
-            is_hollow=model_avatar.is_hollow,
-            wall_params=model_avatar.wall_params,
-            contactors=model_avatar.contactors
-        )
-
     def generate_loop(self, loop: Loop) -> List[int]:
-
         """
         Génère des avatars selon une boucle.
         
@@ -719,22 +666,45 @@ class ProjectController(QObject):
         """
         if loop.model_avatar_index >= len(self.state.avatars):
             raise ValueError("Index du modèle d'avatar invalide")
+        
         model_avatar = self.state.avatars[loop.model_avatar_index]
         centers = LoopGenerator.generate_positions(loop)
+        
         generated_indices = []
         for center in centers:
-            new_avatar = self._make_loop_avatar(model_avatar, center)
+            # Créer une copie de l'avatar avec nouveau centre
+            new_avatar = Avatar(
+                avatar_type=model_avatar.avatar_type,
+                center=center,
+                material_name=model_avatar.material_name,
+                model_name=model_avatar.model_name,
+                color=model_avatar.color,
+                origin=AvatarOrigin.LOOP,
+                radius=model_avatar.radius,
+                axis=model_avatar.axis,
+                vertices=model_avatar.vertices,
+                nb_vertices=model_avatar.nb_vertices,
+                generation_type=model_avatar.generation_type,
+                is_hollow=model_avatar.is_hollow,
+                wall_params=model_avatar.wall_params,
+                contactors=model_avatar.contactors
+            )
+            
             idx = self.add_avatar(new_avatar)
             generated_indices.append(idx)
+        
         loop.generated_indices = generated_indices
         if not self._is_loading:
             self.state.loops.append(loop)
+        
+        # Ajouter au groupe si spécifié
         if loop.group_name:
             if loop.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[loop.group_name] = []
             self.state.avatar_groups[loop.group_name].extend(generated_indices)
+        
         return generated_indices
-
+    
     def remove_loop(self, index: int) -> bool:
         """
         Supprime une boucle et ses avatars générés.
@@ -742,16 +712,21 @@ class ProjectController(QObject):
         Returns:
             True si supprimé
         """
-        
         if not (0 <= index < len(self.state.loops)):
             return False
+        
         loop = self.state.loops[index]
+        
+        # Supprimer les avatars générés (en ordre inverse pour garder les indices)
         for avatar_idx in sorted(loop.generated_indices, reverse=True):
             self.remove_avatar(avatar_idx)
+        
+        # Supprimer la boucle
         self.state.loops.pop(index)
         return True
 
     def get_loop(self, index: int) -> Optional[Loop]:
+        """Retourne une boucle par son index"""
         if 0 <= index < len(self.state.loops):
             return self.state.loops[index]
         return None
@@ -767,28 +742,60 @@ class ProjectController(QObject):
         Raises:
             ValueError: Si index invalide
         """
-
         if not (0 <= index < len(self.state.loops)):
             raise ValueError(f"Index {index} invalide")
+        
+        # Récupérer l'ancienne boucle
         old_loop = self.state.loops[index]
+        
+        # Supprimer les anciens avatars générés (en ordre inverse)
         for avatar_idx in sorted(old_loop.generated_indices, reverse=True):
             self.remove_avatar(avatar_idx)
+        
+        # Mettre à jour la boucle
         self.state.loops[index] = loop
+        
+        # Régénérer les avatars avec la nouvelle configuration
         if loop.model_avatar_index >= len(self.state.avatars):
             raise ValueError("Index du modèle d'avatar invalide")
+        
         model_avatar = self.state.avatars[loop.model_avatar_index]
         centers = LoopGenerator.generate_positions(loop)
+        
         generated_indices = []
         for center in centers:
-            new_avatar = self._make_loop_avatar(model_avatar, center)
+            # Créer une copie de l'avatar avec nouveau centre
+            new_avatar = Avatar(
+                avatar_type=model_avatar.avatar_type,
+                center=center,
+                material_name=model_avatar.material_name,
+                model_name=model_avatar.model_name,
+                color=model_avatar.color,
+                origin=AvatarOrigin.LOOP,
+                radius=model_avatar.radius,
+                axis=model_avatar.axis,
+                vertices=model_avatar.vertices,
+                nb_vertices=model_avatar.nb_vertices,
+                generation_type=model_avatar.generation_type,
+                is_hollow=model_avatar.is_hollow,
+                wall_params=model_avatar.wall_params,
+                contactors=model_avatar.contactors
+            )
+            
             idx = self.add_avatar(new_avatar)
             generated_indices.append(idx)
+        
+        # Mettre à jour les indices générés
         loop.generated_indices = generated_indices
+        
+        # Mettre à jour le groupe si spécifié
         if old_loop.group_name and old_loop.group_name in self.state.avatar_groups:
+            # Retirer les anciens indices du groupe
             self.state.avatar_groups[old_loop.group_name] = [
                 i for i in self.state.avatar_groups[old_loop.group_name]
                 if i not in old_loop.generated_indices
             ]
+        
         if loop.group_name:
             if loop.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[loop.group_name] = []
@@ -889,7 +896,9 @@ class ProjectController(QObject):
         )
         
         # L'ajouter au state via add_avatar (thread-safe)
-        return self.add_avatar(avatar)
+        idx = self.add_avatar(avatar)
+        
+        return idx
     
     def finalize_granulo(self, config: GranuloGeneration, indices: List[int]) -> None:
         """
@@ -914,7 +923,7 @@ class ProjectController(QObject):
             self.state.avatar_groups[config.group_name].extend(indices)
 
     # ========== BOUCLES FOR ==========
-    def _execute_for_loop_body(self, for_loop: ForLoop) -> List[int]:
+    def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
         """
         Génère des éléments selon une boucle For.
         
@@ -1027,17 +1036,19 @@ class ProjectController(QObject):
                 generated_indices.append(idx)
             
             current += step
-        return generated_indices
-    
-    def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
-        generated_indices = self._execute_for_loop_body(for_loop)
+        
         for_loop.generated_indices = generated_indices
         if not self._is_loading:
+            if not hasattr(self.state, 'for_loops'):
+                self.state.for_loops = []
             self.state.for_loops.append(for_loop)
+        
+        # Ajouter au groupe si spécifié (uniquement pour avatars)
         if for_loop.group_name and for_loop.target_type == 'avatar':
             if for_loop.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[for_loop.group_name] = []
             self.state.avatar_groups[for_loop.group_name].extend(generated_indices)
+        
         return generated_indices
     
     def update_for_loop(self, index: int, for_loop: ForLoop) -> None:
@@ -1053,24 +1064,138 @@ class ProjectController(QObject):
         """
         if not hasattr(self.state, 'for_loops'):
             self.state.for_loops = []
+        
         if not (0 <= index < len(self.state.for_loops)):
             raise ValueError(f"Index {index} invalide")
+        
+        # Récupérer l'ancienne boucle
         old_for_loop = self.state.for_loops[index]
+        
+        # Supprimer les anciens éléments générés (en ordre inverse)
         for elem_idx in sorted(old_for_loop.generated_indices, reverse=True):
             if old_for_loop.target_type == 'avatar':
                 self.remove_avatar(elem_idx)
-            elif old_for_loop.target_type == 'material' and elem_idx < len(self.state.materials):
-                self.remove_material(self.state.materials[elem_idx].name)
-            elif old_for_loop.target_type == 'model' and elem_idx < len(self.state.models):
-                self.remove_model(self.state.models[elem_idx].name)
+            elif old_for_loop.target_type == 'material':
+                if elem_idx < len(self.state.materials):
+                    mat = self.state.materials[elem_idx]
+                    self.remove_material(mat.name)
+            elif old_for_loop.target_type == 'model':
+                if elem_idx < len(self.state.models):
+                    mod = self.state.models[elem_idx]
+                    self.remove_model(mod.name)
+        
+        # Mettre à jour la boucle
         self.state.for_loops[index] = for_loop
-        generated_indices = self._execute_for_loop_body(for_loop)
+        
+        # Régénérer les éléments avec la même logique que generate_for_loop
+        from ..utils.safe_eval import SafeEvaluator
+        import math
+        
+        generated_indices = []
+        
+        # Créer l'évaluateur
+        evaluator = SafeEvaluator()
+        
+        # Contexte de base
+        base_context = {
+            'math': math,
+            'sqrt': math.sqrt,
+            'pi': math.pi,
+            'e': math.e,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'len': len,
+            'str': str,
+            'int': int,
+            'float': float,
+        }
+        
+        # Évaluer start, end, step
+        evaluator.allowed_names = base_context
+        start = evaluator.eval_expression(for_loop.start_expr)
+        end = evaluator.eval_expression(for_loop.end_expr)
+        step = evaluator.eval_expression(for_loop.step_expr)
+        
+        # Boucle For
+        loop_var = for_loop.loop_var
+        current = start
+        
+        while (step > 0 and current < end) or (step < 0 and current > end):
+            # Contexte avec variable de boucle
+            context = {**base_context, loop_var: current}
+            evaluator.allowed_names = context
+            
+            # Évaluer le template
+            evaluated_config = {}
+            for key, value in for_loop.template_config.items():
+                if isinstance(value, str):
+                    # Évaluer l'expression
+                    evaluated_config[key] = evaluator.eval_expression(value)
+                else:
+                    evaluated_config[key] = value
+            
+            # Créer l'élément selon le type
+            if for_loop.target_type == 'avatar':
+                avatar = Avatar(
+                    avatar_type=AvatarType(evaluated_config['avatar_type']),
+                    center=evaluated_config['center'],
+                    material_name=evaluated_config.get('material_name', 'TDURx'),
+                    model_name=evaluated_config.get('model_name', 'rigid'),
+                    color=evaluated_config.get('color', 'BLUEx'),
+                    origin=AvatarOrigin.LOOP,
+                    radius=evaluated_config.get('radius'),
+                    axis=evaluated_config.get('axis'),
+                    vertices=evaluated_config.get('vertices'),
+                    nb_vertices=evaluated_config.get('nb_vertices'),
+                    generation_type=evaluated_config.get('generation_type'),
+                    is_hollow=evaluated_config.get('is_hollow', False),
+                    wall_params=evaluated_config.get('wall_params'),
+                    contactors=evaluated_config.get('contactors')
+                )
+                idx = self.add_avatar(avatar)
+                generated_indices.append(idx)
+            
+            elif for_loop.target_type == 'material':
+                from ..core.models import Material, MaterialType
+                material = Material(
+                    name=evaluated_config['name'],
+                    material_type=MaterialType(evaluated_config.get('material_type', 'RIGID')),
+                    density=evaluated_config.get('density', 2800),
+                    properties=evaluated_config.get('properties', {})
+                )
+                self.add_material(material)
+                # Pour les matériaux, on stocke l'index dans la liste
+                idx = len(self.state.materials) - 1
+                generated_indices.append(idx)
+            
+            elif for_loop.target_type == 'model':
+                from ..core.models import Model
+                model = Model(
+                    name=evaluated_config['name'],
+                    physics=evaluated_config.get('physics', 'MECAx'),
+                    element=evaluated_config.get('element', 'Rxx2D'),
+                    dimension=evaluated_config.get('dimension', 2),
+                    options=evaluated_config.get('options', {})
+                )
+                self.add_model(model)
+                # Pour les modèles, on stocke l'index dans la liste
+                idx = len(self.state.models) - 1
+                generated_indices.append(idx)
+            
+            current += step
+        
         for_loop.generated_indices = generated_indices
+        
+        # Mettre à jour le groupe si spécifié (uniquement pour avatars)
         if old_for_loop.group_name and old_for_loop.group_name in self.state.avatar_groups:
+            # Retirer les anciens indices du groupe
             self.state.avatar_groups[old_for_loop.group_name] = [
                 i for i in self.state.avatar_groups[old_for_loop.group_name]
                 if i not in old_for_loop.generated_indices
             ]
+        
         if for_loop.group_name and for_loop.target_type == 'avatar':
             if for_loop.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[for_loop.group_name] = []
@@ -1278,9 +1403,7 @@ class ProjectController(QObject):
                 regeneration_errors.append(f"Boucle {i+1}: {str(e)}")
         
         # Régénérer granulo
-        saved_granulos = list(self.state.granulo_generations)
-        self.state.granulo_generations = []
-        for i, granulo in enumerate(saved_granulos):
+        for i, granulo in enumerate(self.state.granulo_generations):
             try:
                 self.generate_granulo(granulo)
             except Exception as e:

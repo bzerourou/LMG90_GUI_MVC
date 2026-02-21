@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QPushButton, QMessageBox, QGroupBox, QTextEdit, QProgressBar, QLabel, 
-    QScrollArea
+    QScrollArea, QCheckBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from ...core.validators import ValidationError
@@ -23,68 +23,6 @@ class ComputeWorker(QThread):
         self._process = None
         self._stop_requested = False
 
-    @staticmethod
-    def _find_python_executable() -> str:
-        """
-        Trouve python.exe dans cet ordre :
-        1. python_path.txt écrit par Inno Setup à l'installation (production)
-        2. sys.executable si c'est déjà python.exe (développement)
-        3. CONDA_PREFIX (env conda activé)
-        4. Emplacements conda classiques Windows
-        """
-        import subprocess
-
-        # 1. python_path.txt — écrit par Inno Setup pendant l'installation
-        #    Chemin : même dossier que le .exe de l'app
-        if getattr(sys, 'frozen', False):
-            app_dir = Path(sys.executable).parent
-        else:
-            app_dir = Path(__file__).parent
-
-        python_path_file = app_dir / "python_path.txt"
-        if python_path_file.exists():
-            try:
-                content = python_path_file.read_text(encoding='utf-8').strip()
-                if content and Path(content).exists():
-                    return content
-            except Exception:
-                pass
-
-        # 2. Développement : sys.executable est déjà python.exe
-        if not getattr(sys, 'frozen', False):
-            exe = sys.executable
-            if Path(exe).name.lower() in ("python.exe", "python3.exe", "python", "python3"):
-                return exe
-
-        # 3. CONDA_PREFIX défini si conda activate a été lancé
-        conda_prefix = os.environ.get("CONDA_PREFIX", "")
-        if conda_prefix:
-            candidate = Path(conda_prefix) / "python.exe"
-            if candidate.exists():
-                return str(candidate)
-
-        # 4. Emplacements conda classiques Windows
-        conda_env = os.environ.get("CONDA_DEFAULT_ENV", "lmgc90")
-        home = Path.home()
-        for root in [
-            home / "anaconda3",
-            home / "miniconda3",
-            home / "Anaconda3",
-            home / "Miniconda3",
-            Path("C:/ProgramData/anaconda3"),
-            Path("C:/ProgramData/miniconda3"),
-            Path("C:/Program Files/LMGC90_GUI")
-        ]:
-            for env_name in (conda_env, "lmgc90", "base"):
-                if env_name and env_name != "base":
-                    candidate = root / "envs" / env_name / "python.exe"
-                else:
-                    candidate = root / "python.exe"
-                if candidate.exists():
-                    return str(candidate)
-
-        return sys.executable
-
     def run(self):
         """Lance command.py dans un subprocess sans fenêtre (Windows-safe)"""
         import subprocess
@@ -94,27 +32,29 @@ class ComputeWorker(QThread):
         self.progress.emit("=" * 60)
 
         try:
-            python_exe = self._find_python_executable()
-            self.progress.emit(f"🐍 Python : {python_exe}")
-
-            if not Path(python_exe).exists():
-                self.progress.emit("❌ python.exe introuvable.")
-                self.progress.emit("   Vérifiez que conda est activé et que pylmgc90 est installé.")
-                self.finished.emit(False, "python.exe introuvable")
-                return
-
-            # Environnement propre : hériter du PATH conda sans PYTHONHOME parasites
+            # En mode frozen, sys.executable est LMGC90_GUI.exe qui embarque
+            # python + toutes les libs. On le relance avec LMGC90_WORKER=<script>
+            # dans l'env : main.py détecte cette variable et exécute le script
+            # directement sans lancer la GUI.
+            # En mode dev, sys.executable est python.exe normal.
+            exe = sys.executable
             env = os.environ.copy()
-            # Supprimer PYTHONHOME si présent — python.exe conda le gère seul
             env.pop("PYTHONHOME", None)
 
-            # CREATE_NO_WINDOW : empêche l'apparition d'une fenêtre console Windows
+            if getattr(sys, 'frozen', False):
+                cmd = [exe]
+                env["LMGC90_WORKER"] = str(self.script_path)
+            else:
+                cmd = [exe, "-u", str(self.script_path)]
+
+            self.progress.emit(f"🐍 Exécutable : {exe}")
+
             kwargs = {}
             if sys.platform == "win32":
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
 
             self._process = subprocess.Popen(
-                [python_exe, "-u", str(self.script_path)],
+                cmd,
                 cwd=str(self.work_dir),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -254,8 +194,13 @@ class ComputeTab(QWidget):
         self.freq_display_input = QLineEdit("50")
         output_form.addRow("Fréquence affichage:", self.freq_display_input)
         
+        self.disable_log_check = QCheckBox("Désactiver les messages chipy (chipy.utilities_DisableLogMes)")
+        self.disable_log_check.setChecked(False)
+        output_form.addRow("", self.disable_log_check)
+        
         output_group.setLayout(output_form)
         layout.addWidget(output_group)
+
         
         # Barre de progression
         self.progress_bar = QProgressBar()
@@ -313,6 +258,7 @@ class ComputeTab(QWidget):
             'solver_type': self.solver_combo.currentText(),
             'freq_write': int(self.freq_write_input.text()),
             'freq_display': int(self.freq_display_input.text()),
+            'disable_log': self.disable_log_check.isChecked(),
         }
     
     def run_computation(self):

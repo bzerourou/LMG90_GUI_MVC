@@ -201,7 +201,7 @@ class DOFTab(BaseTab):
             self.controller.update_dof_operation(self.current_edit_index, updated_operation)
             self.operation_updated.emit()
             QMessageBox.information(self, "Succès", "Opération DOF modifiée avec succès.")
-            self._clear_form()
+            #self._clear_form()
             self.refresh()
 
         except ValidationError as e:
@@ -223,7 +223,7 @@ class DOFTab(BaseTab):
         if reply == QMessageBox.StandardButton.Yes:
             self.controller.remove_dof_operation(index)
             self.operation_deleted.emit()
-            self._clear_form()
+            #self._clear_form()
             self.refresh()
 
     def load_for_edit(self, index: int, option=None):

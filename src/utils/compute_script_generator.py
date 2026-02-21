@@ -13,6 +13,10 @@ class ComputeScriptGenerator:
             f.write("""# -*- coding: utf-8 -*-
 # Script de calcul généré automatiquement par LMGC90_GUI
 
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 from pylmgc90 import chipy
 
 # Initialisation
@@ -41,6 +45,12 @@ freq_display = """ + str(params['freq_display']) + """
 ref_radius = 5.e-2
 
 # Configuration
+"""
+)
+            if params.get('disable_log', True):
+                f.write("""chipy.utilities_DisableLogMes()
+""")            
+            f.write("""           
 chipy.SetDimension(dim, mhyp)
 chipy.utilities_logMes('INIT TIME STEPPING')
 chipy.TimeEvolution_SetTimeStep(dt)

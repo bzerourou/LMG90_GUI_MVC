@@ -228,7 +228,7 @@ class VisibilityTab(BaseTab):
             self.rule_created.emit()
             self.refresh()
             QMessageBox.information(self, "Succès", "✅ Règle de visibilité créée")
-            self._clear_form()
+            #self._clear_form()
             
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
@@ -330,7 +330,7 @@ class VisibilityTab(BaseTab):
         self.create_btn.setVisible(True)
         self.update_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
-        self._clear_form()
+        #self._clear_form()
     
     def _clear_form(self):
         self.candidate_body_combo.setCurrentIndex(0)

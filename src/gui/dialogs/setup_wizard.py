@@ -1,5 +1,3 @@
-
-
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QFormLayout, QLineEdit,
     QComboBox, QLabel, QSpinBox, QDoubleSpinBox, QRadioButton,
@@ -29,6 +27,10 @@ class ProjectSetupWizard(QWizard):
         super().__init__(parent)
         self.controller = controller
         
+        self._saved_name         = controller.state.name
+        self._saved_project_path = controller.project_path
+        self._saved_dimension    = controller.state.dimension
+
         self.setWindowTitle("🧙 Assistant de Configuration de Projet")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
         self.setOption(QWizard.WizardOption.HaveHelpButton, False)
@@ -62,7 +64,16 @@ class ProjectSetupWizard(QWizard):
             )
             super().accept()
         except Exception as e:
+            self.controller.state.name      = self._saved_name
+            self.controller.project_path    = self._saved_project_path
+            self.controller.state.dimension = self._saved_dimension
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+
+    def reject(self):
+        self.controller.state.name      = self._saved_name
+        self.controller.project_path    = self._saved_project_path
+        self.controller.state.dimension = self._saved_dimension
+        super().reject()
     
     def _create_project(self):
         """Crée le projet depuis les données du wizard"""
@@ -71,7 +82,8 @@ class ProjectSetupWizard(QWizard):
         project_name = project_page.name_input.text().strip()
         
         if project_name:
-            self.controller.new_project(project_name)
+            # On renomme sans réinitialiser (new_project efface tout)
+            self.controller.state.name = project_name
         
         # Page Dimension
         dim_page = self.page(self.PAGE_DIMENSION)
@@ -89,7 +101,10 @@ class ProjectSetupWizard(QWizard):
             )
             self.controller.add_material(material)
             mat_name = material.name
-        
+        else:
+            sel = mat_page.existing_mat_combo.currentText()
+            mat_name = sel if sel not in ("", "(Aucun matériau)") else None
+
         # Page Modèle
         mod_page = self.page(self.PAGE_MODEL)
         mod_name = None
@@ -102,6 +117,9 @@ class ProjectSetupWizard(QWizard):
             )
             self.controller.add_model(model)
             mod_name = model.name
+        else:
+            sel = mod_page.existing_mod_combo.currentText()
+            mod_name = sel if sel not in ("", "(Aucun modèle)") else None
         
         # Page Avatar
         avatar_page = self.page(self.PAGE_AVATAR)
@@ -273,32 +291,42 @@ class MaterialPage(QWizardPage):
         
         layout = QVBoxLayout()
         
-        self.create_material_check = QCheckBox("Créer un matériau maintenant")
-        self.create_material_check.setChecked(True)
-        self.create_material_check.toggled.connect(self._toggle_form)
+        # ── Matériaux existants (affiché en premier) ──────────────────
+        self.existing_material_group = QGroupBox("Utiliser un matériau existant")
+        ef = QFormLayout()
+        self.existing_mat_combo = QComboBox()
+        ef.addRow("Sélectionner :", self.existing_mat_combo)
+        self.existing_material_group.setLayout(ef)
+        layout.addWidget(self.existing_material_group)
+
+        # ── Créer un nouveau matériau ──────────────────────────────────
+        self.create_material_check = QCheckBox("Créer un nouveau matériau à la place")
+        self.create_material_check.setChecked(False)
+        self.create_material_check.toggled.connect(self._toggle_mode)
         layout.addWidget(self.create_material_check)
-        
-        self.form_widget = QGroupBox("Paramètres du matériau")
+
+        self.form_widget = QGroupBox("Nouveau matériau")
         form = QFormLayout()
-        
+
         self.mat_name_input = QLineEdit("rockx")
         self.mat_name_input.setMaxLength(5)
         form.addRow("Nom (max 5 car.) :", self.mat_name_input)
-        
+
         self.mat_type_combo = QComboBox()
         self.mat_type_combo.addItems([mt.value for mt in MaterialType])
         self.mat_type_combo.setCurrentText("RIGID")
         form.addRow("Type :", self.mat_type_combo)
-        
+
         self.density_spin = QDoubleSpinBox()
         self.density_spin.setRange(0.1, 100000.0)
         self.density_spin.setValue(2500.0)
         self.density_spin.setSuffix(" kg/m³")
         form.addRow("Densité :", self.density_spin)
-        
+
         self.form_widget.setLayout(form)
+        self.form_widget.setVisible(False)
         layout.addWidget(self.form_widget)
-        
+
         info = QLabel(
             "💡 <b>Conseil :</b> Pour des simulations granulaires simples,\n"
             "utilisez RIGID avec une densité typique de 2500 kg/m³ (sable/gravier)."
@@ -306,12 +334,28 @@ class MaterialPage(QWizardPage):
         info.setWordWrap(True)
         info.setStyleSheet("color: #0066cc; padding: 10px; background-color: #e6f2ff; border-radius: 5px;")
         layout.addWidget(info)
-        
+
         layout.addStretch()
         self.setLayout(layout)
-    
-    def _toggle_form(self, checked):
-        self.form_widget.setEnabled(checked)
+
+    def _toggle_mode(self, create_new):
+        self.form_widget.setVisible(create_new)
+        self.existing_material_group.setEnabled(not create_new)
+
+    def initializePage(self):
+        wizard = self.wizard()
+        materials = wizard.controller.get_materials()
+        self.existing_mat_combo.clear()
+        if materials:
+            self.existing_mat_combo.addItems([m.name for m in materials])
+            self.existing_material_group.setEnabled(True)
+            self.create_material_check.setChecked(False)
+            self._toggle_mode(False)
+        else:
+            self.existing_mat_combo.addItem("(Aucun matériau)")
+            self.existing_material_group.setEnabled(False)
+            self.create_material_check.setChecked(True)
+            self._toggle_mode(True)
 
 
 class ModelPage(QWizardPage):
@@ -324,55 +368,72 @@ class ModelPage(QWizardPage):
         
         layout = QVBoxLayout()
         
-        self.create_model_check = QCheckBox("Créer un modèle maintenant")
-        self.create_model_check.setChecked(True)
-        self.create_model_check.toggled.connect(self._toggle_form)
+        # ── Modèles existants (affiché en premier) ────────────────────
+        self.existing_model_group = QGroupBox("Utiliser un modèle existant")
+        ef = QFormLayout()
+        self.existing_mod_combo = QComboBox()
+        ef.addRow("Sélectionner :", self.existing_mod_combo)
+        self.existing_model_group.setLayout(ef)
+        layout.addWidget(self.existing_model_group)
+
+        # ── Créer un nouveau modèle ────────────────────────────────────
+        self.create_model_check = QCheckBox("Créer un nouveau modèle à la place")
+        self.create_model_check.setChecked(False)
+        self.create_model_check.toggled.connect(self._toggle_mode)
         layout.addWidget(self.create_model_check)
-        
-        self.form_widget = QGroupBox("Paramètres du modèle")
+
+        self.form_widget = QGroupBox("Nouveau modèle")
         form = QFormLayout()
-        
+
         self.mod_name_input = QLineEdit("rigid")
         self.mod_name_input.setMaxLength(5)
         form.addRow("Nom (max 5 car.) :", self.mod_name_input)
-        
+
         self.physics_combo = QComboBox()
         self.physics_combo.addItems(["MECAx"])
         form.addRow("Physique :", self.physics_combo)
-        
+
         self.element_combo = QComboBox()
         form.addRow("Élément :", self.element_combo)
-        
+
         self.form_widget.setLayout(form)
+        self.form_widget.setVisible(False)
         layout.addWidget(self.form_widget)
-        
+
         info = QLabel(
             "💡 <b>Conseil :</b> Pour des corps rigides, utilisez Rxx2D (2D) ou Rxx3D (3D)."
         )
         info.setWordWrap(True)
         info.setStyleSheet("color: #0066cc; padding: 10px; background-color: #e6f2ff; border-radius: 5px;")
         layout.addWidget(info)
-        
+
         layout.addStretch()
         self.setLayout(layout)
-    
-    def _toggle_form(self, checked):
-        self.form_widget.setEnabled(checked)
-    
+
+    def _toggle_mode(self, create_new):
+        self.form_widget.setVisible(create_new)
+        self.existing_model_group.setEnabled(not create_new)
+
     def initializePage(self):
-        """Appelé quand la page est affichée"""
-        # Récupérer la dimension depuis la page précédente
         wizard = self.wizard()
         dim_page = wizard.page(ProjectSetupWizard.PAGE_DIMENSION)
-        
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        
-        # Mettre à jour les éléments disponibles
+
         self.element_combo.clear()
-        if dimension == 2:
-            self.element_combo.addItems(["Rxx2D"])
+        self.element_combo.addItems(["Rxx2D"] if dimension == 2 else ["Rxx3D"])
+
+        models = wizard.controller.get_models()
+        self.existing_mod_combo.clear()
+        if models:
+            self.existing_mod_combo.addItems([m.name for m in models])
+            self.existing_model_group.setEnabled(True)
+            self.create_model_check.setChecked(False)
+            self._toggle_mode(False)
         else:
-            self.element_combo.addItems(["Rxx3D"])
+            self.existing_mod_combo.addItem("(Aucun modèle)")
+            self.existing_model_group.setEnabled(False)
+            self.create_model_check.setChecked(True)
+            self._toggle_mode(True)
 
 
 class AvatarPage(QWizardPage):
@@ -605,7 +666,7 @@ class SummaryPage(QWizardPage):
 </ul>
 """
         else:
-            summary += "<p><i>Aucun matériau créé</i></p>"
+            summary += f"<ul><li><b>Existant :</b> {mat_page.existing_mat_combo.currentText()}</li></ul>"
         
         summary += "<h3>⚙️ Modèle</h3>"
         
@@ -618,7 +679,7 @@ class SummaryPage(QWizardPage):
 </ul>
 """
         else:
-            summary += "<p><i>Aucun modèle créé</i></p>"
+            summary += f"<ul><li><b>Existant :</b> {mod_page.existing_mod_combo.currentText()}</li></ul>"
         
         summary += "<h3>🎯 Avatar</h3>"
         

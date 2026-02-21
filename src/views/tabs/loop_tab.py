@@ -649,7 +649,7 @@ class LoopTab(BaseTab):
         self.create_btn.setVisible(True)
         self.update_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
-        self._clear_form()
+        #self._clear_form()
         self.help_label.setText("Sélectionnez un type de boucle pour voir les paramètres adaptés.")
         self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
 

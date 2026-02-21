@@ -380,7 +380,7 @@ class ModelTab(QWidget):
         self.create_btn.setVisible(True)
         self.update_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
-        self._clear_form()
+        #self._clear_form()
     
     def _clear_form(self):
         """Réinitialise"""

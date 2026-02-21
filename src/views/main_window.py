@@ -114,10 +114,10 @@ class MainWindow(QMainWindow):
         fast_granulo.triggered.connect(self._open_fast_granulo)
         file_menu.addAction(fast_granulo)
 
-        #wizard_action = QAction("🧙 Assistant de déformable...", self)
-        #wizard_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
-        #wizard_action.triggered.connect(self._on_deformable_wizard)
-        #file_menu.addAction(wizard_action)
+        wizard_action = QAction("🧙 Assistant de déformable...", self)
+        wizard_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        wizard_action.triggered.connect(self._on_deformable_wizard)
+        file_menu.addAction(wizard_action)
 
 
         file_menu.addSeparator()
@@ -480,7 +480,8 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"LMGC90_GUI v0.3.0 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
-    
+        
+
     def _on_open_project(self):
         """Ouvre un projet existant"""
         start_dir = ""
@@ -504,7 +505,7 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Projet chargé", 5000)
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Impossible de charger :\n{e}")
-    
+        #self.viewer_tab.refresh()
     def _on_save_project(self):
         """Sauvegarde le projet"""
         if not self.controller.project_path:
@@ -557,7 +558,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
- 
 
     # ======Tabs======================
 
@@ -791,7 +791,7 @@ class MainWindow(QMainWindow):
 
     def _on_deformable_wizard(self) : 
         """Lance l'assistant granulométrique"""
-        from ..gui.dialogs.mesh_wizard_deformable import MeshWizard
+        from ..gui.dialogs.mesh_wiz_def import MeshWizard
         
         wizard = MeshWizard(self.controller, self)
         if wizard.exec():
@@ -901,13 +901,19 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur ParaView :\n{e}")
     
-    
-    
 
     # =======Menu calcul ===================
     def _on_compute_setup(self):
         """Ouvre l'onglet calcul"""
-        self.tabs.setCurrentWidget(self.compute_tab)
+        for i in range(self.tabs.count()):
+            if self.tabs.widget(i) is self.compute_tab:
+                self.tabs.setCurrentIndex(i)
+                return
+        self._add_tab('compute')
+        for i in range(self.tabs.count()):
+            if self.tabs.widget(i) is self.compute_tab:
+                self.tabs.setCurrentIndex(i)
+                return
 
     def _on_run_compute(self):
         """Lance le calcul"""
@@ -950,4 +956,5 @@ class MainWindow(QMainWindow):
             if hasattr(tab, 'refresh'):
                 if tab is self.granulo_tab :
                     tab.refresh(full_refresh=True)
+
                 tab.refresh()

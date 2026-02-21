@@ -1,5 +1,3 @@
-
-
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QFormLayout, QLineEdit,
     QComboBox, QLabel, QSpinBox, QDoubleSpinBox, QRadioButton,
@@ -30,6 +28,10 @@ class GranuloWizard(QWizard):
         super().__init__(parent)
         self.controller = controller
         
+        self._saved_name         = controller.state.name
+        self._saved_project_path = controller.project_path
+        self._saved_dimension    = controller.state.dimension
+
         self.setWindowTitle("🎲 Assistant de Distribution Granulométrique")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
         self.setOption(QWizard.WizardOption.HaveHelpButton, False)
@@ -60,16 +62,54 @@ class GranuloWizard(QWizard):
             )
             super().accept()
         except Exception as e:
+            self.controller.state.name      = self._saved_name
+            self.controller.project_path    = self._saved_project_path
+            self.controller.state.dimension = self._saved_dimension
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
+
+    def reject(self):
+        self.controller.state.name      = self._saved_name
+        self.controller.project_path    = self._saved_project_path
+        self.controller.state.dimension = self._saved_dimension
+        super().reject()
     
+    # Correspondance conteneur → fonction de dépôt pylmgc90
+    _DEPOSIT_FUNC = {
+        "Box2D":      "depositInBox2D",
+        "Disk2D":     "depositInDisk2D",
+        "Couette2D":  "depositInCouette2D",
+        "Drum2D":     "depositInDrum2D",
+        "Box3D":      "depositInBox3D",
+        "Sphere3D":   "depositInSphere3D",
+        "Cylinder3D": "depositInCylinder3D",
+    }
+    _DEPOSIT_PARAMS = {
+        "Box2D":      ["lx", "ly"],
+        "Disk2D":     ["r"],
+        "Couette2D":  ["rint", "rext"],
+        "Drum2D":     ["r"],
+        "Box3D":      ["lx", "ly", "lz"],
+        "Sphere3D":   ["r"],
+        "Cylinder3D": ["r"],
+    }
+
     def _generate_granulo(self):
-        """Génère la distribution"""
-        # Dimension
+        """Génère la distribution directement via pre.granuloRandom + depositInXxx.
+        Contourne add_avatar() qui émet un signal par particule → trop lent à 1000+.
+        Les avatars sont insérés directement dans les conteneurs pylmgc90.
+        """
+        from pylmgc90 import pre 
+        from ...core.pylmgc_bridge import LMGC90Bridge
+        from ...core.models import AvatarType, AvatarOrigin, Avatar
+
+        ctrl = self.controller
+
+        # ── Dimension ────────────────────────────────────────────────────────
         dim_page = self.page(self.PAGE_DIMENSION)
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        self.controller.state.dimension = dimension
-        
-        # Matériau
+        ctrl.state.dimension = dimension
+
+        # ── Matériau ─────────────────────────────────────────────────────────
         mat_page = self.page(self.PAGE_MATERIAL)
         if mat_page.create_material_check.isChecked():
             material = Material(
@@ -77,12 +117,14 @@ class GranuloWizard(QWizard):
                 material_type=MaterialType.RIGID,
                 density=mat_page.density_spin.value()
             )
-            self.controller.add_material(material)
+            ctrl.add_material(material)
             mat_name = material.name
         else:
             mat_name = mat_page.existing_combo.currentText()
-        
-        # Modèle
+            if mat_name in ("", "(Aucun matériau)"):
+                raise ValueError("Aucun matériau sélectionné")
+
+        # ── Modèle ───────────────────────────────────────────────────────────
         mod_page = self.page(self.PAGE_MODEL)
         if mod_page.create_model_check.isChecked():
             element = "Rxx2D" if dimension == 2 else "Rxx3D"
@@ -92,44 +134,107 @@ class GranuloWizard(QWizard):
                 element=element,
                 dimension=dimension
             )
-            self.controller.add_model(model)
+            ctrl.add_model(model)
             mod_name = model.name
         else:
             mod_name = mod_page.existing_combo.currentText()
-        
-        # Distribution
+            if mod_name in ("", "(Aucun modèle)"):
+                raise ValueError("Aucun modèle sélectionné")
+
+        # ── Distribution ─────────────────────────────────────────────────────
         dist_page = self.page(self.PAGE_DISTRIBUTION)
         nb_particles = dist_page.nb_particles_spin.value()
-        radius_min = dist_page.radius_min_spin.value()
-        radius_max = dist_page.radius_max_spin.value()
-        seed = dist_page.seed_spin.value() if dist_page.use_seed_check.isChecked() else None
-        
-        # Conteneur
-        cont_page = self.page(self.PAGE_CONTAINER)
+        radius_min   = dist_page.radius_min_spin.value()
+        radius_max   = dist_page.radius_max_spin.value()
+        seed         = dist_page.seed_spin.value() if dist_page.use_seed_check.isChecked() else None
+
+        # ── Conteneur ────────────────────────────────────────────────────────
+        cont_page      = self.page(self.PAGE_CONTAINER)
         container_type = cont_page.container_combo.currentText()
         container_params = cont_page.get_container_params()
+
+        # ── granuloRandom ────────────────────────────────────────────────────
+        granu_kwargs = dict(nb=nb_particles, r_min=radius_min, r_max=radius_max)
+        if seed is not None:
+            granu_kwargs["seed"] = seed
+        radii = pre.granulo_Random(**granu_kwargs)
+
+        # ── Dépôt dans le conteneur ──────────────────────────────────────────
+        deposit_fn   = self._DEPOSIT_FUNC.get(container_type, "depositInBox2D")
+        deposit_keys = self._DEPOSIT_PARAMS.get(container_type, ["lx", "ly"])
+        deposit_kwargs = {k: container_params[k] for k in deposit_keys if k in container_params}
+        nb_particles, coords = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
+
+       # Reshape coordinates
+        #nb_remaining = np.shape(coor)[0] // 2
+        coords.shape = [coords.size//2,2]
         
-        # Type d'avatar
-        avatar_type = "rigidDisk" if dimension == 2 else "rigidSphere"
-        
-        # Groupe
-        group_name = f"granulo_{container_type.lower()}"
-        
-        # Génération
+        # Tronquer les rayons au nombre effectif
+        radii = radii[:nb_particles]
+
+        # ── Objets pylmgc90 matériau / modèle ────────────────────────────────
+        mat_obj = ctrl._pylmgc_materials.get(mat_name)
+        mod_obj = ctrl._pylmgc_models.get(mod_name)
+        if mat_obj is None:
+            raise ValueError(f"Matériau pylmgc90 '{mat_name}' introuvable dans les conteneurs")
+        if mod_obj is None:
+            raise ValueError(f"Modèle pylmgc90 '{mod_name}' introuvable dans les conteneurs")
+
+        # ── Boucle de création directe ────────────────────────────────────────
+        avatar_type_str = "rigidDisk" if dimension == 2 else "rigidSphere"
+        avatar_type_enum = AvatarType(avatar_type_str)
+        group_name       = f"granulo_{container_type.lower()}"
+        color            = "BLUEx"
+
+        generated_indices = []
+        for j in range(nb_particles):
+            center = coords[j].tolist()  # Convertir en liste pour compatibilité avec Avatar
+            radius = radii[j]
+
+            # Modèle Avatar (state) — sans signal
+            av_model = Avatar(
+                avatar_type=avatar_type_enum,
+                center=center,
+                material_name=mat_name,
+                model_name=mod_name,
+                color=color,
+                origin=AvatarOrigin.GRANULO,
+                radius=radius
+            )
+            ctrl.state.avatars.append(av_model)
+            idx = len(ctrl.state.avatars) - 1
+
+            # Objet pylmgc90 direct
+            body_obj = LMGC90Bridge.create_avatar(av_model, mod_obj, mat_obj)
+            ctrl._bodies_container.addAvatar(body_obj)
+            ctrl._pylmgc_bodies.append(body_obj)
+
+            generated_indices.append(idx)
+
+        # ── Enregistrer la config granulo dans le state ───────────────────────
         config = GranuloGeneration(
-            nb_particles=nb_particles,
+            nb_particles=len(radii),
             radius_min=radius_min,
             radius_max=radius_max,
             container_type=container_type,
             container_params=container_params,
             model_name=mod_name,
             material_name=mat_name,
-            avatar_type=avatar_type,
+            avatar_type=avatar_type_str,
             seed=seed,
-            group_name=group_name
+            group_name=group_name,
+            color=color,
         )
-        
-        self.controller.generate_granulo(config)
+        config.generated_indices = generated_indices
+        ctrl.state.granulo_generations.append(config)
+
+        if group_name:
+            if group_name not in ctrl.state.avatar_groups:
+                ctrl.state.avatar_groups[group_name] = []
+            ctrl.state.avatar_groups[group_name].extend(generated_indices)
+
+        # Un seul signal à la fin pour rafraîchir l'UI
+        ctrl.state_changed.emit()
 
 
 class GranuloIntroPage(QWizardPage):
@@ -214,63 +319,58 @@ class GranuloMaterialPage(QWizardPage):
         
         layout = QVBoxLayout()
         
-        # Choix
-        choice_group = QGroupBox("Source du matériau")
-        choice_layout = QVBoxLayout()
-        
-        self.create_material_check = QCheckBox("Créer un nouveau matériau")
-        self.create_material_check.setChecked(True)
+        # ── Matériaux existants (affiché en premier) ───────────────────
+        self.existing_material_group = QGroupBox("Utiliser un matériau existant")
+        existing_form = QFormLayout()
+        self.existing_combo = QComboBox()
+        existing_form.addRow("Sélectionner :", self.existing_combo)
+        self.existing_material_group.setLayout(existing_form)
+        layout.addWidget(self.existing_material_group)
+
+        # ── Créer un nouveau matériau ──────────────────────────────────
+        self.create_material_check = QCheckBox("Créer un nouveau matériau à la place")
+        self.create_material_check.setChecked(False)
         self.create_material_check.toggled.connect(self._toggle_mode)
-        choice_layout.addWidget(self.create_material_check)
-        
-        choice_group.setLayout(choice_layout)
-        layout.addWidget(choice_group)
-        
-        # Nouveau matériau
+        layout.addWidget(self.create_material_check)
+
         self.new_material_group = QGroupBox("Nouveau matériau")
         new_form = QFormLayout()
-        
+
         self.mat_name_input = QLineEdit("TDURx")
         self.mat_name_input.setMaxLength(5)
         new_form.addRow("Nom :", self.mat_name_input)
-        
+
         self.density_spin = QDoubleSpinBox()
         self.density_spin.setRange(100, 20000)
         self.density_spin.setValue(2500)
         self.density_spin.setSuffix(" kg/m³")
         new_form.addRow("Densité :", self.density_spin)
-        
+
         self.new_material_group.setLayout(new_form)
+        self.new_material_group.setVisible(False)
         layout.addWidget(self.new_material_group)
-        
-        # Matériau existant
-        self.existing_material_group = QGroupBox("Matériau existant")
-        existing_form = QFormLayout()
-        
-        self.existing_combo = QComboBox()
-        existing_form.addRow("Sélectionner :", self.existing_combo)
-        
-        self.existing_material_group.setLayout(existing_form)
-        self.existing_material_group.setVisible(False)
-        layout.addWidget(self.existing_material_group)
         
         layout.addStretch()
         self.setLayout(layout)
     
     def _toggle_mode(self, create_new):
         self.new_material_group.setVisible(create_new)
-        self.existing_material_group.setVisible(not create_new)
-    
+        self.existing_material_group.setEnabled(not create_new)
+
     def initializePage(self):
-        """Charger les matériaux existants"""
         wizard = self.wizard()
         materials = wizard.controller.get_materials()
-        
         self.existing_combo.clear()
         if materials:
             self.existing_combo.addItems([m.name for m in materials])
+            self.existing_material_group.setEnabled(True)
+            self.create_material_check.setChecked(False)
+            self._toggle_mode(False)
         else:
             self.existing_combo.addItem("(Aucun matériau)")
+            self.existing_material_group.setEnabled(False)
+            self.create_material_check.setChecked(True)
+            self._toggle_mode(True)
 
 
 class GranuloModelPage(QWizardPage):
@@ -283,57 +383,52 @@ class GranuloModelPage(QWizardPage):
         
         layout = QVBoxLayout()
         
-        # Choix
-        choice_group = QGroupBox("Source du modèle")
-        choice_layout = QVBoxLayout()
-        
-        self.create_model_check = QCheckBox("Créer un nouveau modèle")
-        self.create_model_check.setChecked(True)
+        # ── Modèles existants (affiché en premier) ─────────────────────
+        self.existing_model_group = QGroupBox("Utiliser un modèle existant")
+        existing_form = QFormLayout()
+        self.existing_combo = QComboBox()
+        existing_form.addRow("Sélectionner :", self.existing_combo)
+        self.existing_model_group.setLayout(existing_form)
+        layout.addWidget(self.existing_model_group)
+
+        # ── Créer un nouveau modèle ────────────────────────────────────
+        self.create_model_check = QCheckBox("Créer un nouveau modèle à la place")
+        self.create_model_check.setChecked(False)
         self.create_model_check.toggled.connect(self._toggle_mode)
-        choice_layout.addWidget(self.create_model_check)
-        
-        choice_group.setLayout(choice_layout)
-        layout.addWidget(choice_group)
-        
-        # Nouveau modèle
+        layout.addWidget(self.create_model_check)
+
         self.new_model_group = QGroupBox("Nouveau modèle")
         new_form = QFormLayout()
-        
+
         self.mod_name_input = QLineEdit("rigid")
         self.mod_name_input.setMaxLength(5)
         new_form.addRow("Nom :", self.mod_name_input)
-        
+
         self.new_model_group.setLayout(new_form)
+        self.new_model_group.setVisible(False)
         layout.addWidget(self.new_model_group)
-        
-        # Modèle existant
-        self.existing_model_group = QGroupBox("Modèle existant")
-        existing_form = QFormLayout()
-        
-        self.existing_combo = QComboBox()
-        existing_form.addRow("Sélectionner :", self.existing_combo)
-        
-        self.existing_model_group.setLayout(existing_form)
-        self.existing_model_group.setVisible(False)
-        layout.addWidget(self.existing_model_group)
         
         layout.addStretch()
         self.setLayout(layout)
     
     def _toggle_mode(self, create_new):
         self.new_model_group.setVisible(create_new)
-        self.existing_model_group.setVisible(not create_new)
-    
+        self.existing_model_group.setEnabled(not create_new)
+
     def initializePage(self):
-        """Charger les modèles existants"""
         wizard = self.wizard()
         models = wizard.controller.get_models()
-        
         self.existing_combo.clear()
         if models:
             self.existing_combo.addItems([m.name for m in models])
+            self.existing_model_group.setEnabled(True)
+            self.create_model_check.setChecked(False)
+            self._toggle_mode(False)
         else:
             self.existing_combo.addItem("(Aucun modèle)")
+            self.existing_model_group.setEnabled(False)
+            self.create_model_check.setChecked(True)
+            self._toggle_mode(True)
 
 
 class DistributionPage(QWizardPage):
