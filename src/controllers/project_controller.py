@@ -1378,6 +1378,7 @@ class ProjectController(QObject):
             self._pylmgc_models[mod.name] = mod_obj
         
         # Recréer avatars manuels
+        regeneration_errors = []
         manual_avatars = [av for av in self.state.avatars if av.origin == AvatarOrigin.MANUAL]
         for avatar in manual_avatars:
             mat_obj = self._pylmgc_materials.get(avatar.material_name)
@@ -1389,11 +1390,19 @@ class ProjectController(QObject):
                 raise ValueError(f"Modèle '{avatar.model_name}' introuvable lors de la reconstruction")
             
             body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
+            if body_obj is None:
+                # MESH_DEFORMABLE sans mesh_params (ancien fichier) — on l'ignore
+                self._pylmgc_bodies.append(None)
+                regeneration_errors.append(
+                    f"Corps déformable '{avatar.material_name}/{avatar.model_name}' : "
+                    f"mesh_params absent (fichier créé avant la v2). "
+                    f"Recréez le corps via le wizard."
+                )
+                continue
             self._bodies_container.addAvatar(body_obj)
             self._pylmgc_bodies.append(body_obj)
         
         # Régénérer boucles
-        regeneration_errors = []
         for i, loop in enumerate(self.state.loops):
             try:
                 if loop.model_avatar_index >= len(self.state.avatars):

@@ -1,8 +1,6 @@
 # ============================================================================
-# mesh_wizard_deformable.py
 # Assistant PyQt6 pour la création de corps déformables (mesh2D / mesh3D)
 # S'appuie directement sur pre.buildMesh2D() et pre.buildMeshH8() de pylmgc90,
-# en suivant le même patron que setup_wizard.py et granulo_wizard.py.
 # ============================================================================
 
 from PyQt6.QtWidgets import (
@@ -12,6 +10,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QFileDialog, QWidget
 )
 from PyQt6.QtCore import Qt
+from typing import Dict, Any
 
 from ...core.models import (
     Material, Model, Avatar,
@@ -146,7 +145,7 @@ def _gmsh_cylinder(cx, cy, cz, r, h, nr, ntheta, nz, filepath):
     gmsh.write(filepath)
     gmsh.finalize()
 
-
+# ═══════════════════════════════════════════════════════════════════════════════
 # Wizard principal
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -277,7 +276,7 @@ class MeshWizard(QWizard):
                 "formulation":  formulation,
                 "mass_storage": mass_stor,
                 "material":     "elas_",
-                "external_model": "MatL_",
+                "external_model": "no___",
             }
             model = Model(
                 name=mod_name,
@@ -312,7 +311,37 @@ class MeshWizard(QWizard):
         ctrl._pylmgc_bodies.append(mesh_obj)
 
         # ── enregistrement dans le state (avatar de type MESH_DEFORMABLE) ─────
-        center = geom_page.get_center(dimension)
+        center    = geom_page.get_center(dimension)
+        geom_type = geom_page.geom_type_combo.currentText()
+
+        # Construire mesh_params pour la re-génération au chargement
+        mp: Dict[str, Any] = {'geom': geom_type, 'dim': dimension}
+        if geom_type == "Rectangle":
+            mp.update({'lx': geom_page.lx_spin.value(), 'ly': geom_page.ly_spin.value(),
+                       'mesh_type': ref_page.mesh_type_combo.currentText(),
+                       'nx': ref_page.nx_spin.value(), 'ny': ref_page.ny_spin.value()})
+        elif geom_type == "Disque":
+            mp.update({'r': geom_page.radius_spin.value(),
+                       'nr': ref_page.nr_spin.value(), 'ntheta': ref_page.ntheta_spin.value()})
+        elif geom_type == "Boîte (H8)":
+            mp.update({'lx': geom_page.lx_spin.value(), 'ly': geom_page.ly_spin.value(),
+                       'lz': geom_page.lz_spin.value(),
+                       'nx': ref_page.nx_spin.value(), 'ny': ref_page.ny_spin.value(),
+                       'nz': ref_page.nz_spin.value()})
+        elif geom_type == "Sphère":
+            mp.update({'r': geom_page.radius_spin.value(),
+                       'nr': ref_page.nr_spin.value(), 'ntheta': ref_page.ntheta_spin.value(),
+                       'nphi': ref_page.nphi_spin.value()})
+        elif geom_type == "Cylindre":
+            mp.update({'r': geom_page.radius_spin.value(), 'h': geom_page.height_spin.value(),
+                       'nr': ref_page.nr_spin.value(), 'ntheta': ref_page.ntheta_spin.value(),
+                       'nz': ref_page.nz_spin.value()})
+        elif geom_type == "Fichier externe":
+            mp['filepath'] = geom_page.file_path_input.text().strip()
+        mp['cx'] = center[0]; mp['cy'] = center[1]
+        if dimension == 3:
+            mp['cz'] = center[2]
+
         avatar = Avatar(
             avatar_type=AvatarType.MESH_DEFORMABLE,
             center=center,
@@ -320,7 +349,8 @@ class MeshWizard(QWizard):
             model_name=mod_name,
             color="CYANx",
             origin=AvatarOrigin.MANUAL,
-            contactors=[]
+            contactors=[],
+            mesh_params=mp,
         )
         ctrl.state.avatars.append(avatar)
 

@@ -192,6 +192,8 @@ class Avatar:
     is_hollow: bool = False
     wall_params: Optional[Dict[str, Any]] = None  # l, h, r, rmin, rmax, nb_vertex, nb_polyg
     contactors: List[Dict[str, Any]] = field(default_factory=list)
+    # Paramètres de maillage déformable (MESH_DEFORMABLE uniquement)
+    mesh_params: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire pour sérialisation"""
@@ -235,6 +237,8 @@ class Avatar:
         if self.contactors:
             data['contactors'] = convert_to_serializable(self.contactors)
         
+        if self.mesh_params is not None:
+            data['mesh_params'] = convert_to_serializable(self.mesh_params)
         return data
     
     @classmethod
@@ -266,7 +270,8 @@ class Avatar:
             generation_type=data.get('gen_type'),
             is_hollow=data.get('is_Hollow', False),
             wall_params=wall_params if wall_params else None,
-            contactors=data.get('contactors', [])
+            contactors=data.get('contactors', []),
+            mesh_params=data.get('mesh_params'),
         )
 
 

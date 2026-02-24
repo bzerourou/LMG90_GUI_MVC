@@ -305,6 +305,81 @@ class LMGC90Bridge:
                 material=material_obj,
                 color=color
             )
+        elif atype == AvatarType.MESH_DEFORMABLE:
+            mp = avatar.mesh_params
+            if not mp:
+               return None
+
+            geom = mp['geom']
+            dim  = mp['dim']
+            cx   = mp.get('cx', 0.0)
+            cy   = mp.get('cy', 0.0)
+            cz   = mp.get('cz', 0.0)
+
+            if geom == "Rectangle":
+                from pylmgc90.pre import buildMesh2D
+                x0 = cx - mp['lx'] / 2.0
+                y0 = cy - mp['ly'] / 2.0
+                surf = buildMesh2D(mp['mesh_type'], x0, y0,
+                                   mp['lx'], mp['ly'], mp['nx'], mp['ny'])
+                return pre.buildMeshedAvatar(mesh=surf, model=model_obj, material=material_obj)
+
+            elif geom == "Boîte (H8)":
+                from pylmgc90.pre import buildMeshH8
+                x0 = cx - mp['lx'] / 2.0
+                y0 = cy - mp['ly'] / 2.0
+                z0 = cz - mp['lz'] / 2.0
+                vol = buildMeshH8(x0, y0, z0,
+                                  mp['lx'], mp['ly'], mp['lz'],
+                                  mp['nx'], mp['ny'], mp['nz'])
+                return pre.buildMeshedAvatar(mesh=vol, model=model_obj, material=material_obj)
+
+            elif geom == "Disque":
+                import tempfile, os
+                from ..gui.dialogs.mesh_wiz_def import _gmsh_disk
+                with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as f:
+                    tmp = f.name
+                try:
+                    _gmsh_disk(cx, cy, mp['r'], mp['nr'], mp['ntheta'], tmp)
+                    surf = pre.readMesh(tmp, 2)
+                finally:
+                    os.unlink(tmp)
+                return pre.buildMeshedAvatar(mesh=surf, model=model_obj, material=material_obj)
+
+            elif geom == "Sphère":
+                import tempfile, os
+                from ..gui.dialogs.mesh_wiz_def import _gmsh_sphere
+                with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as f:
+                    tmp = f.name
+                try:
+                    _gmsh_sphere(cx, cy, cz, mp['r'], mp['nr'], mp['ntheta'], mp['nphi'], tmp)
+                    vol = pre.readMesh(tmp, 3)
+                finally:
+                    os.unlink(tmp)
+                return pre.buildMeshedAvatar(mesh=vol, model=model_obj, material=material_obj)
+
+            elif geom == "Cylindre":
+                import tempfile, os
+                from ..gui.dialogs.mesh_wiz_def import _gmsh_cylinder
+                with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as f:
+                    tmp = f.name
+                try:
+                    _gmsh_cylinder(cx, cy, cz, mp['r'], mp['h'],
+                                   mp['nr'], mp['ntheta'], mp['nz'], tmp)
+                    vol = pre.readMesh(tmp, 3)
+                finally:
+                    os.unlink(tmp)
+                return pre.buildMeshedAvatar(mesh=vol, model=model_obj, material=material_obj)
+
+            elif geom == "Fichier externe":
+                filepath = mp.get('filepath', '')
+                if not filepath:
+                    raise ValueError("Chemin de fichier manquant pour MESH_DEFORMABLE externe.")
+                mesh = pre.readMesh(filepath, dim)
+                return pre.buildMeshedAvatar(mesh=mesh, model=model_obj, material=material_obj)
+
+            else:
+                raise ValueError(f"Géométrie MESH_DEFORMABLE inconnue : '{geom}'")
 
         
         else:
