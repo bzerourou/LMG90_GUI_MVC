@@ -1,142 +1,320 @@
 # ============================================================================
-# Wizard pour la création de maillages déformables (mesh2d/mesh3d)
+# mesh_wizard_deformable.py
+# Assistant PyQt6 pour la création de corps déformables (mesh2D / mesh3D)
+# S'appuie directement sur pre.buildMesh2D() et pre.buildMeshH8() de pylmgc90,
+# en suivant le même patron que setup_wizard.py et granulo_wizard.py.
 # ============================================================================
-"""
-Assistant de création de corps déformables avec éléments finis.
-Gère mesh2d (2D) et mesh3d (3D) de pylmgc90.
-"""
+
 from PyQt6.QtWidgets import (
-    QWizard, QWizardPage, QVBoxLayout, QFormLayout, QLineEdit,
-    QComboBox, QLabel, QSpinBox, QDoubleSpinBox, QRadioButton,
-    QGroupBox, QHBoxLayout, QCheckBox, QMessageBox, QTextEdit,
+    QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QLineEdit, QComboBox, QLabel, QSpinBox, QDoubleSpinBox,
+    QRadioButton, QGroupBox, QCheckBox, QMessageBox, QTextEdit,
     QPushButton, QFileDialog
 )
 from PyQt6.QtCore import Qt
-from pathlib import Path
 
-from ...core.models import Material, Model, MaterialType, Avatar, AvatarType, AvatarOrigin
+from ...core.models import (
+    Material, Model, Avatar,
+    MaterialType, AvatarType, AvatarOrigin
+)
 from ...controllers.project_controller import ProjectController
 
 
+# ─────────────────────────── constantes ───────────────────────────────────────
+
+# Types d'éléments disponibles par dimension
+_ELEMENTS_2D = ["T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx"]
+_ELEMENTS_3D = ["H8xxx", "H20xx", "TE4xx", "TE10x", "SHB8x", "SHB6x"]
+
+# Descriptions des éléments
+_ELEMENT_INFO = {
+    "T3xxx": "Triangle linéaire à 3 nœuds",
+    "Q4xxx": "Quadrangle bilinéaire à 4 nœuds",
+    "T6xxx": "Triangle quadratique à 6 nœuds",
+    "Q8xxx": "Quadrangle serendipity à 8 nœuds",
+    "Q9xxx": "Quadrangle biquadratique complet à 9 nœuds",
+    "H8xxx": "Hexaèdre trilinéaire à 8 nœuds",
+    "H20xx": "Hexaèdre triquadratique à 20 nœuds",
+    "TE4xx": "Tétraèdre linéaire à 4 nœuds",
+    "TE10x": "Tétraèdre quadratique à 10 nœuds",
+    "SHB8x": "Solide-coque hexaédrique SHB8 à 8 nœuds",
+    "SHB6x": "Solide-coque prismatique SHB6 à 6 nœuds",
+}
+
+# Types de maillage pylmgc90 par dimension de géométrie
+_MESH_TYPES_2D = ["Q4", "2T3", "4T3", "Q8"]
+_MESH_TYPES_3D = ["H8"]        # buildMeshH8 — seul disponible nativement
+
+# Options d'anisotropie pour le modèle
+_ANISOTROPY = ["iso__", "ortho"]
+
+# Options cinématique / formulation
+_KINEMATIC    = ["small", "large"]
+_FORMULATION  = ["UpdtL", "TotaL"]
+_MASS_STORAGE = ["lump_", "coher"]
+
+# Propriétés par défaut des matériaux élastiques
+_MAT_DEFAULTS = {
+    "ELAS":        {"elas": "standard", "young": 70e9,   "nu": 0.3,  "anisotropy": "isotropic"},
+    "ELAS_DILA":   {"elas": "standard", "young": 70e9,   "nu": 0.3,  "anisotropy": "isotropic", "dilatation": 1e-5, "T_ref_meca": 20.0},
+    "VISCO_ELAS":  {"elas": "standard", "anisotropy": "isotropic", "young": 1.17e11, "nu": 0.35,
+                    "viscous_model": "KelvinVoigt", "viscous_young": 1.17e9, "viscous_nu": 0.35},
+    "ELAS_PLAS":   {"elas": "standard", "anisotropy": "isotropic", "young": 1.17e11, "nu": 0.35,
+                    "critere": "Von-Mises", "isoh": "linear", "iso_hard": 4e8,
+                    "isoh_coeff": 1e8, "cinh": "none", "visc": "none"},
+    "THERMO_ELAS": {"elas": "standard", "young": 0.0, "nu": 0.0, "anisotropy": "isotropic",
+                    "dilatation": 0.0, "T_ref_meca": 0.0, "conductivity": "field", "specific_capacity": "field"},
+    "PORO_ELAS":   {"elas": "standard", "young": 0.0, "nu": 0.0, "anisotropy": "isotropic",
+                    "hydro_cpl": 0.0, "conductivity": "field", "specific_capacity": "field"},
+}
+
+_ELASTIC_TYPES = list(_MAT_DEFAULTS.keys())
+
+
+# ─────────────────────────── helpers gmsh ─────────────────────────────────────
+
+def _gmsh_disk(cx, cy, r, nr, ntheta, filepath):
+    """
+    Génère un maillage 2D de disque via gmsh et l'écrit dans filepath (.msh v2).
+    lc est déduit du rayon et du nombre d'éléments angulaires.
+    """
+    import gmsh
+    lc = (2 * 3.14159 * r / ntheta)   # taille de maille ≈ arc / ntheta
+
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 0)
+    gmsh.model.add("disk")
+
+    gmsh.model.occ.addDisk(cx, cy, 0.0, r, r)
+    gmsh.model.occ.synchronize()
+
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", lc)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", lc)
+    gmsh.option.setNumber("Mesh.Algorithm", 6)          # Frontal-Delaunay
+    gmsh.model.mesh.generate(2)
+    gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
+    gmsh.write(filepath)
+    gmsh.finalize()
+
+
+def _gmsh_sphere(cx, cy, cz, r, nr, ntheta, nphi, filepath):
+    """
+    Génère un maillage 3D de sphère pleine via gmsh.
+    lc déduit du rayon et de ntheta.
+    """
+    import gmsh
+    lc = (2 * 3.14159 * r / ntheta)
+
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 0)
+    gmsh.model.add("sphere")
+
+    gmsh.model.occ.addSphere(cx, cy, cz, r)
+    gmsh.model.occ.synchronize()
+
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", lc)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", lc)
+    gmsh.option.setNumber("Mesh.Algorithm3D", 4)        # Frontal
+    gmsh.model.mesh.generate(3)
+    gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
+    gmsh.write(filepath)
+    gmsh.finalize()
+
+
+def _gmsh_cylinder(cx, cy, cz, r, h, nr, ntheta, nz, filepath):
+    """
+    Génère un maillage 3D de cylindre plein via gmsh.
+    Le cylindre est centré en (cx, cy, cz), axe Z, de rayon r et hauteur h.
+    lc déduit de r et ntheta.
+    """
+    import gmsh
+    lc = (2 * 3.14159 * r / ntheta)
+
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 0)
+    gmsh.model.add("cylinder")
+
+    # addCylinder(x, y, z, dx, dy, dz, r) — base en z0 = cz - h/2
+    gmsh.model.occ.addCylinder(cx, cy, cz - h / 2.0, 0.0, 0.0, h, r)
+    gmsh.model.occ.synchronize()
+
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", lc)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", lc)
+    gmsh.option.setNumber("Mesh.Algorithm3D", 4)
+    gmsh.model.mesh.generate(3)
+    gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
+    gmsh.write(filepath)
+    gmsh.finalize()
+
+
+# Wizard principal
+# ═══════════════════════════════════════════════════════════════════════════════
+
 class MeshWizard(QWizard):
-    """Assistant de création de maillages déformables"""
-    
-    PAGE_INTRO = 0
-    PAGE_DIMENSION = 1
-    PAGE_MESH_TYPE = 2
-    PAGE_GEOMETRY = 3
-    PAGE_MESH_PARAMS = 4
-    PAGE_MATERIAL = 5
-    PAGE_MODEL = 6
-    PAGE_BOUNDARY = 7
-    PAGE_SUMMARY = 8
-    
+    """
+    Assistant de création de corps déformables.
+    Génère un maillage structuré 2D ou 3D via pre.buildMesh2D / pre.buildMeshH8,
+    crée le matériau élastique et le modèle EF, puis insère l'avatar MAILx
+    directement dans les conteneurs pylmgc90 du controller.
+    """
+
+    PAGE_INTRO   = 0
+    PAGE_DIM     = 1
+    PAGE_MAT     = 2
+    PAGE_MODEL   = 3
+    PAGE_GEOM    = 4
+    PAGE_REFINE  = 5
+    PAGE_BOUNDARY= 6
+    PAGE_SUMMARY = 7
+
     def __init__(self, controller: ProjectController, parent=None):
         super().__init__(parent)
         self.controller = controller
-        
-        self.setWindowTitle("🔷 Assistant de Maillage Déformable")
+
+        # Snapshot pour restauration sur Annuler / erreur
+        self._saved_name         = controller.state.name
+        self._saved_project_path = controller.project_path
+        self._saved_dimension    = controller.state.dimension
+
+        self.setWindowTitle("🔷 Assistant Corps Déformable (EF)")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
         self.setOption(QWizard.WizardOption.HaveHelpButton, False)
-        self.resize(800, 600)
-        
-        # Pages
+        self.resize(820, 600)
+
         self.addPage(MeshIntroPage())
         self.addPage(MeshDimensionPage())
-        self.addPage(MeshTypePage())
-        self.addPage(GeometryPage())
-        self.addPage(MeshParametersPage())
         self.addPage(MeshMaterialPage())
         self.addPage(MeshModelPage())
-        self.addPage(BoundaryConditionsPage())
+        self.addPage(MeshGeometryPage())
+        self.addPage(MeshRefinementPage())
+        self.addPage(MeshBoundaryPage())
         self.addPage(MeshSummaryPage())
-        
-        self.setButtonText(QWizard.WizardButton.NextButton, "Suivant ➡️")
-        self.setButtonText(QWizard.WizardButton.BackButton, "⬅️ Retour")
-        self.setButtonText(QWizard.WizardButton.FinishButton, "✅ Générer Maillage")
+
+        self.setButtonText(QWizard.WizardButton.NextButton,   "Suivant ➡️")
+        self.setButtonText(QWizard.WizardButton.BackButton,   "⬅️ Retour")
+        self.setButtonText(QWizard.WizardButton.FinishButton, "✅ Générer le maillage")
         self.setButtonText(QWizard.WizardButton.CancelButton, "❌ Annuler")
-    
+
+    # ── accept / reject ────────────────────────────────────────────────────────
+
     def accept(self):
-        """Génération finale"""
         try:
-            self._generate_mesh()
+            n_nodes, n_elems = self._generate_mesh()
             QMessageBox.information(
                 self, "Succès",
-                "✅ Maillage déformable généré avec succès !"
+                f"✅ Corps déformable généré avec succès !\n"
+                f"   {n_nodes} nœuds · {n_elems} éléments"
             )
             super().accept()
         except Exception as e:
+            self.controller.state.name      = self._saved_name
+            self.controller.project_path    = self._saved_project_path
+            self.controller.state.dimension = self._saved_dimension
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
-    
+
+    def reject(self):
+        self.controller.state.name      = self._saved_name
+        self.controller.project_path    = self._saved_project_path
+        self.controller.state.dimension = self._saved_dimension
+        super().reject()
+
+    # ── génération principale ──────────────────────────────────────────────────
+
     def _generate_mesh(self):
-        """Génère le maillage déformable"""
-        from pylmgc90 import pre
-        
-        # Dimension
-        dim_page = self.page(self.PAGE_DIMENSION)
+        """
+        Construit le maillage EF et l'insère dans le projet.
+        Retourne (nb_noeuds, nb_elements).
+        """
+        from pylmgc90.pre import buildMesh2D, buildMeshH8
+
+        ctrl = self.controller
+
+        # ── pages ─────────────────────────────────────────────────────────────
+        dim_page    = self.page(self.PAGE_DIM)
+        mat_page    = self.page(self.PAGE_MAT)
+        mod_page    = self.page(self.PAGE_MODEL)
+        geom_page   = self.page(self.PAGE_GEOM)
+        ref_page    = self.page(self.PAGE_REFINE)
+        bound_page  = self.page(self.PAGE_BOUNDARY)
+
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        self.controller.state.dimension = dimension
-        
-        # Type de maillage
-        mesh_type_page = self.page(self.PAGE_MESH_TYPE)
-        mesh_type = mesh_type_page.type_combo.currentText()
-        
-        # Géométrie
-        geom_page = self.page(self.PAGE_GEOMETRY)
-        
-        # Paramètres de maillage
-        mesh_params = self.page(self.PAGE_MESH_PARAMS)
-        
-        # Matériau
-        mat_page = self.page(self.PAGE_MATERIAL)
+        ctrl.state.dimension = dimension
+
+        # ── matériau ──────────────────────────────────────────────────────────
         if mat_page.create_mat_check.isChecked():
+            mat_name = mat_page.mat_name_input.text().strip()
+            if not mat_name:
+                raise ValueError("Le nom du matériau ne peut pas être vide.")
+            mat_type_str = mat_page.mat_type_combo.currentText()
+            props = self._collect_mat_properties(mat_page, mat_type_str)
             material = Material(
-                name=mat_page.mat_name_input.text().strip(),
-                material_type=MaterialType(mat_page.mat_type_combo.currentText()),
+                name=mat_name,
+                material_type=MaterialType(mat_type_str),
                 density=mat_page.density_spin.value(),
-                properties={
-                    'young': mat_page.young_spin.value(),
-                    'poisson': mat_page.poisson_spin.value()
-                }
+                properties=props
             )
-            self.controller.add_material(material)
-            mat_name = material.name
+            ctrl.add_material(material)
         else:
-            mat_name = mat_page.existing_combo.currentText()
-        
-        # Modèle
-        mod_page = self.page(self.PAGE_MODEL)
+            sel = mat_page.existing_mat_combo.currentText()
+            if sel in ("", "(Aucun matériau élastique)", "(Aucun matériau)"):
+                raise ValueError("Aucun matériau sélectionné.")
+            mat_name = sel
+
+        # ── modèle ────────────────────────────────────────────────────────────
         if mod_page.create_mod_check.isChecked():
-            element = mod_page.element_combo.currentText()
+            mod_name = mod_page.mod_name_input.text().strip()
+            if not mod_name:
+                raise ValueError("Le nom du modèle ne peut pas être vide.")
+            element     = mod_page.element_combo.currentText()
+            physics     = mod_page.physics_combo.currentText()
+            anisotropy  = mod_page.anisotropy_combo.currentText()
+            kinematic   = mod_page.kinematic_combo.currentText()
+            formulation = mod_page.formulation_combo.currentText()
+            mass_stor   = mod_page.mass_combo.currentText()
+            options = {
+                "anisotropy":   anisotropy,
+                "kinematic":    kinematic,
+                "formulation":  formulation,
+                "mass_storage": mass_stor,
+                "material":     "elas_",
+                "external_model": "MatL_",
+            }
             model = Model(
-                name=mod_page.mod_name_input.text().strip(),
-                physics=mod_page.physics_combo.currentText(),
+                name=mod_name,
+                physics=physics,
                 element=element,
-                dimension=dimension
+                dimension=dimension,
+                options=options
             )
-            self.controller.add_model(model)
-            mod_name = model.name
+            ctrl.add_model(model)
         else:
-            mod_name = mod_page.existing_combo.currentText()
-        
-        # Récupérer les objets pylmgc
-        mat_obj = self.controller._pylmgc_materials[mat_name]
-        mod_obj = self.controller._pylmgc_models[mod_name]
-        
-        # Créer le maillage selon le type
+            sel = mod_page.existing_mod_combo.currentText()
+            if sel in ("", f"(Aucun modèle {dimension}D)", "(Aucun modèle)"):
+                raise ValueError("Aucun modèle sélectionné.")
+            mod_name = sel
+
+        # ── objets pylmgc90 du matériau et du modèle ─────────────────────────
+        mat_obj = ctrl._pylmgc_materials.get(mat_name)
+        mod_obj = ctrl._pylmgc_models.get(mod_name)
+        if mat_obj is None:
+            raise ValueError(f"Matériau pylmgc90 '{mat_name}' introuvable.")
+        if mod_obj is None:
+            raise ValueError(f"Modèle pylmgc90 '{mod_name}' introuvable.")
+
+        # ── maillage ──────────────────────────────────────────────────────────
         if dimension == 2:
-            mesh_obj = self._create_mesh_2d(mesh_type, geom_page, mesh_params, mod_obj, mat_obj)
+            mesh_obj = self._build_mesh_2d(geom_page, ref_page, mat_obj, mod_obj, buildMesh2D)
         else:
-            mesh_obj = self._create_mesh_3d(mesh_type, geom_page, mesh_params, mod_obj, mat_obj)
-        
-        # Ajouter au controller
-        self.controller._bodies_container.addAvatar(mesh_obj)
-        self.controller._pylmgc_bodies.append(mesh_obj)
-        
-        # Créer l'avatar correspondant
-        center = geom_page.get_center()
+            mesh_obj = self._build_mesh_3d(geom_page, ref_page, mat_obj, mod_obj, buildMeshH8)
+
+        # ── insertion dans les conteneurs pylmgc90 ────────────────────────────
+        ctrl._bodies_container.addAvatar(mesh_obj)
+        ctrl._pylmgc_bodies.append(mesh_obj)
+
+        # ── enregistrement dans le state (avatar de type MESH_DEFORMABLE) ─────
+        center = geom_page.get_center(dimension)
         avatar = Avatar(
-            avatar_type=AvatarType.EMPTY_AVATAR,
+            avatar_type=AvatarType.MESH_DEFORMABLE,
             center=center,
             material_name=mat_name,
             model_name=mod_name,
@@ -144,174 +322,232 @@ class MeshWizard(QWizard):
             origin=AvatarOrigin.MANUAL,
             contactors=[]
         )
-        self.controller.state.avatars.append(avatar)
-        
-        # Appliquer les conditions aux limites
+        ctrl.state.avatars.append(avatar)
+
+        # ──Appliquer les conditions aux limites ────────────────────────────
         boundary_page = self.page(self.PAGE_BOUNDARY)
         if boundary_page.fix_bottom_check.isChecked():
             # Appliquer fixation du bord inférieur
             self._apply_boundary_conditions(mesh_obj, boundary_page)
-    
-    def _create_mesh_2d(self, mesh_type, geom_page, mesh_params, mod_obj, mat_obj):
-        """Crée un maillage 2D"""
-        from pylmgc90 import pre
-        
-        if mesh_type == "Rectangle":
-            # Dimensions
-            width = geom_page.width_spin.value()
-            height = geom_page.height_spin.value()
-            center = geom_page.get_center()
-            
-            # Nombre d'éléments
-            nx = mesh_params.nx_spin.value()
-            ny = mesh_params.ny_spin.value()
 
-            #il faut créer un mesh 
-            mesh = pre.mesh()
-            
-            # Générer le maillage rectangulaire
-            mesh = pre.buildMesh2D(
-                mesh_type=='RECTANGLE',
-                lx=width,
-                ly=height,
-                nx=nx,
-                ny=ny,
-                center=center,
+        # Un seul signal pour rafraîchir l'UI
+        ctrl.state_changed.emit()
+
+        # Statistiques pour le message de succès
+        n_nodes = len(mesh_obj.nodes) if hasattr(mesh_obj, 'nodes') else 0
+        n_elems = len(mesh_obj.bulks) if hasattr(mesh_obj, 'bulks') else 0
+        return n_nodes, n_elems
+
+    # ── construction 2D ───────────────────────────────────────────────────────
+
+    def _build_mesh_2d(self, geom_page, ref_page, mat_obj, mod_obj, buildMesh2D):
+        """
+        Appelle pre.buildMesh2D(mesh_type, x0, y0, lx, ly, nb_elem_x, nb_elem_y).
+        Retourne l'avatar MAILx pylmgc90.
+        """
+        geom_type = geom_page.geom_type_combo.currentText()
+        mesh_type = ref_page.mesh_type_combo.currentText()   # Q4, 2T3, 4T3, Q8
+
+        if geom_type == "Rectangle":
+            lx = geom_page.lx_spin.value()
+            ly = geom_page.ly_spin.value()
+            x0 = geom_page.cx_spin.value() - lx / 2.0
+            y0 = geom_page.cy_spin.value() - ly / 2.0
+            nx = ref_page.nx_spin.value()
+            ny = ref_page.ny_spin.value()
+
+            # buildMesh2D renvoie un objet mesh (nodes + bulks) ;
+            # on l'enveloppe ensuite dans un avatar MAILx via pre.buildMeshedAvatar.
+            from pylmgc90 import pre as pre_mod
+            surf_mesh = buildMesh2D(
+                mesh_type,
+                x0, y0,
+                lx, ly,
+                nx, ny
+            )
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=surf_mesh,
                 model=mod_obj,
                 material=mat_obj
             )
-            
-            return mesh
-        
-        elif mesh_type == "Disque":
-            # Rayon
-            radius = geom_page.radius_spin.value()
-            center = geom_page.get_center()
-            
-            # Nombre d'éléments radiaux et angulaires
-            nr = mesh_params.nr_spin.value()
-            ntheta = mesh_params.ntheta_spin.value()
-            
-            mesh = pre.mesh2D(
-                shape='DISK',
-                r=radius,
-                nr=nr,
-                ntheta=ntheta,
-                center=center,
+            return avatar
+
+        elif geom_type == "Disque":
+            import tempfile, os
+            from pylmgc90 import pre as pre_mod
+            r      = geom_page.radius_spin.value()
+            cx     = geom_page.cx_spin.value()
+            cy     = geom_page.cy_spin.value()
+            nr     = ref_page.nr_spin.value()
+            ntheta = ref_page.ntheta_spin.value()
+
+            with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as f:
+                tmp = f.name
+            try:
+                _gmsh_disk(cx, cy, r, nr, ntheta, tmp)
+                surf_mesh = pre_mod.readMesh(tmp, 2)
+            finally:
+                os.unlink(tmp)
+
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=surf_mesh,
                 model=mod_obj,
-                material=mat_obj
+                material=mat_obj,
             )
-            
-            return mesh
-        
-        elif mesh_type == "Fichier externe":
-            # Charger depuis un fichier .msh ou .vtk
-            filepath = geom_page.file_path_input.text()
-            
-            mesh = pre.mesh2D(
-                mesh_file=filepath,
+            return avatar
+
+        elif geom_type == "Fichier externe":
+            filepath = geom_page.file_path_input.text().strip()
+            if not filepath:
+                raise ValueError("Aucun fichier de maillage sélectionné.")
+            from pylmgc90 import pre as pre_mod
+            surf_mesh = pre_mod.readMesh(filepath, 2)
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=surf_mesh,
                 model=mod_obj,
-                material=mat_obj
+                material=mat_obj,
             )
-            
-            return mesh
-        else : 
-             raise ValueError(f"Type de maillage 2D non supporté : {mesh_type}")
-    
-    
-    def _create_mesh_3d(self, mesh_type, geom_page, mesh_params, mod_obj, mat_obj):
-        """Crée un maillage 3D"""
-        from pylmgc90 import pre
-        
-        if mesh_type == "Cube":
-            # Dimensions
+            return avatar
+
+        else:
+            raise ValueError(f"Géométrie 2D non supportée : '{geom_type}'")
+
+    # ── construction 3D ───────────────────────────────────────────────────────
+
+    def _build_mesh_3d(self, geom_page, ref_page, mat_obj, mod_obj, buildMeshH8):
+        """
+        Appelle pre.buildMeshH8(x0, y0, z0, lx, ly, lz, nx, ny, nz).
+        Retourne l'avatar MAILx pylmgc90.
+        """
+        from pylmgc90 import pre as pre_mod
+
+        geom_type = geom_page.geom_type_combo.currentText()
+
+        if geom_type == "Boîte (H8)":
             lx = geom_page.lx_spin.value()
             ly = geom_page.ly_spin.value()
             lz = geom_page.lz_spin.value()
-            center = geom_page.get_center()
-            
-            # Nombre d'éléments
-            nx = mesh_params.nx_spin.value()
-            ny = mesh_params.ny_spin.value()
-            nz = mesh_params.nz_spin.value()
-            
-            mesh = pre.mesh3D(
-                shape='BOX',
-                lx=lx,
-                ly=ly,
-                lz=lz,
-                nx=nx,
-                ny=ny,
-                nz=nz,
-                center=center,
-                model=mod_obj,
-                material=mat_obj
+            x0 = geom_page.cx_spin.value() - lx / 2.0
+            y0 = geom_page.cy_spin.value() - ly / 2.0
+            z0 = geom_page.cz_spin.value() - lz / 2.0
+            nx = ref_page.nx_spin.value()
+            ny = ref_page.ny_spin.value()
+            nz = ref_page.nz_spin.value()
+
+            vol_mesh = buildMeshH8(
+                x0, y0, z0,
+                lx, ly, lz,
+                nx, ny, nz
             )
-            
-            return mesh
-        
-        elif mesh_type == "Sphère":
-            # Rayon
-            radius = geom_page.radius_spin.value()
-            center = geom_page.get_center()
-            
-            # Nombre d'éléments
-            nr = mesh_params.nr_spin.value()
-            ntheta = mesh_params.ntheta_spin.value()
-            nphi = mesh_params.nphi_spin.value()
-            
-            mesh = pre.mesh3D(
-                shape='SPHERE',
-                r=radius,
-                nr=nr,
-                ntheta=ntheta,
-                nphi=nphi,
-                center=center,
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=vol_mesh,
                 model=mod_obj,
-                material=mat_obj
+                material=mat_obj,
+
             )
-            
-            return mesh
-        
-        elif mesh_type == "Cylindre":
-            # Dimensions
-            radius = geom_page.radius_spin.value()
-            height = geom_page.height_spin.value()
-            center = geom_page.get_center()
-            
-            # Nombre d'éléments
-            nr = mesh_params.nr_spin.value()
-            ntheta = mesh_params.ntheta_spin.value()
-            nz = mesh_params.nz_spin.value()
-            
-            mesh = pre.mesh3D(
-                shape='CYLINDER',
-                r=radius,
-                h=height,
-                nr=nr,
-                ntheta=ntheta,
-                nz=nz,
-                center=center,
+            return avatar
+
+        elif geom_type == "Sphère":
+            import tempfile, os
+            r      = geom_page.radius_spin.value()
+            cx     = geom_page.cx_spin.value()
+            cy     = geom_page.cy_spin.value()
+            cz     = geom_page.cz_spin.value()
+            nr     = ref_page.nr_spin.value()
+            ntheta = ref_page.ntheta_spin.value()
+            nphi   = ref_page.nphi_spin.value()
+
+            with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as f:
+                tmp = f.name
+            try:
+                _gmsh_sphere(cx, cy, cz, r, nr, ntheta, nphi, tmp)
+                vol_mesh = pre_mod.readMesh(tmp, 3)
+            finally:
+                os.unlink(tmp)
+
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=vol_mesh,
                 model=mod_obj,
-                material=mat_obj
+                material=mat_obj,
             )
-            
-            return mesh
-        
-        elif mesh_type == "Fichier externe":
-            # Charger depuis un fichier .msh ou .vtk
-            filepath = geom_page.file_path_input.text()
-            
-            mesh = pre.mesh3D(
-                mesh_file=filepath,
+            return avatar
+
+        elif geom_type == "Cylindre":
+            import tempfile, os
+            r      = geom_page.radius_spin.value()
+            h      = geom_page.height_spin.value()
+            cx     = geom_page.cx_spin.value()
+            cy     = geom_page.cy_spin.value()
+            cz     = geom_page.cz_spin.value()
+            nr     = ref_page.nr_spin.value()
+            ntheta = ref_page.ntheta_spin.value()
+            nz     = ref_page.nz_spin.value()
+
+            with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as f:
+                tmp = f.name
+            try:
+                _gmsh_cylinder(cx, cy, cz, r, h, nr, ntheta, nz, tmp)
+                vol_mesh = pre_mod.readMesh(tmp, 3)
+            finally:
+                os.unlink(tmp)
+
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=vol_mesh,
                 model=mod_obj,
-                material=mat_obj
+                material=mat_obj,
             )
-            
-            return mesh
-        else  : 
-            raise ValueError(f"Type de maillage 3D non supporté : {mesh_type}")
-        
+            return avatar
+
+        elif geom_type == "Fichier externe":
+            filepath = geom_page.file_path_input.text().strip()
+            if not filepath:
+                raise ValueError("Aucun fichier de maillage sélectionné.")
+            vol_mesh = pre_mod.readMesh(filepath, 3)
+            avatar = pre_mod.buildMeshedAvatar(
+                mesh=vol_mesh,
+                model=mod_obj,
+                material=mat_obj,
+            )
+            return avatar
+
+        else:
+            raise ValueError(f"Géométrie 3D non supportée : '{geom_type}'")
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _collect_mat_properties(mat_page, mat_type_str):
+        """
+        Collecte les propriétés mécaniques saisies dans la page matériau.
+        Construit un dictionnaire compatible avec pre.material(**props).
+        """
+        # Base commune à tous les types élastiques
+        props = {
+            "elas":       "standard",
+            "anisotropy": "isotropic",
+            "young":      mat_page.young_spin.value(),
+            "nu":         mat_page.poisson_spin.value(),
+        }
+
+        if mat_type_str == "ELAS_DILA":
+            props["dilatation"] = mat_page.dilatation_spin.value()
+            props["T_ref_meca"] = mat_page.tref_spin.value()
+
+        elif mat_type_str == "VISCO_ELAS":
+            props["viscous_model"] = "KelvinVoigt"
+            props["viscous_young"] = mat_page.viscous_young_spin.value()
+            props["viscous_nu"]    = mat_page.viscous_nu_spin.value()
+
+        elif mat_type_str == "ELAS_PLAS":
+            props["critere"]    = "Von-Mises"
+            props["isoh"]       = "linear"
+            props["iso_hard"]   = mat_page.iso_hard_spin.value()
+            props["isoh_coeff"] = mat_page.isoh_coeff_spin.value()
+            props["cinh"]       = "none"
+            props["visc"]       = "none"
+
+        return props
+    
     def _apply_boundary_conditions(self, mesh_obj, boundary_page):
         """Applique les conditions aux limites au maillage"""
         # Fixation du bord inférieur
@@ -329,813 +565,880 @@ class MeshWizard(QWizard):
             # mesh_obj.imposeDrivenDof(...)
             pass
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 0 — Introduction
+# ═══════════════════════════════════════════════════════════════════════════════
+
 class MeshIntroPage(QWizardPage):
-    """Introduction"""
-    
+
     def __init__(self):
         super().__init__()
-        self.setTitle("🔷 Assistant de Maillage Déformable")
-        self.setSubTitle("Créez des corps déformables avec éléments finis (mesh2d/mesh3d).")
-        
+        self.setTitle("🔷 Assistant Corps Déformable")
+        self.setSubTitle("Créez un corps déformable maillé avec des EF LMGC90.")
+
         layout = QVBoxLayout()
-        
         intro = QLabel(
             "<h3>📋 Étapes :</h3>"
             "<ol>"
             "<li>✅ Choisir la dimension (2D ou 3D)</li>"
+            "<li>✅ Définir le matériau déformable</li>"
+            "<li>✅ Choisir le type d'élément fini</li>"
             "<li>✅ Sélectionner le type de maillage</li>"
             "<li>✅ Définir la géométrie</li>"
             "<li>✅ Configurer le raffinement du maillage</li>"
-            "<li>✅ Définir le matériau déformable</li>"
-            "<li>✅ Choisir le type d'élément fini</li>"
             "<li>✅ Appliquer les conditions aux limites</li>"
             "<li>✅ Générer le maillage</li>"
             "</ol>"
             "<p><b>💡 Astuce :</b> Les maillages permettent de simuler la déformation de solides.</p>"
+            "<p><b>💡 Astuce :</b> Le maillage est construit via <code>buildMesh2D</code> "
+            "ou <code>buildMeshH8</code> de pylmgc90 puis converti en avatar MAILx.</p>"
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        
         layout.addStretch()
         self.setLayout(layout)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 1 — Dimension
+# ═══════════════════════════════════════════════════════════════════════════════
+
 class MeshDimensionPage(QWizardPage):
-    """Dimension"""
-    
+
     def __init__(self):
         super().__init__()
         self.setTitle("📐 Dimension")
         self.setSubTitle("Choisissez si votre maillage sera 2D ou 3D.")
-        
+
         layout = QVBoxLayout()
-        
-        dim_group = QGroupBox("Dimension spatiale")
-        dim_layout = QVBoxLayout()
-        
-        self.dim_2d_radio = QRadioButton("2D - Maillage bidimensionnel")
+        group = QGroupBox("Dimension spatiale")
+        g_layout = QVBoxLayout()
+
+        self.dim_2d_radio = QRadioButton("2D — Maillage bidimensionnel")
         self.dim_2d_radio.setChecked(True)
-        dim_layout.addWidget(self.dim_2d_radio)
-        
-        info_2d = QLabel("   💡 Éléments : T3, T6, Q4, Q8, Q9")
+        g_layout.addWidget(self.dim_2d_radio)
+
+        info_2d = QLabel(
+            "   💡 Éléments disponibles : T3, Q4, T6, Q8, Q9\n"
+            "   Fonction pylmgc90 : pre.buildMesh2D()"
+        )
         info_2d.setStyleSheet("color: gray; padding-left: 20px;")
-        dim_layout.addWidget(info_2d)
-        
-        dim_layout.addSpacing(20)
-        
-        self.dim_3d_radio = QRadioButton("3D - Maillage tridimensionnel")
-        dim_layout.addWidget(self.dim_3d_radio)
-        
-        info_3d = QLabel("   💡 Éléments : H8, H20, TE10, SHB8")
+        g_layout.addWidget(info_2d)
+        g_layout.addSpacing(16)
+
+        self.dim_3d_radio = QRadioButton("3D — Maillage tridimensionnel")
+        g_layout.addWidget(self.dim_3d_radio)
+
+        info_3d = QLabel(
+            "   💡 Éléments disponibles : H8, H20, TE10, SHB8, SHB6\n"
+            "   Fonction pylmgc90 : pre.buildMeshH8()"
+        )
         info_3d.setStyleSheet("color: gray; padding-left: 20px;")
-        dim_layout.addWidget(info_3d)
-        
-        dim_group.setLayout(dim_layout)
-        layout.addWidget(dim_group)
-        
+        g_layout.addWidget(info_3d)
+
+        group.setLayout(g_layout)
+        layout.addWidget(group)
         layout.addStretch()
         self.setLayout(layout)
 
-
-class MeshTypePage(QWizardPage):
-    """Type de maillage"""
-    
-    def __init__(self):
-        super().__init__()
-        self.setTitle("🔷 Type de Maillage")
-        self.setSubTitle("Sélectionnez la forme géométrique à mailler.")
-        
-        layout = QVBoxLayout()
-        
-        form = QFormLayout()
-        
-        self.type_combo = QComboBox()
-        self.type_combo.currentTextChanged.connect(self._on_type_changed)
-        form.addRow("Type :", self.type_combo)
-        
-        layout.addLayout(form)
-        
-        self.info_label = QLabel()
-        self.info_label.setWordWrap(True)
-        self.info_label.setStyleSheet("background-color: #e3f2fd; padding: 10px; border-radius: 5px;")
-        layout.addWidget(self.info_label)
-        
-        layout.addStretch()
-        self.setLayout(layout)
-    
-    def _on_type_changed(self, mesh_type):
-        infos = {
-            "Rectangle": "Maillage rectangulaire structuré",
-            "Disque": "Maillage de disque circulaire",
-            "Cube": "Maillage de boîte parallélépipédique",
-            "Sphère": "Maillage de sphère",
-            "Cylindre": "Maillage cylindrique",
-            "Fichier externe": "Import depuis fichier .msh ou .vtk (Gmsh, Salome)"
-        }
-        self.info_label.setText(f"<b>{mesh_type}</b><br>{infos.get(mesh_type, '')}")
-    
-    def initializePage(self):
-        """Mise à jour selon dimension"""
-        wizard = self.wizard()
-        dim_page = wizard.page(MeshWizard.PAGE_DIMENSION)
-        
-        dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        
-        self.type_combo.clear()
-        if dimension == 2:
-            self.type_combo.addItems(["Rectangle", "Disque", "Fichier externe"])
-        else:
-            self.type_combo.addItems(["Cube", "Sphère", "Cylindre", "Fichier externe"])
-        
-        self._on_type_changed(self.type_combo.currentText())
-
-
-class GeometryPage(QWizardPage):
-    """Géométrie"""
-    
-    def __init__(self):
-        super().__init__()
-        self.setTitle("📏 Géométrie")
-        self.setSubTitle("Définissez les dimensions de votre maillage.")
-        
-        layout = QVBoxLayout()
-        
-        # Position
-        pos_group = QGroupBox("Position du centre")
-        pos_form = QFormLayout()
-        
-        self.cx_spin = QDoubleSpinBox()
-        self.cx_spin.setRange(-100, 100)
-        self.cx_spin.setValue(0.0)
-        pos_form.addRow("Centre X :", self.cx_spin)
-        
-        self.cy_spin = QDoubleSpinBox()
-        self.cy_spin.setRange(-100, 100)
-        self.cy_spin.setValue(0.0)
-        pos_form.addRow("Centre Y :", self.cy_spin)
-        
-        self.cz_spin = QDoubleSpinBox()
-        self.cz_spin.setRange(-100, 100)
-        self.cz_spin.setValue(0.0)
-        pos_form.addRow("Centre Z :", self.cz_spin)
-        
-        pos_group.setLayout(pos_form)
-        layout.addWidget(pos_group)
-        
-        # Dimensions
-        dim_group = QGroupBox("Dimensions")
-        self.dim_form = QFormLayout()
-        
-        # Rectangle/Cube
-        self.width_spin = QDoubleSpinBox()
-        self.width_spin.setRange(0.1, 100)
-        self.width_spin.setValue(1.0)
-        self.dim_form.addRow("Largeur (lx) :", self.width_spin)
-        
-        self.height_spin = QDoubleSpinBox()
-        self.height_spin.setRange(0.1, 100)
-        self.height_spin.setValue(1.0)
-        self.dim_form.addRow("Hauteur (ly) :", self.height_spin)
-        
-        self.lx_spin = QDoubleSpinBox()
-        self.lx_spin.setRange(0.1, 100)
-        self.lx_spin.setValue(1.0)
-        
-        self.ly_spin = QDoubleSpinBox()
-        self.ly_spin.setRange(0.1, 100)
-        self.ly_spin.setValue(1.0)
-        
-        self.lz_spin = QDoubleSpinBox()
-        self.lz_spin.setRange(0.1, 100)
-        self.lz_spin.setValue(1.0)
-        self.dim_form.addRow("Profondeur (lz) :", self.lz_spin)
-        
-        # Disque/Sphère/Cylindre
-        self.radius_spin = QDoubleSpinBox()
-        self.radius_spin.setRange(0.1, 100)
-        self.radius_spin.setValue(1.0)
-        self.dim_form.addRow("Rayon :", self.radius_spin)
-        
-        # Fichier
-        file_layout = QHBoxLayout()
-        self.file_path_input = QLineEdit()
-        file_layout.addWidget(self.file_path_input)
-        
-        browse_btn = QPushButton("📁 Parcourir")
-        browse_btn.clicked.connect(self._browse_file)
-        file_layout.addWidget(browse_btn)
-        
-        self.dim_form.addRow("Fichier maillage :", file_layout)
-        
-        dim_group.setLayout(self.dim_form)
-        layout.addWidget(dim_group)
-        
-        layout.addStretch()
-        self.setLayout(layout)
-    
-    def _browse_file(self):
-        """Parcourir fichier"""
-        filepath, _ = QFileDialog.getOpenFileName(
-            self, "Sélectionner fichier maillage",
-            "", "Maillages (*.msh *.vtk *.mesh)"
-        )
-        if filepath:
-            self.file_path_input.setText(filepath)
-    
-    def initializePage(self):
-        """Mise à jour selon le type"""
-        wizard = self.wizard()
-        mesh_type_page = wizard.page(MeshWizard.PAGE_MESH_TYPE)
-        dim_page = wizard.page(MeshWizard.PAGE_DIMENSION)
-        
-        mesh_type = mesh_type_page.type_combo.currentText()
-        dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        
-        # Masquer tous les widgets de dimensions
-        for i in range(self.dim_form.rowCount()):
-            label_item = self.dim_form.itemAt(i, QFormLayout.ItemRole.LabelRole)
-            field_item = self.dim_form.itemAt(i, QFormLayout.ItemRole.FieldRole)
-            
-            if label_item and label_item.widget():
-                label_item.widget().setVisible(False)
-            if field_item:
-                widget = field_item.widget()
-                if widget:
-                    widget.setVisible(False)
-
-        # Afficher selon type
-        if mesh_type == "Rectangle":
-            self._show_row("Largeur (lx) :")
-            self._show_row("Hauteur (ly) :")
-        elif mesh_type == "Cube":
-            self._show_row("Longueur X (lx) :")
-            self._show_row("Longueur Y (ly) :")
-            self._show_row("Profondeur (lz) :")
-        elif mesh_type in ["Disque", "Sphère"]:
-            self._show_row("Rayon :")
-        elif mesh_type == "Cylindre":
-            self._show_row("Rayon :")
-            self._show_row("Profondeur (lz) :")
-        elif mesh_type == "Fichier externe":
-            self._show_row("Fichier maillage :")
-        
-        # Z visible seulement en 3D
-        self.cz_spin.parentWidget().setVisible(dimension == 3)
-    
-    def _show_row(self, label_text):
-        """Affiche une ligne du formulaire"""
-        for i in range(self.dim_form.rowCount()):
-            label_item = self.dim_form.itemAt(i, QFormLayout.ItemRole.LabelRole)
-            field_item = self.dim_form.itemAt(i, QFormLayout.ItemRole.FieldRole)
-            
-            if label_item and label_item.widget():
-                if label_item.widget().text() == label_text:
-                    label_item.widget().setVisible(True)
-                    if field_item and field_item.widget():
-                        field_item.widget().setVisible(True)
-        
-    def get_center(self):
-        """Retourne le centre"""
-        wizard = self.wizard()
-        dim_page = wizard.page(MeshWizard.PAGE_DIMENSION)
-        dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        
-        if dimension == 2:
-            return [self.cx_spin.value(), self.cy_spin.value()]
-        else:
-            return [self.cx_spin.value(), self.cy_spin.value(), self.cz_spin.value()]
-
-
-class MeshParametersPage(QWizardPage):
-    """Paramètres de maillage"""
-    
-    def __init__(self):
-        super().__init__()
-        self.setTitle("🔢 Raffinement du Maillage")
-        self.setSubTitle("Définissez la finesse du maillage.")
-        
-        layout = QVBoxLayout()
-        
-        self.params_form = QFormLayout()
-        
-        self.nx_spin = QSpinBox()
-        self.nx_spin.setRange(2, 200)
-        self.nx_spin.setValue(10)
-        self.params_form.addRow("Nombre d'éléments en X (nx) :", self.nx_spin)
-        
-        self.ny_spin = QSpinBox()
-        self.ny_spin.setRange(2, 200)
-        self.ny_spin.setValue(10)
-        self.params_form.addRow("Nombre d'éléments en Y (ny) :", self.ny_spin)
-        
-        self.nz_spin = QSpinBox()
-        self.nz_spin.setRange(2, 200)
-        self.nz_spin.setValue(10)
-        self.params_form.addRow("Nombre d'éléments en Z (nz) :", self.nz_spin)
-        
-        self.nr_spin = QSpinBox()
-        self.nr_spin.setRange(2, 100)
-        self.nr_spin.setValue(10)
-        self.params_form.addRow("Nombre d'éléments radiaux (nr) :", self.nr_spin)
-        
-        self.ntheta_spin = QSpinBox()
-        self.ntheta_spin.setRange(4, 100)
-        self.ntheta_spin.setValue(20)
-        self.params_form.addRow("Nombre d'éléments angulaires (ntheta) :", self.ntheta_spin)
-        
-        self.nphi_spin = QSpinBox()
-        self.nphi_spin.setRange(4, 100)
-        self.nphi_spin.setValue(20)
-        self.params_form.addRow("Nombre d'éléments en phi (nphi) :", self.nphi_spin)
-        
-        layout.addLayout(self.params_form)
-        # Info dynamique
-        self.element_count_label = QLabel()
-        self.element_count_label.setStyleSheet(
-            "background-color: #e8f5e9; padding: 10px; border-radius: 5px; font-weight: bold;"
-        )
-        layout.addWidget(self.element_count_label)
-        
-        info = QLabel(
-            "💡 <b>Conseil :</b> Plus le maillage est fin (nx, ny élevés), "
-            "plus le calcul sera précis mais lent."
-        )
-        info.setWordWrap(True)
-        info.setStyleSheet("background-color: #fff3cd; padding: 10px; border-radius: 5px;")
-        layout.addWidget(info)
-        
-        layout.addStretch()
-        self.setLayout(layout)
-    
-    def _update_element_count(self):
-        """Met à jour le nombre d'éléments estimé"""
-        wizard = self.wizard()
-        mesh_type_page = wizard.page(MeshWizard.PAGE_MESH_TYPE)
-        mesh_type = mesh_type_page.type_combo.currentText()
-        
-        count = 0
-        
-        if mesh_type == "Rectangle":
-            count = self.nx_spin.value() * self.ny_spin.value()
-        elif mesh_type == "Disque":
-            count = self.nr_spin.value() * self.ntheta_spin.value()
-        elif mesh_type == "Cube":
-            count = self.nx_spin.value() * self.ny_spin.value() * self.nz_spin.value()
-        elif mesh_type == "Sphère":
-            count = self.nr_spin.value() * self.ntheta_spin.value() * self.nphi_spin.value()
-        elif mesh_type == "Cylindre":
-            count = self.nr_spin.value() * self.ntheta_spin.value() * self.nz_spin.value()
-        
-        self.element_count_label.setText(f"📊 Nombre d'éléments estimé : {count}")
-    
-    def initializePage(self):
-        """Mise à jour selon le type"""
-        wizard = self.wizard()
-        mesh_type_page = wizard.page(MeshWizard.PAGE_MESH_TYPE)
-        mesh_type = mesh_type_page.type_combo.currentText()
-        dim_page = wizard.page(MeshWizard.PAGE_DIMENSION)
-        dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        
-        # Masquer tous
-        for i in range(self.params_form.rowCount()):
-            self.params_form.itemAt(i, QFormLayout.ItemRole.LabelRole).widget().setVisible(False)
-            self.params_form.itemAt(i, QFormLayout.ItemRole.FieldRole).widget().setVisible(False)
-        
-        # Afficher selon type
-        if mesh_type == "Rectangle":
-            self._show_param_row("Éléments en X (nx) :")
-            self._show_param_row("Éléments en Y (ny) :")
-        
-        elif mesh_type == "Disque":
-            self._show_param_row("Éléments radiaux (nr) :")
-            self._show_param_row("Éléments angulaires (nθ) :")
-        
-        elif mesh_type == "Cube":
-            self._show_param_row("Éléments en X (nx) :")
-            self._show_param_row("Éléments en Y (ny) :")
-            self._show_param_row("Éléments en Z (nz) :")
-        
-        elif mesh_type == "Sphère":
-            self._show_param_row("Éléments radiaux (nr) :")
-            self._show_param_row("Éléments angulaires (nθ) :")
-            self._show_param_row("Éléments en φ (nphi) :")
-        
-        elif mesh_type == "Cylindre":
-            self._show_param_row("Éléments radiaux (nr) :")
-            self._show_param_row("Éléments angulaires (nθ) :")
-            self._show_param_row("Éléments en Z (nz) :")
-        self._update_element_count()
-
-    def _show_param_row(self, label_text):
-        """Affiche une ligne de paramètre"""
-        for i in range(self.params_form.rowCount()):
-            label_item = self.params_form.itemAt(i, QFormLayout.ItemRole.LabelRole)
-            field_item = self.params_form.itemAt(i, QFormLayout.ItemRole.FieldRole)
-            
-            if label_item and label_item.widget():
-                if label_item.widget().text() == label_text:
-                    label_item.widget().setVisible(True)
-                    if field_item and field_item.widget():
-                        field_item.widget().setVisible(True)
-
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 2 — Matériau
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class MeshMaterialPage(QWizardPage):
-    """Matériau déformable"""
-    
+
     def __init__(self):
         super().__init__()
         self.setTitle("🧱 Matériau Déformable")
-        self.setSubTitle("Définissez les propriétés mécaniques.")
-        
+        self.setSubTitle("Sélectionnez ou créez un matériau élastique.")
+
         layout = QVBoxLayout()
-        
-        self.create_mat_check = QCheckBox("Créer un nouveau matériau")
-        self.create_mat_check.setChecked(True)
+
+        # ── Existants en premier ───────────────────────────────────────────────
+        self.existing_group = QGroupBox("Utiliser un matériau existant")
+        ef = QFormLayout()
+        self.existing_mat_combo = QComboBox()
+        ef.addRow("Sélectionner :", self.existing_mat_combo)
+        self.existing_group.setLayout(ef)
+        layout.addWidget(self.existing_group)
+
+        # ── Créer nouveau ─────────────────────────────────────────────────────
+        self.create_mat_check = QCheckBox("Créer un nouveau matériau à la place")
+        self.create_mat_check.setChecked(False)
         self.create_mat_check.toggled.connect(self._toggle_mode)
         layout.addWidget(self.create_mat_check)
-        
-        # Nouveau matériau
+
         self.new_mat_group = QGroupBox("Nouveau matériau")
-        new_form = QFormLayout()
-        
+        nf = QFormLayout()
+
         self.mat_name_input = QLineEdit("ELAS1")
-        new_form.addRow("Nom :", self.mat_name_input)
-        
+        self.mat_name_input.setMaxLength(5)
+        nf.addRow("Nom (max 5 car.) :", self.mat_name_input)
+
         self.mat_type_combo = QComboBox()
-        self.mat_type_combo.addItems(["ELAS", "ELAS_DILA", "VISCO_ELAS", "ELAS_PLAS"])
-        new_form.addRow("Type :", self.mat_type_combo)
-        
+        self.mat_type_combo.addItems(_ELASTIC_TYPES)
+        self.mat_type_combo.currentTextChanged.connect(self._on_mat_type_changed)
+        nf.addRow("Type :", self.mat_type_combo)
+
         self.density_spin = QDoubleSpinBox()
-        self.density_spin.setRange(100, 20000)
-        self.density_spin.setValue(2700)
-        new_form.addRow("Densité (kg/m³) :", self.density_spin)
-        
+        self.density_spin.setRange(10.0, 25000.0)
+        self.density_spin.setDecimals(1)
+        self.density_spin.setValue(2700.0)
+        self.density_spin.setSuffix(" kg/m³")
+        nf.addRow("Densité :", self.density_spin)
+
         self.young_spin = QDoubleSpinBox()
-        self.young_spin.setRange(1e6, 1e12)
+        self.young_spin.setRange(1e3, 1e12)
+        self.young_spin.setDecimals(3)
         self.young_spin.setValue(70e9)
-        self.young_spin.setDecimals(2)
-        new_form.addRow("Module de Young (Pa) :", self.young_spin)
-        
+        self.young_spin.setSuffix(" Pa")
+        nf.addRow("Module de Young :", self.young_spin)
+
         self.poisson_spin = QDoubleSpinBox()
-        self.poisson_spin.setRange(0.0, 0.5)
+        self.poisson_spin.setRange(0.0, 0.4999)
+        self.poisson_spin.setDecimals(4)
         self.poisson_spin.setValue(0.3)
-        self.poisson_spin.setDecimals(3)
-        new_form.addRow("Coefficient de Poisson :", self.poisson_spin)
-        
-        self.new_mat_group.setLayout(new_form)
+        nf.addRow("Coefficient de Poisson (ν) :", self.poisson_spin)
+
+        # ── Champs conditionnels ELAS_DILA ────────────────────────────────────
+        self.dilatation_spin = QDoubleSpinBox()
+        self.dilatation_spin.setRange(0.0, 1.0)
+        self.dilatation_spin.setDecimals(6)
+        self.dilatation_spin.setValue(1e-5)
+        nf.addRow("Dilatation thermique :", self.dilatation_spin)
+
+        self.tref_spin = QDoubleSpinBox()
+        self.tref_spin.setRange(-273.15, 2000.0)
+        self.tref_spin.setDecimals(2)
+        self.tref_spin.setValue(20.0)
+        self.tref_spin.setSuffix(" °C")
+        nf.addRow("T_ref_meca :", self.tref_spin)
+
+        # ── Champs conditionnels VISCO_ELAS ───────────────────────────────────
+        self.viscous_young_spin = QDoubleSpinBox()
+        self.viscous_young_spin.setRange(1e3, 1e12)
+        self.viscous_young_spin.setDecimals(3)
+        self.viscous_young_spin.setValue(1.17e9)
+        self.viscous_young_spin.setSuffix(" Pa")
+        nf.addRow("Young visqueux :", self.viscous_young_spin)
+
+        self.viscous_nu_spin = QDoubleSpinBox()
+        self.viscous_nu_spin.setRange(0.0, 0.4999)
+        self.viscous_nu_spin.setDecimals(4)
+        self.viscous_nu_spin.setValue(0.35)
+        nf.addRow("Poisson visqueux :", self.viscous_nu_spin)
+
+        # ── Champs conditionnels ELAS_PLAS ────────────────────────────────────
+        self.iso_hard_spin = QDoubleSpinBox()
+        self.iso_hard_spin.setRange(0.0, 1e12)
+        self.iso_hard_spin.setDecimals(1)
+        self.iso_hard_spin.setValue(4e8)
+        self.iso_hard_spin.setSuffix(" Pa")
+        nf.addRow("Limite élastique (iso_hard) :", self.iso_hard_spin)
+
+        self.isoh_coeff_spin = QDoubleSpinBox()
+        self.isoh_coeff_spin.setRange(0.0, 1e12)
+        self.isoh_coeff_spin.setDecimals(1)
+        self.isoh_coeff_spin.setValue(1e8)
+        self.isoh_coeff_spin.setSuffix(" Pa")
+        nf.addRow("Module d'écrouissage (isoh_coeff) :", self.isoh_coeff_spin)
+
+        self.new_mat_group.setLayout(nf)
+        self.new_mat_group.setVisible(False)
         layout.addWidget(self.new_mat_group)
-        
-        # Existant
-        self.exist_mat_group = QGroupBox("Matériau existant")
-        exist_form = QFormLayout()
-        
-        self.existing_combo = QComboBox()
-        exist_form.addRow("Sélectionner :", self.existing_combo)
-        
-        self.exist_mat_group.setLayout(exist_form)
-        self.exist_mat_group.setVisible(False)
-        layout.addWidget(self.exist_mat_group)
-        
+
+        # Stocker les labels conditionnels pour les masquer/afficher
+        self._conditional_rows = {
+            "ELAS_DILA":  ["Dilatation thermique :", "T_ref_meca :"],
+            "VISCO_ELAS": ["Young visqueux :", "Poisson visqueux :"],
+            "ELAS_PLAS":  ["Limite élastique (iso_hard) :", "Module d'écrouissage (isoh_coeff) :"],
+        }
+        # Cache des formulaires
+        self._nf = nf
+
+        info = QLabel(
+            "💡 <b>Rappel :</b> Les matériaux élastiques requièrent au minimum "
+            "<code>elas='standard'</code>, <code>young</code>, <code>nu</code> "
+            "et <code>anisotropy='isotropic'</code>."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("background: #e3f2fd; padding: 8px; border-radius: 4px;")
+        layout.addWidget(info)
+
         layout.addStretch()
         self.setLayout(layout)
 
+        # Déclencher l'affichage initial des champs conditionnels
+        self._on_mat_type_changed(self.mat_type_combo.currentText())
+
     def _toggle_mode(self, create_new):
-        """Bascule entre nouveau/existant"""
         self.new_mat_group.setVisible(create_new)
-        self.exist_mat_group.setVisible(not create_new)
+        self.existing_group.setEnabled(not create_new)
+
+    def _on_mat_type_changed(self, mat_type):
+        """Affiche uniquement les champs pertinents pour le type de matériau."""
+        active_labels = set(self._conditional_rows.get(mat_type, []))
+        all_cond = {
+            lbl
+            for labels in self._conditional_rows.values()
+            for lbl in labels
+        }
+        for i in range(self._nf.rowCount()):
+            lbl_item = self._nf.itemAt(i, QFormLayout.ItemRole.LabelRole)
+            fld_item = self._nf.itemAt(i, QFormLayout.ItemRole.FieldRole)
+            if lbl_item and lbl_item.widget():
+                text = lbl_item.widget().text()
+                if text in all_cond:
+                    visible = text in active_labels
+                    lbl_item.widget().setVisible(visible)
+                    if fld_item and fld_item.widget():
+                        fld_item.widget().setVisible(visible)
 
     def initializePage(self):
-        """Charge les matériaux existants"""
-        wizard = self.wizard()
+        wizard    = self.wizard()
         materials = wizard.controller.get_materials()
-        
-        self.existing_combo.clear()
-        if materials:
-            # Filtrer les matériaux élastiques
-            elastic_mats = [m for m in materials if m.material_type.value in ["ELAS", "ELAS_DILA", "VISCO_ELAS", "ELAS_PLAS"]]
-            if elastic_mats:
-                self.existing_combo.addItems([m.name for m in elastic_mats])
-            else:
-                self.existing_combo.addItem("(Aucun matériau élastique)")
+        elastic   = [
+            m for m in materials
+            if m.material_type.value in _ELASTIC_TYPES
+        ]
+        self.existing_mat_combo.clear()
+        if elastic:
+            self.existing_mat_combo.addItems([m.name for m in elastic])
+            self.existing_group.setEnabled(True)
+            self.create_mat_check.setChecked(False)
+            self._toggle_mode(False)
         else:
-            self.existing_combo.addItem("(Aucun matériau)")
+            self.existing_mat_combo.addItem("(Aucun matériau élastique)")
+            self.existing_group.setEnabled(False)
+            self.create_mat_check.setChecked(True)
+            self._toggle_mode(True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 3 — Modèle EF
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class MeshModelPage(QWizardPage):
-    """Page du modèle (type d'élément fini)"""
+
     def __init__(self):
         super().__init__()
-        self.setTitle("⚙️ Modèle - Élément Fini")
-        self.setSubTitle("Choisissez le type d'élément fini à utiliser.")
-        
+        self.setTitle("⚙️ Modèle — Élément Fini")
+        self.setSubTitle("Sélectionnez ou créez un modèle éléments finis.")
+
         layout = QVBoxLayout()
-        
-        self.create_mod_check = QCheckBox("Créer un nouveau modèle")
-        self.create_mod_check.setChecked(True)
+
+        # ── Existants en premier ───────────────────────────────────────────────
+        self.existing_group = QGroupBox("Utiliser un modèle existant")
+        ef = QFormLayout()
+        self.existing_mod_combo = QComboBox()
+        ef.addRow("Sélectionner :", self.existing_mod_combo)
+        self.existing_group.setLayout(ef)
+        layout.addWidget(self.existing_group)
+
+        # ── Créer nouveau ─────────────────────────────────────────────────────
+        self.create_mod_check = QCheckBox("Créer un nouveau modèle à la place")
+        self.create_mod_check.setChecked(False)
         self.create_mod_check.toggled.connect(self._toggle_mode)
         layout.addWidget(self.create_mod_check)
-        
-        # Nouveau modèle
+
         self.new_mod_group = QGroupBox("Nouveau modèle")
-        new_form = QFormLayout()
-        
-        self.mod_name_input = QLineEdit("fem")
+        nf = QFormLayout()
+
+        self.mod_name_input = QLineEdit("femxx")
         self.mod_name_input.setMaxLength(5)
-        new_form.addRow("Nom (max 5 car.) :", self.mod_name_input)
-        
+        nf.addRow("Nom (max 5 car.) :", self.mod_name_input)
+
         self.physics_combo = QComboBox()
         self.physics_combo.addItems(["MECAx", "THERx", "HYDRx"])
-        new_form.addRow("Physique :", self.physics_combo)
-        
+        nf.addRow("Physique :", self.physics_combo)
+
         self.element_combo = QComboBox()
         self.element_combo.currentTextChanged.connect(self._on_element_changed)
-        new_form.addRow("Élément fini :", self.element_combo)
-        
-        self.element_info = QLabel()
-        self.element_info.setWordWrap(True)
-        self.element_info.setStyleSheet("background-color: #f0f0f0; padding: 8px; border-radius: 5px; font-size: 9pt;")
-        new_form.addRow("", self.element_info)
-        
-        self.new_mod_group.setLayout(new_form)
+        nf.addRow("Élément fini :", self.element_combo)
+
+        self.element_info_label = QLabel()
+        self.element_info_label.setWordWrap(True)
+        self.element_info_label.setStyleSheet(
+            "background: #f5f5f5; padding: 6px; border-radius: 4px; font-size: 9pt;"
+        )
+        nf.addRow("", self.element_info_label)
+
+        self.anisotropy_combo = QComboBox()
+        self.anisotropy_combo.addItems(_ANISOTROPY)
+        nf.addRow("Anisotropie :", self.anisotropy_combo)
+
+        self.kinematic_combo = QComboBox()
+        self.kinematic_combo.addItems(_KINEMATIC)
+        nf.addRow("Cinématique :", self.kinematic_combo)
+
+        self.formulation_combo = QComboBox()
+        self.formulation_combo.addItems(_FORMULATION)
+        nf.addRow("Formulation :", self.formulation_combo)
+
+        self.mass_combo = QComboBox()
+        self.mass_combo.addItems(_MASS_STORAGE)
+        nf.addRow("Stockage masse :", self.mass_combo)
+
+        self.new_mod_group.setLayout(nf)
+        self.new_mod_group.setVisible(False)
         layout.addWidget(self.new_mod_group)
-        
-        # Modèle existant
-        self.exist_mod_group = QGroupBox("Modèle existant")
-        exist_form = QFormLayout()
-        
-        self.existing_combo = QComboBox()
-        exist_form.addRow("Sélectionner :", self.existing_combo)
-        
-        self.exist_mod_group.setLayout(exist_form)
-        self.exist_mod_group.setVisible(False)
-        layout.addWidget(self.exist_mod_group)
-        
+
         layout.addStretch()
         self.setLayout(layout)
 
     def _toggle_mode(self, create_new):
-        """Bascule entre nouveau/existant"""
         self.new_mod_group.setVisible(create_new)
-        self.exist_mod_group.setVisible(not create_new)
+        self.existing_group.setEnabled(not create_new)
 
     def _on_element_changed(self, element):
-        """Met à jour l'info de l'élément"""
-        infos = {
-            # 2D
-            "T3xxx": "Triangle à 3 nœuds (linéaire)",
-            "T6xxx": "Triangle à 6 nœuds (quadratique)",
-            "Q4xxx": "Quadrangle à 4 nœuds (bilinéaire)",
-            "Q8xxx": "Quadrangle à 8 nœuds (biquadratique)",
-            "Q9xxx": "Quadrangle à 9 nœuds (biquadratique complet)",
-            # 3D
-            "H8xxx": "Hexaèdre à 8 nœuds (trilinéaire)",
-            "H20xx": "Hexaèdre à 20 nœuds (triquadratique)",
-            "TE10x": "Tétraèdre à 10 nœuds (quadratique)",
-            "SHB8x": "Hexaèdre SHB8 à 8 nœuds (solide-coque)",
-            "SHB6x": "Prisme SHB6 à 6 nœuds (solide-coque)"
-        }
-        self.element_info.setText(infos.get(element, ""))
+        self.element_info_label.setText(_ELEMENT_INFO.get(element, ""))
 
     def initializePage(self):
-        """Charge les modèles selon la dimension"""
-        wizard = self.wizard()
-        dim_page = wizard.page(MeshWizard.PAGE_DIMENSION)
+        wizard    = self.wizard()
+        dim_page  = wizard.page(MeshWizard.PAGE_DIM)
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        
-        # Remplir les éléments disponibles
+
+        # Éléments compatibles avec la dimension
+        self.element_combo.blockSignals(True)
         self.element_combo.clear()
+        self.element_combo.addItems(_ELEMENTS_2D if dimension == 2 else _ELEMENTS_3D)
+        self.element_combo.blockSignals(False)
+        self._on_element_changed(self.element_combo.currentText())
+
+        # Modèles existants compatibles
+        models    = wizard.controller.get_models()
+        compat    = [m for m in models if m.dimension == dimension]
+        self.existing_mod_combo.clear()
+        if compat:
+            self.existing_mod_combo.addItems([m.name for m in compat])
+            self.existing_group.setEnabled(True)
+            self.create_mod_check.setChecked(False)
+            self._toggle_mode(False)
+        else:
+            self.existing_mod_combo.addItem(f"(Aucun modèle {dimension}D)")
+            self.existing_group.setEnabled(False)
+            self.create_mod_check.setChecked(True)
+            self._toggle_mode(True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 4 — Géométrie
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class MeshGeometryPage(QWizardPage):
+
+    def __init__(self):
+        super().__init__()
+        self.setTitle("📏 Géométrie")
+        self.setSubTitle("Définissez la forme et les dimensions de votre corps.")
+
+        # Un seul QFormLayout pour toute la page
+        self.form = QFormLayout()
+        self.form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)
+
+        self.geom_type_combo = QComboBox()
+        self.geom_type_combo.currentTextChanged.connect(self._on_type_changed)
+        self.form.addRow("Forme :", self.geom_type_combo)
+
+        self.cx_spin = QDoubleSpinBox()
+        self.cx_spin.setRange(-1000.0, 1000.0); self.cx_spin.setDecimals(4)
+        self.form.addRow("Centre X (m) :", self.cx_spin)
+
+        self.cy_spin = QDoubleSpinBox()
+        self.cy_spin.setRange(-1000.0, 1000.0); self.cy_spin.setDecimals(4)
+        self.form.addRow("Centre Y (m) :", self.cy_spin)
+
+        self.cz_spin = QDoubleSpinBox()
+        self.cz_spin.setRange(-1000.0, 1000.0); self.cz_spin.setDecimals(4)
+        self.form.addRow("Centre Z (m) :", self.cz_spin)
+
+        self.lx_spin = QDoubleSpinBox()
+        self.lx_spin.setRange(1e-6, 1e6); self.lx_spin.setDecimals(4)
+        self.lx_spin.setValue(1.0); self.lx_spin.setSuffix(" m")
+        self.form.addRow("Longueur X (lx) :", self.lx_spin)
+
+        self.ly_spin = QDoubleSpinBox()
+        self.ly_spin.setRange(1e-6, 1e6); self.ly_spin.setDecimals(4)
+        self.ly_spin.setValue(1.0); self.ly_spin.setSuffix(" m")
+        self.form.addRow("Longueur Y (ly) :", self.ly_spin)
+
+        self.lz_spin = QDoubleSpinBox()
+        self.lz_spin.setRange(1e-6, 1e6); self.lz_spin.setDecimals(4)
+        self.lz_spin.setValue(1.0); self.lz_spin.setSuffix(" m")
+        self.form.addRow("Longueur Z (lz) :", self.lz_spin)
+
+        self.radius_spin = QDoubleSpinBox()
+        self.radius_spin.setRange(1e-6, 1e6); self.radius_spin.setDecimals(4)
+        self.radius_spin.setValue(0.5); self.radius_spin.setSuffix(" m")
+        self.form.addRow("Rayon (r) :", self.radius_spin)
+
+        self.height_spin = QDoubleSpinBox()
+        self.height_spin.setRange(1e-6, 1e6); self.height_spin.setDecimals(4)
+        self.height_spin.setValue(1.0); self.height_spin.setSuffix(" m")
+        self.form.addRow("Hauteur (h) :", self.height_spin)
+
+        file_widget = QWidget()
+        file_layout = QHBoxLayout(file_widget)
+        file_layout.setContentsMargins(0, 0, 0, 0)
+        self.file_path_input = QLineEdit()
+        self.file_path_input.setPlaceholderText("chemin/vers/maillage.msh")
+        file_layout.addWidget(self.file_path_input)
+        browse_btn = QPushButton("📁 Parcourir")
+        browse_btn.clicked.connect(self._browse_file)
+        file_layout.addWidget(browse_btn)
+        self.form.addRow("Fichier maillage :", file_widget)
+
+        layout = QVBoxLayout()
+        layout.addLayout(self.form)
+        layout.addStretch()
+        self.setLayout(layout)
+
+    def _browse_file(self):
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Sélectionner un fichier maillage",
+            "", "Maillages (*.msh *.vtk *.mesh);;Tous (*)"
+        )
+        if filepath:
+            self.file_path_input.setText(filepath)
+
+    def _set_row_visible(self, label_text, visible):
+        for i in range(self.form.rowCount()):
+            lbl = self.form.itemAt(i, QFormLayout.ItemRole.LabelRole)
+            fld = self.form.itemAt(i, QFormLayout.ItemRole.FieldRole)
+            if lbl and lbl.widget() and lbl.widget().text() == label_text:
+                lbl.widget().setVisible(visible)
+                if fld and fld.widget():
+                    fld.widget().setVisible(visible)
+
+    def _on_type_changed(self, geom_type):
+        is_rect     = geom_type == "Rectangle"
+        is_box      = geom_type == "Boîte (H8)"
+        is_disk     = geom_type == "Disque"
+        is_sphere   = geom_type == "Sphère"
+        is_cylinder = geom_type == "Cylindre"
+        is_file     = geom_type == "Fichier externe"
+
+        self._set_row_visible("Longueur X (lx) :", is_rect or is_box)
+        self._set_row_visible("Longueur Y (ly) :", is_rect or is_box)
+        self._set_row_visible("Longueur Z (lz) :", is_box)
+        self._set_row_visible("Rayon (r) :",       is_disk or is_sphere or is_cylinder)
+        self._set_row_visible("Hauteur (h) :",     is_cylinder)
+        self._set_row_visible("Fichier maillage :", is_file)
+
+    def initializePage(self):
+        wizard    = self.wizard()
+        dim_page  = wizard.page(MeshWizard.PAGE_DIM)
+        dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
+
+        self.geom_type_combo.blockSignals(True)
+        self.geom_type_combo.clear()
         if dimension == 2:
-            self.element_combo.addItems(["T3xxx", "T6xxx", "Q4xxx", "Q8xxx", "Q9xxx"])
+            self.geom_type_combo.addItems(["Rectangle", "Disque", "Fichier externe"])
         else:
-            self.element_combo.addItems(["H8xxx", "H20xx", "TE10x", "SHB8x", "SHB6x"])
-        
-        # Charger modèles existants
-        models = wizard.controller.get_models()
-        self.existing_combo.clear()
-        if models:
-            compatible_models = [m for m in models if m.dimension == dimension]
-            if compatible_models:
-                self.existing_combo.addItems([m.name for m in compatible_models])
-            else:
-                self.existing_combo.addItem(f"(Aucun modèle {dimension}D)")
-        else:
-            self.existing_combo.addItem("(Aucun modèle)")
-class BoundaryConditionsPage(QWizardPage):
-    """Page des conditions aux limites"""
+            self.geom_type_combo.addItems(["Boîte (H8)", "Sphère", "Cylindre", "Fichier externe"])
+        self.geom_type_combo.blockSignals(False)
+
+        self._set_row_visible("Centre Z (m) :", dimension == 3)
+        self._on_type_changed(self.geom_type_combo.currentText())
+
+    def get_center(self, dimension):
+        if dimension == 2:
+            return [self.cx_spin.value(), self.cy_spin.value()]
+        return [self.cx_spin.value(), self.cy_spin.value(), self.cz_spin.value()]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 5 — Raffinement
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class MeshRefinementPage(QWizardPage):
+
+    def __init__(self):
+        super().__init__()
+        self.setTitle("🔢 Raffinement du maillage")
+        self.setSubTitle("Définissez la finesse du maillage.")
+
+        self.form = QFormLayout()
+
+        self.mesh_type_combo = QComboBox()
+        self.mesh_type_combo.addItems(_MESH_TYPES_2D)
+        self.mesh_type_combo.currentTextChanged.connect(self._on_mesh_type_changed)
+        self.form.addRow("Type structuré :", self.mesh_type_combo)
+
+        self.mesh_type_info = QLabel()
+        self.mesh_type_info.setWordWrap(True)
+        self.mesh_type_info.setStyleSheet("color: gray; font-size: 9pt;")
+        self.form.addRow("", self.mesh_type_info)
+
+        self.nx_spin = QSpinBox()
+        self.nx_spin.setRange(1, 500); self.nx_spin.setValue(10)
+        self.form.addRow("Éléments en X (nx) :", self.nx_spin)
+
+        self.ny_spin = QSpinBox()
+        self.ny_spin.setRange(1, 500); self.ny_spin.setValue(10)
+        self.form.addRow("Éléments en Y (ny) :", self.ny_spin)
+
+        self.nz_spin = QSpinBox()
+        self.nz_spin.setRange(1, 500); self.nz_spin.setValue(5)
+        self.form.addRow("Éléments en Z (nz) :", self.nz_spin)
+
+        self.nr_spin = QSpinBox()
+        self.nr_spin.setRange(2, 200); self.nr_spin.setValue(5)
+        self.form.addRow("Éléments radiaux (nr) :", self.nr_spin)
+
+        self.ntheta_spin = QSpinBox()
+        self.ntheta_spin.setRange(4, 200); self.ntheta_spin.setValue(16)
+        self.form.addRow("Éléments angulaires (ntheta) :", self.ntheta_spin)
+
+        self.nphi_spin = QSpinBox()
+        self.nphi_spin.setRange(4, 200); self.nphi_spin.setValue(8)
+        self.form.addRow("Éléments en phi (nphi) :", self.nphi_spin)
+
+        self.count_label = QLabel()
+        self.count_label.setStyleSheet(
+            "background: #e8f5e9; padding: 6px; border-radius: 4px; font-weight: bold;"
+        )
+
+        for spin in (self.nx_spin, self.ny_spin, self.nz_spin,
+                     self.nr_spin, self.ntheta_spin, self.nphi_spin):
+            spin.valueChanged.connect(self._update_count)
+
+        layout = QVBoxLayout()
+        layout.addLayout(self.form)
+        layout.addWidget(self.count_label)
+        layout.addStretch()
+        self.setLayout(layout)
+
+    def _set_row_visible(self, label_text, visible):
+        for i in range(self.form.rowCount()):
+            lbl = self.form.itemAt(i, QFormLayout.ItemRole.LabelRole)
+            fld = self.form.itemAt(i, QFormLayout.ItemRole.FieldRole)
+            if lbl and lbl.widget() and lbl.widget().text() == label_text:
+                lbl.widget().setVisible(visible)
+                if fld and fld.widget():
+                    fld.widget().setVisible(visible)
+
+    def _on_mesh_type_changed(self, t):
+        infos = {
+            "Q4":  "Quadrangles bilinéaires à 4 nœuds",
+            "2T3": "Triangles à 3 nœuds (Q4 coupé en 2)",
+            "4T3": "Triangles à 3 nœuds (Q4 coupé en 4)",
+            "Q8":  "Quadrangles serendipity à 8 nœuds",
+        }
+        self.mesh_type_info.setText(infos.get(t, ""))
+
+    def _update_count(self):
+        wizard = self.wizard()
+        if wizard is None:
+            return
+        geom_page = wizard.page(MeshWizard.PAGE_GEOM)
+        geom_type = geom_page.geom_type_combo.currentText() if geom_page else ""
+        counts = {
+            "Rectangle":  self.nx_spin.value() * self.ny_spin.value(),
+            "Disque":     self.nr_spin.value() * self.ntheta_spin.value(),
+            "Boîte (H8)": self.nx_spin.value() * self.ny_spin.value() * self.nz_spin.value(),
+            "Sphère":     self.nr_spin.value() * self.ntheta_spin.value() * self.nphi_spin.value(),
+            "Cylindre":   self.nr_spin.value() * self.ntheta_spin.value() * self.nz_spin.value(),
+        }
+        n = counts.get(geom_type, 0)
+        self.count_label.setText(f"📊 Éléments estimés : {n}")
+
+    def initializePage(self):
+        wizard    = self.wizard()
+        geom_page = wizard.page(MeshWizard.PAGE_GEOM)
+        geom_type = geom_page.geom_type_combo.currentText() if geom_page else ""
+
+        # Type structuré uniquement pour Rectangle
+        self._set_row_visible("Type structuré :", geom_type == "Rectangle")
+        self._set_row_visible("", geom_type == "Rectangle")  # ligne info
+
+        visible_map = {
+            "Rectangle":  ["Éléments en X (nx) :", "Éléments en Y (ny) :"],
+            "Disque":     ["Éléments radiaux (nr) :", "Éléments angulaires (ntheta) :"],
+            "Boîte (H8)": ["Éléments en X (nx) :", "Éléments en Y (ny) :", "Éléments en Z (nz) :"],
+            "Sphère":     ["Éléments radiaux (nr) :", "Éléments angulaires (ntheta) :", "Éléments en phi (nphi) :"],
+            "Cylindre":   ["Éléments radiaux (nr) :", "Éléments angulaires (ntheta) :", "Éléments en Z (nz) :"],
+        }
+        all_rows = [
+            "Éléments en X (nx) :", "Éléments en Y (ny) :", "Éléments en Z (nz) :",
+            "Éléments radiaux (nr) :", "Éléments angulaires (ntheta) :", "Éléments en phi (nphi) :",
+        ]
+        to_show = set(visible_map.get(geom_type, []))
+        for label in all_rows:
+            self._set_row_visible(label, label in to_show)
+
+        self._on_mesh_type_changed(self.mesh_type_combo.currentText())
+        self._update_count()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 6 — Boundary Conditions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class MeshBoundaryPage(QWizardPage):
+    """
+    Page des conditions aux limites — UI uniquement, sans application effective.
+    Les sélections sont mémorisées pour le récapitulatif ; l'application
+    se fait ensuite via l'onglet DOF.
+    """
+
     def __init__(self):
         super().__init__()
         self.setTitle("🔒 Conditions aux Limites")
-        self.setSubTitle("Définissez les conditions aux limites du maillage.")
-        
-        layout = QVBoxLayout()
-        
+        self.setSubTitle(
+            "Notez les conditions souhaitées — à appliquer via l'onglet DOF."
+        )
+
+        self.form = QFormLayout()
+
         info = QLabel(
-            "💡 <b>Les conditions aux limites seront appliquées au maillage.</b><br>"
-            "Vous pourrez les modifier plus tard dans l'onglet DOF."
+            "ℹ️ Ces sélections sont enregistrées en mémo uniquement.<br>"
+            "Utilisez l'<b>onglet DOF</b> pour les appliquer sur les groupes "
+            "<code>down</code>, <code>up</code>, <code>left</code>, <code>right</code>"
+            " (+ <code>front</code>, <code>rear</code> en 3D)."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("background-color: #e3f2fd; padding: 10px; border-radius: 5px;")
-        layout.addWidget(info)
-        
+        info.setStyleSheet("color: #1a5276; font-size: 9pt;")
+        self.form.addRow(info)
+
         # Fixations
-        fix_group = QGroupBox("Fixations (conditions de Dirichlet)")
-        fix_layout = QVBoxLayout()
-        
-        self.fix_bottom_check = QCheckBox("Fixer le bord inférieur (y = y_min)")
-        self.fix_bottom_check.setChecked(True)
-        fix_layout.addWidget(self.fix_bottom_check)
-        
-        self.fix_top_check = QCheckBox("Fixer le bord supérieur (y = y_max)")
-        fix_layout.addWidget(self.fix_top_check)
-        
-        self.fix_left_check = QCheckBox("Fixer le bord gauche (x = x_min)")
-        fix_layout.addWidget(self.fix_left_check)
-        
-        self.fix_right_check = QCheckBox("Fixer le bord droit (x = x_max)")
-        fix_layout.addWidget(self.fix_right_check)
-        
-        fix_group.setLayout(fix_layout)
-        layout.addWidget(fix_group)
-        
-        # Chargements
-        load_group = QGroupBox("Chargements (conditions de Neumann)")
-        load_layout = QVBoxLayout()
-        
-        self.apply_load_check = QCheckBox("Appliquer un chargement")
-        load_layout.addWidget(self.apply_load_check)
-        
-        load_params = QFormLayout()
-        
+        self.fix_bottom_check = QCheckBox("Bord inférieur  (down)")
+        self.form.addRow("Fixer :", self.fix_bottom_check)
+
+        self.fix_top_check = QCheckBox("Bord supérieur  (up)")
+        self.form.addRow("", self.fix_top_check)
+
+        self.fix_left_check = QCheckBox("Bord gauche  (left)")
+        self.form.addRow("", self.fix_left_check)
+
+        self.fix_right_check = QCheckBox("Bord droit  (right)")
+        self.form.addRow("", self.fix_right_check)
+
+        self.fix_front_check = QCheckBox("Face avant  (front)  — 3D")
+        self.form.addRow("", self.fix_front_check)
+
+        self.fix_rear_check = QCheckBox("Face arrière  (rear)  — 3D")
+        self.form.addRow("", self.fix_rear_check)
+
+        # Chargement
+        self.apply_load_check = QCheckBox("Activer")
+        self.form.addRow("Chargement :", self.apply_load_check)
+
+        self.load_face_combo = QComboBox()
+        self.load_face_combo.addItems(["down", "up", "left", "right", "front", "rear"])
+        self.form.addRow("Groupe cible :", self.load_face_combo)
+
         self.load_value_spin = QDoubleSpinBox()
-        self.load_value_spin.setRange(-1e6, 1e6)
-        self.load_value_spin.setValue(1000)
-        self.load_value_spin.setSuffix(" N")
-        load_params.addRow("Valeur :", self.load_value_spin)
-        
+        self.load_value_spin.setRange(-1e9, 1e9)
+        self.load_value_spin.setSuffix(" N/m²")
+        self.form.addRow("Valeur :", self.load_value_spin)
+
         self.load_direction_combo = QComboBox()
         self.load_direction_combo.addItems(["X", "Y", "Z"])
-        load_params.addRow("Direction :", self.load_direction_combo)
-        
-        load_layout.addLayout(load_params)
-        
-        load_group.setLayout(load_layout)
-        layout.addWidget(load_group)
-        
-        note = QLabel(
-            "⚠️ <b>Note :</b> L'application des conditions aux limites nécessite "
-            "une implémentation spécifique dans le code pylmgc90 (TODO)."
-        )
-        note.setWordWrap(True)
-        note.setStyleSheet("color: #ff9800; background-color: #fff3cd; padding: 8px; border-radius: 5px;")
-        layout.addWidget(note)
-        
+        self.form.addRow("Direction :", self.load_direction_combo)
+
+        layout = QVBoxLayout()
+        layout.addLayout(self.form)
         layout.addStretch()
         self.setLayout(layout)
-class MeshSummaryPage(QWizardPage) : 
-    """Page de récapitulatif"""
+
+    def initializePage(self):
+        wizard    = self.wizard()
+        dim_page  = wizard.page(MeshWizard.PAGE_DIM)
+        is_3d     = not dim_page.dim_2d_radio.isChecked()
+        self.fix_front_check.setVisible(is_3d)
+        self.fix_rear_check.setVisible(is_3d)
+        self.load_face_combo.model().item(4).setEnabled(is_3d)
+        self.load_face_combo.model().item(5).setEnabled(is_3d)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Page 7 — Récapitulatif
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class MeshSummaryPage(QWizardPage):
+
     def __init__(self):
         super().__init__()
         self.setTitle("📋 Récapitulatif")
         self.setSubTitle("Vérifiez la configuration avant de générer le maillage.")
-        
+
         layout = QVBoxLayout()
-        
         self.summary_text = QTextEdit()
         self.summary_text.setReadOnly(True)
         layout.addWidget(self.summary_text)
-        
         self.setLayout(layout)
 
     def initializePage(self):
-        """Génère le récapitulatif"""
-        wizard = self.wizard()
-        
-        dim_page = wizard.page(MeshWizard.PAGE_DIMENSION)
-        mesh_type_page = wizard.page(MeshWizard.PAGE_MESH_TYPE)
-        geom_page = wizard.page(MeshWizard.PAGE_GEOMETRY)
-        mesh_params = wizard.page(MeshWizard.PAGE_MESH_PARAMS)
-        mat_page = wizard.page(MeshWizard.PAGE_MATERIAL)
-        mod_page = wizard.page(MeshWizard.PAGE_MODEL)
-        boundary_page = wizard.page(MeshWizard.PAGE_BOUNDARY)
-        
-        dimension = "2D" if dim_page.dim_2d_radio.isChecked() else "3D"
-        mesh_type = mesh_type_page.type_combo.currentText()
-        
-        summary = f"""
+        wizard     = self.wizard()
+        dim_page   = wizard.page(MeshWizard.PAGE_DIM)
+        mat_page   = wizard.page(MeshWizard.PAGE_MAT)
+        mod_page   = wizard.page(MeshWizard.PAGE_MODEL)
+        geom_page  = wizard.page(MeshWizard.PAGE_GEOM)
+        ref_page   = wizard.page(MeshWizard.PAGE_REFINE)
+        bound_page = wizard.page(MeshWizard.PAGE_BOUNDARY)
 
-<h2>🔷 Maillage Déformable {dimension}</h2>
-<h3>📐 Configuration</h3>
-<ul>
-<li><b>Dimension :</b> {dimension}</li>
-<li><b>Type de maillage :</b> {mesh_type}</li>
-<li><b>Centre :</b> {geom_page.get_center()}</li>
-</ul>
-<h3>📏 Géométrie</h3>
-"""
-        if mesh_type == "Rectangle":
-            summary += f"""
-<ul>
-<li><b>Largeur :</b> {geom_page.width_spin.value()} m</li>
-<li><b>Hauteur :</b> {geom_page.height_spin.value()} m</li>
-</ul>
-"""
-        elif mesh_type == "Cube":
-            summary += f"""
-<ul>
-<li><b>Dimensions :</b> {geom_page.lx_spin.value()} × {geom_page.ly_spin.value()} × {geom_page.lz_spin.value()} m</li>
-</ul>
-"""
-        elif mesh_type in ["Disque", "Sphère"]:
-            summary += f"""
-<ul>
-<li><b>Rayon :</b> {geom_page.radius_spin.value()} m</li>
-</ul>
-"""
-        elif mesh_type == "Cylindre":
-            summary += f"""
-<ul>
-<li><b>Rayon :</b> {geom_page.radius_spin.value()} m</li>
-<li><b>Hauteur :</b> {geom_page.lz_spin.value()} m</li>
-</ul>
-"""
-        elif mesh_type == "Fichier externe":
-            summary += f"""
-<ul>
-<li><b>Fichier :</b> {geom_page.file_path_input.text()}</li>
-</ul>
-"""
-        summary += "<h3>🔢 Raffinement</h3>"
-        
-        if mesh_type == "Rectangle":
-            count = mesh_params.nx_spin.value() * mesh_params.ny_spin.value()
-            summary += f"""
-<ul>
-<li><b>Éléments en X :</b> {mesh_params.nx_spin.value()}</li>
-<li><b>Éléments en Y :</b> {mesh_params.ny_spin.value()}</li>
-<li><b>Total estimé :</b> {count} éléments</li>
-</ul>
-"""
-        elif mesh_type == "Cube":
-            count = mesh_params.nx_spin.value() * mesh_params.ny_spin.value() * mesh_params.nz_spin.value()
-            summary += f"""
-<ul>
-<li><b>Éléments :</b> {mesh_params.nx_spin.value()} × {mesh_params.ny_spin.value()} × {mesh_params.nz_spin.value()}</li>
-<li><b>Total estimé :</b> {count} éléments</li>
-</ul>
-    """
-        summary += "<h3>🧱 Matériau</h3>"
-        
+        dimension  = "2D" if dim_page.dim_2d_radio.isChecked() else "3D"
+        geom_type  = geom_page.geom_type_combo.currentText()
+        mesh_type  = ref_page.mesh_type_combo.currentText() if dimension == "2D" else "H8"
+
+        # ── Géométrie ─────────────────────────────────────────────────────────
+        if geom_type in ("Rectangle", "Boîte (H8)"):
+            lx = geom_page.lx_spin.value()
+            ly = geom_page.ly_spin.value()
+            dims_html = f"<li><b>lx</b> = {lx:.4f} m &nbsp; <b>ly</b> = {ly:.4f} m"
+            if dimension == "3D":
+                lz = geom_page.lz_spin.value()
+                dims_html += f" &nbsp; <b>lz</b> = {lz:.4f} m"
+            dims_html += "</li>"
+        elif geom_type == "Disque":
+            dims_html = f"<li><b>Rayon :</b> {geom_page.radius_spin.value():.4f} m</li>"
+        elif geom_type == "Sphère":
+            dims_html = f"<li><b>Rayon :</b> {geom_page.radius_spin.value():.4f} m</li>"
+        elif geom_type == "Cylindre":
+            dims_html = (
+                f"<li><b>Rayon :</b> {geom_page.radius_spin.value():.4f} m &nbsp;"
+                f"<b>Hauteur :</b> {geom_page.height_spin.value():.4f} m</li>"
+            )
+        else:
+            dims_html = f"<li><b>Fichier :</b> {geom_page.file_path_input.text()}</li>"
+
+        cx = geom_page.cx_spin.value()
+        cy = geom_page.cy_spin.value()
+        center_str = f"({cx:.3f}, {cy:.3f}"
+        if dimension == "3D":
+            cz = geom_page.cz_spin.value()
+            center_str += f", {cz:.3f}"
+        center_str += ")"
+
+        # ── Raffinement ───────────────────────────────────────────────────────
+        if geom_type == "Rectangle":
+            n_elem = ref_page.nx_spin.value() * ref_page.ny_spin.value()
+            ref_html = (
+                f"<li>{ref_page.nx_spin.value()} × {ref_page.ny_spin.value()} "
+                f"= <b>{n_elem}</b> éléments estimés</li>"
+                f"<li>Type structuré : {ref_page.mesh_type_combo.currentText()}</li>"
+            )
+        elif geom_type == "Disque":
+            n_elem = ref_page.nr_spin.value() * ref_page.ntheta_spin.value()
+            ref_html = (
+                f"<li>nr = {ref_page.nr_spin.value()} &nbsp;"
+                f"ntheta = {ref_page.ntheta_spin.value()} "
+                f"→ <b>{n_elem}</b> éléments estimés</li>"
+            )
+        elif geom_type == "Boîte (H8)":
+            n_elem = ref_page.nx_spin.value() * ref_page.ny_spin.value() * ref_page.nz_spin.value()
+            ref_html = (
+                f"<li>{ref_page.nx_spin.value()} × {ref_page.ny_spin.value()} × "
+                f"{ref_page.nz_spin.value()} = <b>{n_elem}</b> éléments estimés</li>"
+            )
+        elif geom_type == "Sphère":
+            n_elem = ref_page.nr_spin.value() * ref_page.ntheta_spin.value() * ref_page.nphi_spin.value()
+            ref_html = (
+                f"<li>nr = {ref_page.nr_spin.value()} &nbsp;"
+                f"ntheta = {ref_page.ntheta_spin.value()} &nbsp;"
+                f"nphi = {ref_page.nphi_spin.value()} "
+                f"→ <b>{n_elem}</b> éléments estimés</li>"
+            )
+        elif geom_type == "Cylindre":
+            n_elem = ref_page.nr_spin.value() * ref_page.ntheta_spin.value() * ref_page.nz_spin.value()
+            ref_html = (
+                f"<li>nr = {ref_page.nr_spin.value()} &nbsp;"
+                f"ntheta = {ref_page.ntheta_spin.value()} &nbsp;"
+                f"nz = {ref_page.nz_spin.value()} "
+                f"→ <b>{n_elem}</b> éléments estimés</li>"
+            )
+        else:
+            ref_html = "<li>Maillage depuis fichier — raffinement non estimable</li>"
+
+        # ── Matériau ──────────────────────────────────────────────────────────
         if mat_page.create_mat_check.isChecked():
-            summary += f"""
-<ul>
-<li><b>Nom :</b> {mat_page.mat_name_input.text()}</li>
-<li><b>Type :</b> {mat_page.mat_type_combo.currentText()}</li>
-<li><b>Densité :</b> {mat_page.density_spin.value()} kg/m³</li>
-<li><b>Module de Young :</b> {mat_page.young_spin.value():.2e} Pa</li>
-<li><b>Coefficient de Poisson :</b> {mat_page.poisson_spin.value()}</li>
-</ul>
-"""
+            mat_html = (
+                f"<li><b>Nom :</b> {mat_page.mat_name_input.text()}</li>"
+                f"<li><b>Type :</b> {mat_page.mat_type_combo.currentText()}</li>"
+                f"<li><b>Densité :</b> {mat_page.density_spin.value():.1f} kg/m³</li>"
+                f"<li><b>Young :</b> {mat_page.young_spin.value():.3e} Pa &nbsp;"
+                f"<b>ν :</b> {mat_page.poisson_spin.value():.4f}</li>"
+            )
         else:
-            summary += f"<ul><li><b>Existant :</b> {mat_page.existing_combo.currentText()}</li></ul>"
-        summary += "<h3>⚙️ Modèle</h3>"
-    
+            mat_html = f"<li><b>Existant :</b> {mat_page.existing_mat_combo.currentText()}</li>"
+
+        # ── Modèle ────────────────────────────────────────────────────────────
         if mod_page.create_mod_check.isChecked():
-            summary += f"""
-<ul>
-<li><b>Nom :</b> {mod_page.mod_name_input.text()}</li>
-<li><b>Physique :</b> {mod_page.physics_combo.currentText()}</li>
-<li><b>Élément :</b> {mod_page.element_combo.currentText()}</li>
-</ul>
-"""
+            mod_html = (
+                f"<li><b>Nom :</b> {mod_page.mod_name_input.text()}</li>"
+                f"<li><b>Physique :</b> {mod_page.physics_combo.currentText()}</li>"
+                f"<li><b>Élément :</b> {mod_page.element_combo.currentText()} "
+                f"— {_ELEMENT_INFO.get(mod_page.element_combo.currentText(), '')}</li>"
+                f"<li><b>Anisotropie :</b> {mod_page.anisotropy_combo.currentText()} &nbsp;"
+                f"<b>Cinématique :</b> {mod_page.kinematic_combo.currentText()}</li>"
+                f"<li><b>Formulation :</b> {mod_page.formulation_combo.currentText()} &nbsp;"
+                f"<b>Masse :</b> {mod_page.mass_combo.currentText()}</li>"
+            )
         else:
-            summary += f"<ul><li><b>Existant :</b> {mod_page.existing_combo.currentText()}</li></ul>"
-        summary += "<h3>🔒 Conditions aux Limites</h3><ul>"
-        
-        if boundary_page.fix_bottom_check.isChecked():
-            summary += "<li>Bord inférieur fixé</li>"
-        if boundary_page.fix_top_check.isChecked():
-            summary += "<li>Bord supérieur fixé</li>"
-        if boundary_page.fix_left_check.isChecked():
-            summary += "<li>Bord gauche fixé</li>"
-        if boundary_page.fix_right_check.isChecked():
-            summary += "<li>Bord droit fixé</li>"
-        if boundary_page.apply_load_check.isChecked():
-            summary += f"<li>Charge appliquée : {boundary_page.load_value_spin.value()} N en {boundary_page.load_direction_combo.currentText()}</li>"
-        
-        if not any([
-            boundary_page.fix_bottom_check.isChecked(),
-            boundary_page.fix_top_check.isChecked(),
-            boundary_page.fix_left_check.isChecked(),
-            boundary_page.fix_right_check.isChecked(),
-            boundary_page.apply_load_check.isChecked()
-        ]):
-            summary += "<li><i>Aucune condition définie</i></li>"
-        
-        summary += "</ul>"
-        
-        summary += """
+            mod_html = f"<li><b>Existant :</b> {mod_page.existing_mod_combo.currentText()}</li>"
+
+        # ── Conditions aux Limites (mémo) ─────────────────────────────────────
+        cl_items = []
+        if bound_page.fix_bottom_check.isChecked():
+            cl_items.append("Bord inférieur (down) fixé")
+        if bound_page.fix_top_check.isChecked():
+            cl_items.append("Bord supérieur (up) fixé")
+        if bound_page.fix_left_check.isChecked():
+            cl_items.append("Bord gauche (left) fixé")
+        if bound_page.fix_right_check.isChecked():
+            cl_items.append("Bord droit (right) fixé")
+        if bound_page.fix_front_check.isChecked():
+            cl_items.append("Face avant (front) fixée")
+        if bound_page.fix_rear_check.isChecked():
+            cl_items.append("Face arrière (rear) fixée")
+        if bound_page.apply_load_check.isChecked():
+            cl_items.append(
+                f"Chargement {bound_page.load_value_spin.value():.2e} N/m² "
+                f"en {bound_page.load_direction_combo.currentText()} "
+                f"sur groupe '{bound_page.load_face_combo.currentText()}'"
+            )
+        if cl_items:
+            cl_html = "".join(f"<li>{item}</li>" for item in cl_items)
+        else:
+            cl_html = "<li><i>Aucune condition notée — à définir dans l'onglet DOF</i></li>"
+
+        html = f"""
+<h2>🔷 Corps Déformable {dimension}</h2>
+
+<h3>📐 Géométrie</h3>
+<ul>
+  <li><b>Forme :</b> {geom_type}</li>
+  <li><b>Type de maillage :</b> {mesh_type}</li>
+  {dims_html}
+  <li><b>Centre :</b> {center_str}</li>
+</ul>
+
+<h3>🔢 Raffinement</h3>
+<ul>
+  {ref_html}
+</ul>
+
+<h3>🧱 Matériau</h3>
+<ul>
+  {mat_html}
+</ul>
+
+<h3>⚙️ Modèle EF</h3>
+<ul>
+  {mod_html}
+</ul>
+
+<h3>🔒 Conditions aux Limites (mémo)</h3>
+<ul>
+  {cl_html}
+</ul>
+
 <hr>
-<h3 style='color: green;'>✅ Prêt à Générer !</h3>
-<p><b>Cliquez sur 'Générer Maillage' pour créer le maillage déformable.</b></p>
-<p><i>⚠️ La génération peut prendre quelques secondes selon la finesse du maillage.</i></p>
+<h3 style="color: green;">✅ Prêt à générer !</h3>
+<p><b>Cliquez sur « Générer le maillage » pour créer le corps déformable.</b></p>
+<p style="color: #888;">
+  ⚠️ La génération peut prendre quelques secondes selon la finesse du maillage.
+</p>
 """
-        self.summary_text.setHtml(summary)
+        self.summary_text.setHtml(html)

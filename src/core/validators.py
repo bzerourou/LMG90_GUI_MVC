@@ -47,7 +47,7 @@ class ModelValidator:
     """Valide les données de modèle"""
     
     VALID_ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
+    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx"]
     
     @staticmethod
     def validate(model: Model) -> Tuple[bool, str]:
@@ -111,8 +111,7 @@ class AvatarValidator:
     RIGID_ELEMENTS_3D = ["Rxx3D"]
     
     DEFORMABLE_ELEMENTS_2D = ["T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    DEFORMABLE_ELEMENTS_3D = ["H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
-    
+    DEFORMABLE_ELEMENTS_3D = ["H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx"]
 
     @staticmethod
     def validate(avatar: Avatar, model: Model) -> Tuple[bool, str]:
