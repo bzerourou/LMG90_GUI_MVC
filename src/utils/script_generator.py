@@ -139,6 +139,99 @@ class ScriptGenerator:
         mod = avatar.model_name
         color = avatar.color
         
+        # ── Corps déformable (MESH_DEFORMABLE) ───────────────────────────────
+        if atype == "mesh":
+            mp = avatar.mesh_params
+            if not mp:
+                f.write(f"# ⚠️  Corps déformable sans mesh_params — à recréer via le wizard\n\n")
+                return
+
+            geom = mp['geom']
+            dim  = mp['dim']
+            cx   = mp.get('cx', 0.0)
+            cy   = mp.get('cy', 0.0)
+            cz   = mp.get('cz', 0.0)
+
+            f.write(f"# Corps déformable — {geom}\n")
+
+            if geom == "Rectangle":
+                x0 = cx - mp['lx'] / 2.0
+                y0 = cy - mp['ly'] / 2.0
+                f.write(f"_surf = pre.buildMesh2D(\n")
+                f.write(f"    '{mp['mesh_type']}',\n")
+                f.write(f"    {x0}, {y0},\n")
+                f.write(f"    {mp['lx']}, {mp['ly']},\n")
+                f.write(f"    {mp['nx']}, {mp['ny']}\n")
+                f.write(f")\n")
+
+            elif geom == "Boîte (H8)":
+                x0 = cx - mp['lx'] / 2.0
+                y0 = cy - mp['ly'] / 2.0
+                z0 = cz - mp['lz'] / 2.0
+                f.write(f"_vol = pre.buildMeshH8(\n")
+                f.write(f"    {x0}, {y0}, {z0},\n")
+                f.write(f"    {mp['lx']}, {mp['ly']}, {mp['lz']},\n")
+                f.write(f"    {mp['nx']}, {mp['ny']}, {mp['nz']}\n")
+                f.write(f")\n")
+
+            elif geom == "Disque":
+                lc = round(2 * 3.14159 * mp['r'] / mp['ntheta'], 6)
+                f.write(f"import gmsh, tempfile, os\n")
+                f.write(f"gmsh.initialize(); gmsh.option.setNumber('General.Terminal', 0)\n")
+                f.write(f"gmsh.model.add('disk'); gmsh.model.occ.addDisk({cx}, {cy}, 0., {mp['r']}, {mp['r']})\n")
+                f.write(f"gmsh.model.occ.synchronize()\n")
+                f.write(f"gmsh.option.setNumber('Mesh.CharacteristicLengthMin', {lc})\n")
+                f.write(f"gmsh.option.setNumber('Mesh.CharacteristicLengthMax', {lc})\n")
+                f.write(f"gmsh.option.setNumber('Mesh.MshFileVersion', 2.2)\n")
+                f.write(f"gmsh.model.mesh.generate(2)\n")
+                f.write(f"_tmp = tempfile.mktemp(suffix='.msh'); gmsh.write(_tmp); gmsh.finalize()\n")
+                f.write(f"_surf = pre.readMesh(_tmp, 2); os.unlink(_tmp)\n")
+
+            elif geom == "Sphère":
+                lc = round(2 * 3.14159 * mp['r'] / mp['ntheta'], 6)
+                f.write(f"import gmsh, tempfile, os\n")
+                f.write(f"gmsh.initialize(); gmsh.option.setNumber('General.Terminal', 0)\n")
+                f.write(f"gmsh.model.add('sphere'); gmsh.model.occ.addSphere({cx}, {cy}, {cz}, {mp['r']})\n")
+                f.write(f"gmsh.model.occ.synchronize()\n")
+                f.write(f"gmsh.option.setNumber('Mesh.CharacteristicLengthMin', {lc})\n")
+                f.write(f"gmsh.option.setNumber('Mesh.CharacteristicLengthMax', {lc})\n")
+                f.write(f"gmsh.option.setNumber('Mesh.MshFileVersion', 2.2)\n")
+                f.write(f"gmsh.model.mesh.generate(3)\n")
+                f.write(f"_tmp = tempfile.mktemp(suffix='.msh'); gmsh.write(_tmp); gmsh.finalize()\n")
+                f.write(f"_vol = pre.readMesh(_tmp, 3); os.unlink(_tmp)\n")
+
+            elif geom == "Cylindre":
+                lc = round(2 * 3.14159 * mp['r'] / mp['ntheta'], 6)
+                z0 = cz - mp['h'] / 2.0
+                f.write(f"import gmsh, tempfile, os\n")
+                f.write(f"gmsh.initialize(); gmsh.option.setNumber('General.Terminal', 0)\n")
+                f.write(f"gmsh.model.add('cylinder')\n")
+                f.write(f"gmsh.model.occ.addCylinder({cx}, {cy}, {z0}, 0., 0., {mp['h']}, {mp['r']})\n")
+                f.write(f"gmsh.model.occ.synchronize()\n")
+                f.write(f"gmsh.option.setNumber('Mesh.CharacteristicLengthMin', {lc})\n")
+                f.write(f"gmsh.option.setNumber('Mesh.CharacteristicLengthMax', {lc})\n")
+                f.write(f"gmsh.option.setNumber('Mesh.MshFileVersion', 2.2)\n")
+                f.write(f"gmsh.model.mesh.generate(3)\n")
+                f.write(f"_tmp = tempfile.mktemp(suffix='.msh'); gmsh.write(_tmp); gmsh.finalize()\n")
+                f.write(f"_vol = pre.readMesh(_tmp, 3); os.unlink(_tmp)\n")
+
+            elif geom == "Fichier externe":
+                filepath = mp.get('filepath', '').replace('\\', '/')
+                f.write(f"_mesh = pre.readMesh('{filepath}', {dim})\n")
+
+            # buildMeshedAvatar commun à tous les cas
+            mesh_var = "_surf" if dim == 2 else "_vol"
+            if geom == "Fichier externe":
+                mesh_var = "_mesh"
+            f.write(f"body = pre.buildMeshedAvatar(\n")
+            f.write(f"    mesh={mesh_var},\n")
+            f.write(f"    model=mods['{mod}'],\n")
+            f.write(f"    material=mats['{mat}']\n")
+            f.write(f")\n")
+            f.write(f"{container}.addAvatar(body)\n")
+            f.write(f"bodies_list.append(body)\n\n")
+            return
+
         # emptyAvatar
         if atype == "emptyAvatar":
             f.write(f"# Avatar vide avec contacteurs personnalisés\n")
@@ -640,4 +733,4 @@ class ScriptGenerator:
         elif isinstance(value, np.ndarray):
             return value.tolist()
         else :      
-            return value            
+            return value
