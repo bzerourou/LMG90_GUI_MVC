@@ -25,6 +25,12 @@ class EmptyAvatarTab(BaseTab):
     avatar_created = pyqtSignal()
     avatar_updated = pyqtSignal()
     avatar_deleted = pyqtSignal()
+
+    
+    shapes_2d = ["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"]
+    shapes_3d = ["SPHER",  "PLANx", "CYLND", "DNLYC", "POLYR", "PT3Dx"]
+    mesh_shapes_2d = ["ALpxx", "CLxx" , "DISKL", "PT2TL"  ]  # contacteurs pour corps déformable 2d
+    mesh_shapes_3d = [ "ASpxx", "CSpxx", "PT3Dx"  ]  # contacteurs pour corps déformable 3d
     
     def __init__(self, controller: ProjectController):
         super().__init__(controller)
@@ -75,24 +81,49 @@ class EmptyAvatarTab(BaseTab):
         layout.addWidget(form_label)
         
         form = QFormLayout()
+
+        # ── Mode : Avatar vide ou Corps déformable ────────────────────────────
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Avatar vide (emptyAvatar)", "Corps déformable existant"])
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        form.addRow("Mode :", self.mode_combo)
+
+        # Sélecteur du corps déformable (visible en mode déformable uniquement)
+        self.deformable_combo = QComboBox()
+        self.deformable_label = QLabel("Corps déformable :")
+        form.addRow(self.deformable_label, self.deformable_combo)
+        self.deformable_label.setVisible(False)
+        self.deformable_combo.setVisible(False)
         
         self.dim_combo = QComboBox()
         self.dim_combo.addItems(["2", "3"])
         self.dim_combo.currentTextChanged.connect(self._on_dim_changed)
-        form.addRow("Dimension :", self.dim_combo)
+        self._dim_label = QLabel("Dimension :")
+        form.addRow(self._dim_label, self.dim_combo)
         
         self.center_label = QLabel("Centre (x,y) :")
         self.center_input = QLineEdit("0.0, 0.0")
         form.addRow(self.center_label, self.center_input)
         
         self.material_combo = QComboBox()
-        form.addRow("Matériau :", self.material_combo)
+        self._mat_label = QLabel("Matériau :")
+        form.addRow(self._mat_label, self.material_combo)
         
         self.model_combo = QComboBox()
-        form.addRow("Modèle :", self.model_combo)
+        self._mod_label = QLabel("Modèle :")
+        form.addRow(self._mod_label, self.model_combo)
         
         self.color_input = QLineEdit("BLUEx")
-        form.addRow("Couleur :", self.color_input)
+        self._color_label = QLabel("Couleur :")
+        form.addRow(self._color_label, self.color_input)
+        
+        # Champ groupe (visible en mode déformable uniquement)
+        self.group_input = QLineEdit()
+        self.group_input.setPlaceholderText("ex: 102  (laisser vide si aucun)")
+        self._group_label = QLabel("Groupe (group=) :")
+        form.addRow(self._group_label, self.group_input)
+        self._group_label.setVisible(False)
+        self.group_input.setVisible(False)
         
         layout.addLayout(form)
         
@@ -156,6 +187,66 @@ class EmptyAvatarTab(BaseTab):
             if widget:
                 widget.deleteLater()
         self._add_contactor_row()
+
+    def _on_mode_changed(self, index):
+        """Bascule entre mode emptyAvatar et mode corps déformable."""
+        is_deformable = (index == 1)
+
+        # Champs spécifiques emptyAvatar
+        for w in (self._dim_label, self.dim_combo,
+                  self.center_label, self.center_input,
+                  self._mat_label, self.material_combo,
+                  self._mod_label, self.model_combo,
+                  self._color_label, self.color_input):
+            w.setVisible(not is_deformable)
+
+        # Champs spécifiques déformable
+        self._dim_label.setVisible(True), self.dim_combo.setVisible(True),
+        self.deformable_label.setVisible(is_deformable)
+        self.deformable_combo.setVisible(is_deformable)
+        self._group_label.setVisible(is_deformable)
+        self.group_input.setVisible(is_deformable)
+
+        # Forme des contacteurs : ajouter ASpxx en mode déformable
+        self._refresh_contactor_shapes()
+
+        self.create_btn.setText(
+            "✅ Ajouter contacteurs au corps" if is_deformable else "✅ Créer Avatar Vide"
+        )
+
+    def _refresh_contactor_shapes(self):
+        """Met à jour les combos de forme dans toutes les lignes de contacteurs."""
+        is_deformable = self.mode_combo.currentIndex() == 1
+        dim = int(self.dim_combo.currentText()) if not is_deformable else 3
+
+        if dim == 2:
+            shapes = self.mesh_shapes_2d if is_deformable else self.shapes_2d
+        else:
+            shapes = self.mesh_shapes_3d if is_deformable else self.shapes_3d
+
+        for i in range(self.contactors_layout.count()):
+            widget = self.contactors_layout.itemAt(i).widget()
+            if not widget:
+                continue
+            row = widget.layout()
+            if not hasattr(row, 'shape_combo'):
+                continue
+            current = row.shape_combo.currentText()
+            row.shape_combo.blockSignals(True)
+            row.shape_combo.clear()
+            row.shape_combo.addItems(shapes)
+            if current in shapes:
+                row.shape_combo.setCurrentText(current)
+            row.shape_combo.blockSignals(False)
+
+        center_default = "0.0, 0.0" if dim == 2 else "0.0, 0.0, 0.0"
+        self.center_input.setText(center_default)
+        self.center_label.setText(f"Centre ({'x,y' if dim == 2 else 'x,y,z'}) :")
+        for i in reversed(range(self.contactors_layout.count())):
+            widget = self.contactors_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        self._add_contactor_row()
     
     def _add_contactor_row(self):
         row = QHBoxLayout()
@@ -164,10 +255,17 @@ class EmptyAvatarTab(BaseTab):
         
         shape_combo = QComboBox()
         dim = int(self.dim_combo.currentText())
-        if dim == 2:
-            shape_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        is_deformable = self.mode_combo.currentIndex() == 1
+        if dim ==2 and is_deformable:
+            shape_combo.addItems(self.mesh_shapes_2d)
+        elif dim == 3 and is_deformable:
+            shape_combo.addItems(self.mesh_shapes_3d)
         else:
-            shape_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
+
+            if dim == 2:
+                shape_combo.addItems(self.shapes_2d)
+            else:
+                shape_combo.addItems(self.shapes_3d)
 
         shape_combo.currentTextChanged.connect(
             lambda: self._on_contactor_type_changed(row)
@@ -202,7 +300,7 @@ class EmptyAvatarTab(BaseTab):
     def _on_contactor_type_changed(self, row):
         shape = row.shape_combo.currentText()
         
-        if shape in ["DISKx", "xKSID"]:
+        if shape in ["DISKx", "xKSID", "SPHER"]:
             row.params_input.setText("byrd=0.3")
             row.params_label.setText("Params (byrd) :")
         elif shape == "JONCx":
@@ -211,10 +309,20 @@ class EmptyAvatarTab(BaseTab):
         elif shape == "POLYG":
             row.params_input.setText("nb_vertices=4, vertices=[[-1.,-1.],[1.,-1.],[1.,1.],[-1.,1.]]")
             row.params_label.setText("Params (vertices) :")
-        elif shape == "PT2Dx":
+        elif shape in  ["PT2Dx", "PT3Dx", "PT2TL", "PT3Dx"]:
             row.params_input.setText("")
             row.params_label.setText("Params :")
-    
+        elif shape == "PLANx":
+            row.params_input.setText("axe1=1.0, axe2=1.0, axe3=0.1")
+            row.params_label.setText("Params (axes) :")
+        elif shape in [ "CYLND", "DNLYC"] :
+            row.params_input.setText("byrd=0.5, High=1.0")
+            row.params_label.setText("Params (radius, height) :")
+        elif shape == "POLYR":
+            row.params_input.setText("nb_vertices=4, vertices=[[-1.,-1.,-1.],[1.,-1.,-1.],[1.,1.,-1.],[-1.,1.,-1.],[-1.,-1.,1.],[1.,-1.,1.],[1.,1.,1.],[-1.,1.,1.]]")
+            row.params_label.setText("Params (vertices) :")
+        
+        
     def _remove_contactor_row(self, row):
         for i in range(self.contactors_layout.count()):
             widget = self.contactors_layout.itemAt(i).widget()
@@ -244,19 +352,75 @@ class EmptyAvatarTab(BaseTab):
     
     def _on_create(self):
         try:
-            avatar = self._build_avatar_from_form()
-            
-            idx = self.controller.add_avatar(avatar)
-            
-            self.avatar_created.emit()
-            self.refresh()
-            QMessageBox.information(self, "Succès", f"✅ Avatar vide #{idx} créé avec {len(avatar.contactors)} contacteur(s)")
-            #self._clear_form()
-            
+            if self.mode_combo.currentIndex() == 1:
+                self._add_contactors_to_deformable()
+            else:
+                avatar = self._build_avatar_from_form()
+                idx = self.controller.add_avatar(avatar)
+                self.avatar_created.emit()
+                self.refresh()
+                QMessageBox.information(self, "Succès", f"✅ Avatar vide #{idx} créé avec {len(avatar.contactors)} contacteur(s)")
         except ValidationError as e:
             QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+
+    def _add_contactors_to_deformable(self):
+        """Applique addContactors sur un corps déformable pylmgc90 existant."""
+        avatar_idx = self.deformable_combo.currentData()
+        if avatar_idx is None:
+            raise ValueError("Aucun corps déformable sélectionné.")
+
+        body_obj = self.controller._pylmgc_bodies[avatar_idx]
+        if body_obj is None:
+            raise ValueError("Corps pylmgc90 introuvable (non reconstruit ?).")
+
+        group = self.group_input.text().strip() or None
+        n_added = 0
+
+        for i in range(self.contactors_layout.count()):
+            widget = self.contactors_layout.itemAt(i).widget()
+            if not widget:
+                continue
+            row = widget.layout()
+            shape = row.shape_combo.currentText()
+            color = row.color_input.text().strip() or "BLEUx"
+            params_text = row.params_input.text().strip()
+
+            params = {}
+            if params_text:
+                params = self._parse_params(params_text)
+
+            kwargs = {'shape': shape, 'color': color, **params}
+            if group:
+                kwargs['group'] = group
+
+            body_obj.addContactors(**kwargs)
+            n_added += 1
+
+        # Mettre à jour les contacteurs dans l'avatar du state pour la sérialisation
+        avatar = self.controller.state.avatars[avatar_idx]
+        if avatar.contactors is None:
+            avatar.contactors = []
+        for i in range(self.contactors_layout.count()):
+            widget = self.contactors_layout.itemAt(i).widget()
+            if not widget:
+                continue
+            row = widget.layout()
+            params_text = row.params_input.text().strip()
+            params = self._parse_params(params_text) if params_text else {}
+            entry = {'shape': row.shape_combo.currentText(),
+                     'color': row.color_input.text().strip() or "BLEUx",
+                     'params': params}
+            if group:
+                entry['group'] = group
+            avatar.contactors.append(entry)
+
+        self.controller.state_changed.emit()
+        QMessageBox.information(self, "Succès",
+            f"✅ {n_added} contacteur(s) ajouté(s) au corps déformable #{avatar_idx}")
+
+    
     
     def _on_edit_from_tree(self):
         selected = self.tree.currentItem()
@@ -505,6 +669,14 @@ class EmptyAvatarTab(BaseTab):
         self.model_combo.clear()
         models = self.controller.get_models()
         self.model_combo.addItems([m.name for m in models])
+
+        # Peupler le combo des corps déformables
+        self.deformable_combo.clear()
+        for idx, av in enumerate(self.controller.state.avatars):
+            if av.avatar_type == AvatarType.MESH_DEFORMABLE:
+                mp = av.mesh_params or {}
+                label = f"#{idx} — {mp.get('geom','mesh')}  ({av.material_name}/{av.model_name})"
+                self.deformable_combo.addItem(label, idx)
         
         all_avatars = self.controller.state.avatars
         

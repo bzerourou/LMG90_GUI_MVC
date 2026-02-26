@@ -24,8 +24,8 @@ class ModelTab(QWidget):
     model_updated = pyqtSignal()
     model_deleted = pyqtSignal()
     
-    ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx"]
+    ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx", "SPRG2"]
+    ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx", "SPRG3" ]
     
     ELEMENT_OPTIONS = {
         "T3xxx": ["kinematic", "formulation", "mass_storage"],
@@ -34,6 +34,8 @@ class ModelTab(QWidget):
         "Q8xxx": ["kinematic", "formulation", "mass_storage"],
         "Q9xxx": ["kinematic", "formulation", "mass_storage"],
         "BARxx": ["kinematic", "formulation", "mass_storage"],
+        "SPRG2": ["kinematic", "formulation", "mass_storage"],
+        "SPRG3": ["kinematic", "formulation", "mass_storage"],
         "H8xxx": ["kinematic", "formulation", "mass_storage"],
         "SHB8x": ["kinematic", "formulation", "mass_storage"],  
         "H20xx": ["kinematic", "formulation", "mass_storage"], 
@@ -48,7 +50,8 @@ class ModelTab(QWidget):
         "mass_storage": ["lump_", "coher"],
         "material": ["elas_", "elasd", "J2iso", "J2mix", "kvisc"],
         "anisotropy": ["iso__", "ortho"],
-        "external_model": ["MatL_", "Demfi", "Umat_", "no___"],
+        "external_model": ["MatL_", "Demfi", "Umat_", "no___", "yes__"],
+        
     }
     
     def __init__(self, controller: ProjectController):
@@ -250,6 +253,8 @@ class ModelTab(QWidget):
         """Crée un modèle"""
         try:
             options = {k: v.currentText() for k, v in self.option_combos.items() if v.currentText()}
+            if self.element_combo.currentText() in ["SPRG2", "SPRG3"]:
+                options['discrete'] = "yes__"
             
             model = Model(
                 name=self.name_input.text().strip(),

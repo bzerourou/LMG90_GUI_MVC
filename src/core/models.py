@@ -51,6 +51,9 @@ class MaterialType(Enum):
     ELAS_PLAS = "ELAS_PLAS"
     THERMO_ELAS = "THERMO_ELAS"
     PORO_ELAS = "PORO_ELAS"
+    DISCRETE = "DISCRETE"
+    USER_MAT = "USER_MAT"
+    EXTERNAL = "EXTERNAL"
 
 
 class AvatarType(Enum):
@@ -76,15 +79,88 @@ class AvatarType(Enum):
     GRANULO_ROUGH_WALL_3D = "granuloRoughWall3D"
     
 class ContactLawType(Enum):
-    """Types de lois de contact"""
-    IQS_CLB = "IQS_CLB"
-    IQS_CLB_G0 = "IQS_CLB_g0"
-    COUPLED_DOF = "COUPLED_DOF"
-    IQS_DS_CLB = "IQS_DS_CLB"                    
-    IQS_MOHR_DS_CLB = "IQS_MOHR_DS_CLB"          
-    IQS_MAC_CZM = "IQS_MAC_CZM"                  
-    ELASTIC_WIRE = "ELASTIC_WIRE"                
-    ELASTIC_REPELL_CLB = "ELASTIC_REPELL_CLB"    
+    """Types de lois de contact pylmgc90"""
+    # Rigide / Rigide
+    IQS_CLB          = "IQS_CLB"
+    IQS_CLB_G0       = "IQS_CLB_g0"
+    IQS_DS_CLB       = "IQS_DS_CLB"
+    IQS_MOHR_DS_CLB  = "IQS_MOHR_DS_CLB"
+    IQS_MAC_CZM      = "IQS_MAC_CZM"
+    RST_CLB          = "RST_CLB"
+    # Rigide / Déformable  ou  Déformable / Déformable
+    GAP_SGR_CLB      = "GAP_SGR_CLB"
+    GAP_SGR_CLB_G0   = "GAP_SGR_CLB_g0"
+    GAP_MOHR_DS_CLB  = "GAP_MOHR_DS_CLB"
+    MAC_CZM          = "MAC_CZM"
+    MAL_CZM          = "MAL_CZM"
+    # Point / Point
+    ELASTIC_WIRE     = "ELASTIC_WIRE"
+    BRITTLE_ELASTIC_WIRE = "BRITTLE_ELASTIC_WIRE"
+    ELASTIC_ROD      = "ELASTIC_ROD"
+    VOIGT_ROD        = "VOIGT_ROD"
+    # Any / Any
+    COUPLED_DOF        = "COUPLED_DOF"
+    NORMAL_COUPLED_DOF = "NORMAL_COUPLED_DOF"
+    ELASTIC_REPELL_CLB = "ELASTIC_REPELL_CLB"
+
+
+
+# ---------------------------------------------------------------------------
+# Classification des lois par catégorie de paires de contacteurs
+# Utilisé dans contact_tab pour filtrer le combo "Type" et dans les validators
+# ---------------------------------------------------------------------------
+
+#: Lois applicables entre deux corps rigides
+LAWS_RIGID_RIGID: list[str] = [
+    "IQS_CLB",
+    "IQS_CLB_g0",
+    "IQS_DS_CLB",
+    # lois cohésive
+    "IQS_MOHR_DS_CLB",
+    #modèle cohésif
+    "IQS_MAC_CZM",
+    #fr avec restitution
+    "RST_CLB",
+
+
+]
+
+#: Lois applicables entre rigide/déformable ou déformable/déformable
+LAWS_RIGID_DEFORMABLE: list[str] = [
+
+    "GAP_SGR_CLB",
+    "GAP_SGR_CLB_g0",
+    #loi cohésive
+    "GAP_MOHR_DS_CLB",
+    #modèle cohésif
+    "MAC_CZM",
+    "MAL_CZM"
+]
+
+#: Lois applicables entre contacteurs ponctuels (PT2Dx / PT3Dx / NODES)
+LAWS_POINT_POINT: list[str] = [
+    #cables
+    "ELASTIC_WIRE",
+    "BRITTLE_ELASTIC_WIRE",
+    #barre élastique
+    "ELASTIC_ROD",
+    "VOIGT_ROD" ,
+]
+
+#: Toutes les lois disponibles (any / any)
+LAWS_ANY_ANY: list[str] = [
+       "COUPLED_DOF",
+       "NORMAL_COUPLED_DOF",
+       "ELASTIC_REPELL_CLB",
+]
+
+#: Dictionnaire catégorie → liste de lois (utilisé dans contact_tab)
+CONTACT_LAW_CATEGORIES: dict[str, list[str]] = {
+    "Rigide / Rigide":               LAWS_RIGID_RIGID,
+    "Rigide / Déformable (ou Déf/Déf)": LAWS_RIGID_DEFORMABLE,
+    "Point / Point":                 LAWS_POINT_POINT,
+    "Toutes (any / any)":            LAWS_ANY_ANY,
+}  
 
 
 
@@ -699,4 +775,3 @@ class ProjectState:
             avatar_groups=data.get('avatar_groups', {}),
             dynamic_vars=data.get('dynamic_vars', {})
         )
-    

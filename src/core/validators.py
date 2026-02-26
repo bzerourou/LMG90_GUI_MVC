@@ -47,7 +47,7 @@ class ModelValidator:
     """Valide les données de modèle"""
     
     VALID_ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx"]
+    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
     
     @staticmethod
     def validate(model: Model) -> Tuple[bool, str]:
@@ -111,7 +111,8 @@ class AvatarValidator:
     RIGID_ELEMENTS_3D = ["Rxx3D"]
     
     DEFORMABLE_ELEMENTS_2D = ["T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    DEFORMABLE_ELEMENTS_3D = ["H8xxx", "SHB8x", "H20xx", "SHB6x", "TE4xx", "TE10x", "DKTxx", "BARxx"]
+    DEFORMABLE_ELEMENTS_3D = ["H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
+    
 
     @staticmethod
     def validate(avatar: Avatar, model: Model) -> Tuple[bool, str]:
@@ -345,51 +346,65 @@ class AvatarValidator:
 
 class ContactLawValidator:
     """Valide les lois de contact"""
-    
+
+    # Lois qui nécessitent un coefficient de friction
+    _FRICTION_REQUIRED = {
+        "IQS_CLB",
+        "IQS_CLB_g0",
+        "IQS_DS_CLB",
+        "IQS_MOHR_DS_CLB",
+        "RST_CLB",
+        "GAP_SGR_CLB",
+        "GAP_SGR_CLB_g0",
+        "GAP_MOHR_DS_CLB",
+        "ELASTIC_REPELL_CLB",
+    }
+
+    # Lois sans friction ni propriétés obligatoires (validation triviale = nom seul)
+    _NO_PARAMS = {
+        "COUPLED_DOF",
+        "NORMAL_COUPLED_DOF",
+    }
+
+    # Propriétés obligatoires par type de loi
+    _REQUIRED_PROPS = {
+        "IQS_DS_CLB":       ["stfr", "dyfr"],
+        "IQS_MOHR_DS_CLB":  ["stfr", "dyfr", "cohn", "coht"],
+        "IQS_MAC_CZM":      ["stfr", "dyfr", "cn", "ct", "b", "w"],
+        "GAP_MOHR_DS_CLB":  ["stfr", "dyfr", "cohn", "coht"],
+        "MAC_CZM":          ["stfr", "dyfr", "cn", "ct", "b", "w"],
+        "MAL_CZM":          ["stfr", "dyfr", "cn", "ct", "s1", "s2", "G1", "G2"],
+        "ELASTIC_WIRE":     ["stiffness", "prestrain"],
+        "BRITTLE_ELASTIC_WIRE": ["stiffness", "prestrain", "Fmax"],
+        "ELASTIC_ROD":      ["stiffness", "prestrain"],
+        "VOIGT_ROD":        ["stiffness", "viscosity", "prestrain"],
+        "ELASTIC_REPELL_CLB": ["stiffness"],
+        "RST_CLB":          ["rstn", "rstt"],
+    }
+
     @staticmethod
     def validate(law: ContactLaw) -> Tuple[bool, str]:
         """Valide une loi de contact"""
         if not law.name or not law.name.strip():
             return False, "Le nom de la loi ne peut pas être vide"
-        
-        from .models import ContactLawType
-        
-        friction_required = [
-            ContactLawType.IQS_CLB, 
-            ContactLawType.IQS_CLB_G0,
-            ContactLawType.IQS_DS_CLB,           
-            ContactLawType.IQS_MOHR_DS_CLB,      
-            ContactLawType.ELASTIC_REPELL_CLB    
-        ]
-        
-        if law.law_type in friction_required:
+
+        law_value = law.law_type.value.strip()
+
+        # Vérification friction
+        if law_value in ContactLawValidator._FRICTION_REQUIRED:
             if law.friction is None:
-                return False, f"Friction requise pour {law.law_type.value}"
+                return False, f"Friction requise pour {law_value}"
             if law.friction < 0:
-                return False, "Le coefficient de friction doit être positif"
-        
-        if law.law_type == ContactLawType.IQS_DS_CLB:
-            if 'stfr' not in law.properties or 'dyfr' not in law.properties:
-                return False, "IQS_DS_CLB nécessite stfr et dyfr"
-        
-        elif law.law_type == ContactLawType.IQS_MOHR_DS_CLB:
-            required = ['stfr', 'dyfr', 'cohn', 'coht']
-            missing = [p for p in required if p not in law.properties]
-            if missing:
-                return False, f"IQS_MOHR_DS_CLB nécessite: {', '.join(missing)}"
-        
-        elif law.law_type == ContactLawType.IQS_MAC_CZM:
-            required = ['stfr', 'dyfr', 'cn', 'ct', 'b', 'w']
-            missing = [p for p in required if p not in law.properties]
-            if missing:
-                return False, f"IQS_MAC_CZM nécessite: {', '.join(missing)}"
-        
-        elif law.law_type == ContactLawType.ELASTIC_WIRE:
-            if 'stiffness' not in law.properties or 'prestrain' not in law.properties:
-                return False, "ELASTIC_WIRE nécessite stiffness et prestrain"
-        
+                return False, f"Le coefficient de friction doit être positif ou nul ({law_value})"
+
+        # Vérification propriétés obligatoires
+        required = ContactLawValidator._REQUIRED_PROPS.get(law_value, [])
+        missing = [p for p in required if p not in law.properties]
+        if missing:
+            return False, f"{law_value} nécessite : {', '.join(missing)}"
+
         return True, ""
-    
+
     @staticmethod
     def validate_or_raise(law: ContactLaw) -> None:
         """Valide ou lève une exception"""

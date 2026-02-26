@@ -77,7 +77,7 @@ class VisibilityTab(BaseTab):
         candidate_form = QFormLayout()
         
         self.candidate_body_combo = QComboBox()
-        self.candidate_body_combo.addItems(["RBDY2", "RBDY3"])
+        self.candidate_body_combo.addItems(["RBDY2", "RBDY3", "MAILx", "MBS3D", "MBS2D"])
         candidate_form.addRow("Corps :", self.candidate_body_combo)
         
         self.candidate_contactor_combo = QComboBox()
@@ -93,7 +93,7 @@ class VisibilityTab(BaseTab):
         antagonist_form = QFormLayout()
         
         self.antagonist_body_combo = QComboBox()
-        self.antagonist_body_combo.addItems(["RBDY2", "RBDY3"])
+        self.antagonist_body_combo.addItems(["RBDY2", "RBDY3", "MAILx", "MBS3D", "MBS2D"])
         antagonist_form.addRow("Corps :", self.antagonist_body_combo)
         
         self.antagonist_contactor_combo = QComboBox()
@@ -163,16 +163,16 @@ class VisibilityTab(BaseTab):
     def _update_candidate_contactors(self, body_type):
         self.candidate_contactor_combo.clear()
         if body_type == "RBDY2":
-            self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+            self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx", "ALpxx", "CLxx"])
         else:
-            self.candidate_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
+            self.candidate_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx","ASpxx", "CSpxx"])
 
     def _update_antagonist_contactors(self, body_type):
         self.antagonist_contactor_combo.clear()
         if body_type == "RBDY2":
-            self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+            self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx","ALpxx", "CLxx"])
         else:
-            self.antagonist_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
+            self.antagonist_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx", "ASpxx", "CSpxx"])
 
     def _show_context_menu(self, position):
         item = self.tree.itemAt(position)

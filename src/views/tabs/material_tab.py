@@ -133,7 +133,10 @@ class MaterialTab(BaseTab):
             "VISCO_ELAS": "elas='standard', anisotropy='isotropic', young=1.17e11, nu=0.35,viscous_model='KelvinVoigt', viscous_young=1.17e9, viscous_nu=0.35",
             "ELAS_PLAS": "elas='standard', anisotropy='isotropic', young=1.17e11, nu=0.35,critere='Von-Mises', isoh='linear', iso_hard=4.e8, isoh_coeff=1e8, cinh='none', visc='none'",
             "THERMO_ELAS": "elas='standard', young=0.0, nu=0.0, anisotropy='isotropic', dilatation = 0.0,T_ref_meca = 0.0, conductivity='field', specific_capacity='field'",
-            "PORO_ELAS": "elas='standard', young=0.0, nu=0.0, anisotropy='isotropic',hydro_cpl = 0.0, conductivity='field', specific_capacity='field'"
+            "PORO_ELAS": "elas='standard', young=0.0, nu=0.0, anisotropy='isotropic',hydro_cpl = 0.0, conductivity='field', specific_capacity='field'",
+            "DISCRETE": "masses=[20,30], stiffnesses=[0.3,0.6], viscosities=[0.1,0.3]", 
+            "USER_MAT" : "file_mat='material.dat'",
+            "EXTERNAL": "",
         }
         
         if mat_type in suggestions:

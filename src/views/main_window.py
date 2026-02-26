@@ -414,7 +414,8 @@ class MainWindow(QMainWindow):
         self.model_tab.model_created.connect(self._refresh_all)
         self.model_tab.model_updated.connect(self._refresh_all)
         self.model_tab.model_deleted.connect(self._refresh_all)
-        self.model_tab.dimension_changed.connect( self.avatar_tab._update_avatar_types)
+        self.model_tab.dimension_changed.connect(self.avatar_tab._update_avatar_types)
+        #self.model_tab.dimension_changed.connect(self.empty_avatar_tab.sync_dimension)
 
         #avatars
         self.avatar_tab.avatar_created.connect(self._refresh_all)
@@ -481,7 +482,7 @@ class MainWindow(QMainWindow):
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
-
+    
     def _on_open_project(self):
         """Ouvre un projet existant"""
         start_dir = ""
@@ -505,7 +506,7 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Projet chargé", 5000)
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Impossible de charger :\n{e}")
-        #self.viewer_tab.refresh()
+    
     def _on_save_project(self):
         """Sauvegarde le projet"""
         if not self.controller.project_path:
@@ -558,6 +559,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
     
+ 
 
     # ======Tabs======================
 
@@ -905,15 +907,7 @@ class MainWindow(QMainWindow):
     # =======Menu calcul ===================
     def _on_compute_setup(self):
         """Ouvre l'onglet calcul"""
-        for i in range(self.tabs.count()):
-            if self.tabs.widget(i) is self.compute_tab:
-                self.tabs.setCurrentIndex(i)
-                return
-        self._add_tab('compute')
-        for i in range(self.tabs.count()):
-            if self.tabs.widget(i) is self.compute_tab:
-                self.tabs.setCurrentIndex(i)
-                return
+        self.tabs.setCurrentWidget(self.compute_tab)
 
     def _on_run_compute(self):
         """Lance le calcul"""
@@ -956,5 +950,4 @@ class MainWindow(QMainWindow):
             if hasattr(tab, 'refresh'):
                 if tab is self.granulo_tab :
                     tab.refresh(full_refresh=True)
-
                 tab.refresh()

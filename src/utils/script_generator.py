@@ -229,7 +229,21 @@ class ScriptGenerator:
             f.write(f"    material=mats['{mat}']\n")
             f.write(f")\n")
             f.write(f"{container}.addAvatar(body)\n")
-            f.write(f"bodies_list.append(body)\n\n")
+            f.write(f"bodies_list.append(body)\n")
+            # Contacteurs éventuellement ajoutés via l'onglet empty_avatar
+            if avatar.contactors:
+                for cont in avatar.contactors:
+                    shape = cont['shape']
+                    color = cont.get('color', 'BLEUx')
+                    group = cont.get('group')
+                    params = cont.get('params', {})
+                    kwargs = f"shape='{shape}', color='{color}'"
+                    if group:
+                        kwargs += f", group='{group}'"
+                    for k, v in params.items():
+                        kwargs += f", {k}={repr(v)}"
+                    f.write(f"body.addContactors({kwargs})\n")
+            f.write("\n")
             return
 
         # emptyAvatar
