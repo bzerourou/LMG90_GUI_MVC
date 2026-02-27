@@ -115,7 +115,7 @@ class ModelTab(QWidget):
         form.addRow("Nom (max 5 car.) :", self.name_input)
         
         self.physics_combo = QComboBox()
-        self.physics_combo.addItems(["MECAx", "THERx", "HYDRx"])
+        self.physics_combo.addItems(["MECAx"])
         form.addRow("Physique :", self.physics_combo)
         
         self.dimension_combo = QComboBox()

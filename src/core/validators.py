@@ -46,8 +46,8 @@ class MaterialValidator:
 class ModelValidator:
     """Valide les données de modèle"""
     
-    VALID_ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
+    VALID_ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx", "SPRG2"]
+    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx", "SPRG3"]
     
     @staticmethod
     def validate(model: Model) -> Tuple[bool, str]:
