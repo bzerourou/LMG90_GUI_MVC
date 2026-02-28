@@ -55,9 +55,16 @@ chipy.SetDimension(dim, mhyp)
 chipy.utilities_logMes('INIT TIME STEPPING')
 chipy.TimeEvolution_SetTimeStep(dt)
 chipy.Integrator_InitTheta(theta)
+""")
+            if params.get('disable_deformable', True):
+                f.write("""
 
 chipy.ReadDatbox(deformable=False)
+""")
+            else:
+                f.write("""
 
+chipy.ReadDatbox(deformable=True)
 chipy.utilities_logMes('DISPLAY & WRITE')
 chipy.OpenDisplayFiles()
 chipy.OpenPostproFiles()

@@ -195,8 +195,12 @@ class ComputeTab(QWidget):
         output_form.addRow("Fréquence affichage:", self.freq_display_input)
         
         self.disable_log_check = QCheckBox("Désactiver les messages chipy (chipy.utilities_DisableLogMes)")
-        self.disable_log_check.setChecked(False)
+        self.disable_log_check.setChecked(True)
         output_form.addRow("", self.disable_log_check)
+        # pour les déformables 
+        self.disable_deformable_check = QCheckBox("Désactiver les déformables chipy.ReadDatbox(deformable=False)")
+        self.disable_deformable_check.setChecked(True)
+        output_form.addRow("", self.disable_deformable_check)
         
         output_group.setLayout(output_form)
         layout.addWidget(output_group)
@@ -259,6 +263,7 @@ class ComputeTab(QWidget):
             'freq_write': int(self.freq_write_input.text()),
             'freq_display': int(self.freq_display_input.text()),
             'disable_log': self.disable_log_check.isChecked(),
+            'disable_deformable': self.disable_deformable_check.isChecked()
         }
     
     def run_computation(self):

@@ -534,7 +534,7 @@ class DistributionPage(QWizardPage):
             self.ratio_label.setText("<span style='color: red;'>⚠️ Rmax doit être > Rmin</span>")
             return
         
-        ratio = rmax / rmin
+        ratio = rmax / rmin if rmin > 0 else float('inf')
         self.ratio_label.setText(f"<b>{ratio:.2f}</b>")
         
         # Dessiner histogramme

@@ -907,7 +907,15 @@ class MainWindow(QMainWindow):
     # =======Menu calcul ===================
     def _on_compute_setup(self):
         """Ouvre l'onglet calcul"""
-        self.tabs.setCurrentWidget(self.compute_tab)
+        for i in range(self.tabs.count()):
+            if self.tabs.widget(i) is self.compute_tab:
+                self.tabs.setCurrentIndex(i)
+                return
+        self._add_tab('compute')
+        for i in range(self.tabs.count()):
+            if self.tabs.widget(i) is self.compute_tab:
+                self.tabs.setCurrentIndex(i)
+                return
 
     def _on_run_compute(self):
         """Lance le calcul"""

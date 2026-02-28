@@ -162,17 +162,21 @@ class VisibilityTab(BaseTab):
     
     def _update_candidate_contactors(self, body_type):
         self.candidate_contactor_combo.clear()
-        if body_type == "RBDY2":
-            self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx", "ALpxx", "CLxx"])
-        else:
-            self.candidate_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx","ASpxx", "CSpxx"])
+        if body_type == "RBDY2" or body_type == "MBS2D":
+            self.candidate_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx" ])
+        elif body_type == "RBDY3" or body_type == "MBS3D":
+            self.candidate_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
+        elif body_type == "MAILx":
+            self.candidate_contactor_combo.addItems(["ALpxx", "CLxxx","ASpxx", "CSpxx"])
 
     def _update_antagonist_contactors(self, body_type):
         self.antagonist_contactor_combo.clear()
-        if body_type == "RBDY2":
-            self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx","ALpxx", "CLxx"])
-        else:
-            self.antagonist_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx", "ASpxx", "CSpxx"])
+        if body_type == "RBDY2" or body_type == "MBS2D":
+            self.antagonist_contactor_combo.addItems(["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"])
+        elif body_type == "RBDY3" or body_type == "MBS3D":
+            self.antagonist_contactor_combo.addItems(["SPHER", "PLANx", "CYLND", "POLYR", "PT3Dx"])
+        elif body_type == "MAILx":
+            self.antagonist_contactor_combo.addItems(["ALpxx", "CLxxx","ASpxx", "CSpxx"])
 
     def _show_context_menu(self, position):
         item = self.tree.itemAt(position)

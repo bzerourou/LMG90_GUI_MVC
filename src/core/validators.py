@@ -46,9 +46,42 @@ class MaterialValidator:
 class ModelValidator:
     """Valide les données de modèle"""
     
-    VALID_ELEMENTS_2D = ["Rxx2D", "T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx", "SPRG2"]
-    VALID_ELEMENTS_3D = ["Rxx3D", "H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx", "SPRG3"]
-    
+    VALID_ELEMENTS_2D = [
+        # Rigide
+        "Rxx2D",
+        # Triangles
+        "T3xxx", "T3Lxx", "T33xx",
+        "T6xxx", "T63xx",
+        "DKTxx",
+        # Quadrangles
+        "Q4xxx", "Q4P0x", "Q44xx",
+        "Q8xxx", "Q8Rxx", "Q84xx",
+        "Q9xxx",
+        # Barres / ressorts / câbles 2D
+        "BARxx",
+        "SPRG2",
+        "S2xth",
+    ]
+        
+    VALID_ELEMENTS_3D = [
+        # Rigide
+        "Rxx3D",
+        # Tétraèdres
+        "TE4xx", "TE4Lx", "TE44x",
+        "TE10x", "TE104",
+        # Hexaèdres
+        "H8xxx", "H88xx",
+        "H20xx", "H20Rx", "H208x",
+        # Prismes
+        "PRI6x", "SHB6x",
+        "PRI15",
+        # Barres / ressorts / câbles 3D
+        "BARxx",
+        "SPRG3",
+        ]
+       # Ensemble union pour validation rapide
+    _ALL_VALID = set(VALID_ELEMENTS_2D) | set(VALID_ELEMENTS_3D)
+   
     @staticmethod
     def validate(model: Model) -> Tuple[bool, str]:
         """
@@ -110,8 +143,34 @@ class AvatarValidator:
     RIGID_ELEMENTS_2D = ["Rxx2D"]
     RIGID_ELEMENTS_3D = ["Rxx3D"]
     
-    DEFORMABLE_ELEMENTS_2D = ["T3xxx", "Q4xxx", "T6xxx", "Q8xxx", "Q9xxx", "BARxx"]
-    DEFORMABLE_ELEMENTS_3D = ["H8xxx", "SHB8x", "H20xx", "SHB6x", "TE10x", "DKTxx", "BARxx"]
+    DEFORMABLE_ELEMENTS_2D = [
+        # Triangles
+        "T3xxx", "T3Lxx", "T33xx",
+        "T6xxx", "T63xx",
+        "DKTxx",
+        # Quadrangles
+        "Q4xxx", "Q4P0x", "Q44xx",
+        "Q8xxx", "Q8Rxx", "Q84xx",
+        "Q9xxx",
+        # Barres / ressorts 2D
+        "BARxx",
+        "SPRG2",
+        "S2xth",
+        ]
+    DEFORMABLE_ELEMENTS_3D = [
+        # Tétraèdres
+        "TE4xx", "TE4Lx", "TE44x",
+        "TE10x", "TE104",
+        # Hexaèdres
+        "H8xxx", "H88xx",
+        "H20xx", "H20Rx", "H208x",
+        # Prismes
+        "PRI6x", "SHB6x",
+        "PRI15",
+        # Barres / ressorts 3D
+        "BARxx",
+        "SPRG3",
+        ]
     
 
     @staticmethod
