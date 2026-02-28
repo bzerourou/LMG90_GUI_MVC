@@ -1,6 +1,6 @@
 # Granulométrie et Dépôt
 
-Cette section sert à la génération de dépôts granulaires.
+Cette section sert à la génération de dépôts granulaires, toute fois il vous sera impossible de créer une distribution de plus de 1500 avatars, cela ralentira considérablement l'application.
 
 ## Paramètres
 - Nombre de particules à générer
@@ -21,9 +21,9 @@ Cette section sert à la génération de dépôts granulaires.
 Cet exemple n'est pas concret mais montre seulement les proprétés de vos granulométries
 | Champ | Description | Exemple |
 |-------|-------------|---------|
-| **Nombre de particules** | Nombre total de particules à générer | `200` |
+| **Nombre de particules** | Nombre total de particules à générer | `400` |
 | **Rayon Min (rmin)** | Rayon minimum des particules | `0.05` |
-| **Rayon Max (rmax)** | Rayon maximum des particules | `0.15` |
+| **Rayon Max (rmax)** | Rayon maximum des particules | `0.075` |
 
 
 | Conteneur | Paramètres | Description |
@@ -51,7 +51,7 @@ Le rendu de mon modèle,
 ![](captures/rendu_depot_granulo_disk_jonc.JPG)
 
 ## Assistant de granulométrie 
-Vous pouvez aussi utiliser l'assistant de granulométrie afin de générer facilement vos dépôts, cet assistant fait appel aux routines de LMGC90, cela pourra ralentir considérablement votre interface, il n'est pas idéal pour une génération de plus de 2000 avatars (particules).
+Vous pouvez aussi utiliser l'assistant de granulométrie afin de générer facilement vos dépôts, cet assistant fait appel aux routines de LMGC90.
 Pour cela il vous suffit de cliquer sur le menu "Fichier" puis "Assistant de granulométrie " ou avec le raccourci clavier "ctr+ shift+ G". L'assistant s'ouvrira, cliquez sur le bouton "suivant"
 
 ![](captures/assistant_granulo_page1.JPG)

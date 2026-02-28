@@ -9,6 +9,8 @@ Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI
 - [Création d'un modèle](model_creation.md)
 - [Création d'un avatar](avatar_creation.md)
 - [Avatar vide](empty_avatar.md)
+- [Templates](templates.md)
+- [Déformables](meshed.md)
 - [Boucles paramétriques](loops.md)
 - [Granulométrie](granulometry.md)
 - [Conditions aux limites](dof.md)
