@@ -1,6 +1,6 @@
 # Déformable 
 
-Dans cette section nous allons nous servir de l'assistant des déformables afin de pouvoir les créer et utiliser dans vos modèles numériques. Nous commençons par une brève introduction sur les corps déformbles.
+Dans cette section nous allons nous servir de l'assistant des déformables afin de pouvoir les créer et les utiliser dans vos modèles numériques. Nous commençons par une brève introduction sur les corps déformbles.
 
 
 ### 📚 Documentation Complète - Corps Déformables LMGC90
@@ -105,10 +105,10 @@ On choisi la dimension de notre déformable, dans mon cas je la fixe à 3, puis 
 ![](captures/assistant_defor_page2.JPG)
 
 
-On arrive maintenant à la page pour créer un matériau, vous avez aussi la possibilité de choisir un matériau déjà créer, je choisis les valeurs par défauts du matériau, puis "Suivant", 
+On arrive maintenant à la page pour créer un matériau, vous avez aussi la possibilité de choisir un matériau déjà crée, je choisis les valeurs par défauts du matériau, puis sur "Suivant", 
 ![](captures/assistant_defor_page3.JPG)
 
-Cette page est prèsque la plus importante, car votre maillage dépendra de votre éléments bien choisi, je vais créer un modèle avec un élément fini de type "TE4xx", puis "Suivant", 
+Cette page est prèsque la plus importante, car votre maillage dépendra de votre éléments bien choisi, je vais créer un modèle avec un élément fini de type "TE4xx", puis sur "Suivant", 
 ![](captures/assistant_defor_page4.JPG)
 
 On est dans la page de votre géométrie, l'assistant vous propose quatre types de géométries de bases : 
@@ -116,11 +116,11 @@ On est dans la page de votre géométrie, l'assistant vous propose quatre types 
    - Sphère
    - Cylindre
    - Fichier externe 
-dans mon cas je veux importer ma géométrie créer avec **gmsh** sous l'extension .mesh, je clique sur le bouton "Parcourir " afin de parcourir le chemin vers mon fichier "Donut.mesh", puis je clique sur "Suivant", 
+dans mon cas je veux importer ma géométrie crée avec **gmsh** sous l'extension .mesh, je clique sur le bouton "Parcourir " afin de parcourir le chemin vers mon fichier "Donut.mesh", puis je clique sur "Suivant", 
 
 ![](captures/assistant_defor_page5.JPG)
 
-Nous arriverons à la page de type d'élément fini, dans mon cas l'assistant à bien choisi tout seul, je clique sur "Suivant", 
+Nous arriverons à la page de type d'élément fini, dans mon cas l'assistant à bien choisi tout seul, elle peut peut être personnalisée dans certaines cas,  je clique sur "Suivant", 
 
 ![](captures/assistant_defor_page6.JPG)
 
