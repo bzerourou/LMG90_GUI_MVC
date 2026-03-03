@@ -179,7 +179,7 @@ class ProjectSetupWizard(QWizard):
             )
             self.controller.add_visibility_rule(rule)
         #rafraîchir la vue pour afficher les nouveaux éléments
-        super().setWindowTitle(f"LMGC90_GUI v0.3.0 - {project_name}")
+        super().setWindowTitle(f"LMGC90_GUI v0.3.5 - {project_name}")
 
 class IntroPage(QWizardPage):
     """Page d'introduction"""
@@ -192,7 +192,7 @@ class IntroPage(QWizardPage):
         layout = QVBoxLayout()
         
         intro = QLabel(
-            "<h3>📋 Ce que nous allons faire :</h3>"
+            "<h3>📋 Étapes :</h3>"
             "<ul>"
             "<li>✅ Définir les informations du projet</li>"
             "<li>✅ Choisir la dimension (2D ou 3D)</li>"
@@ -202,7 +202,7 @@ class IntroPage(QWizardPage):
             "<li>✅ Loi de contact</li>"
             "<li>✅ Table de visibilité</li>"
             "</ul>"
-            "<p><b>💡 Astuce :</b> Vous pourrez toujours modifier ces éléments après.</p>"
+            "<p><b>💡 Astuce :</b> Vous pourrez toujours modifier les éléments crées.</p>"
             "<p><i>⏱️ Temps estimé : 2-3 minutes</i></p>"
         )
         intro.setWordWrap(True)

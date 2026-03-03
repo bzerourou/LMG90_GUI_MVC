@@ -5,9 +5,9 @@
 Dialogues personnalisés de l'application.
 """
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, 
+    QWidget,QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, 
     QTreeWidgetItem, QPushButton, QDialogButtonBox, 
-    QInputDialog, QLabel, QLineEdit, QFormLayout,
+    QTabWidget, QLabel, QLineEdit, QFormLayout,
     QGroupBox, QFileDialog, QSpinBox, QCheckBox, QComboBox, QMessageBox
 )
 
@@ -399,263 +399,505 @@ class DynamicVarsDialog(QDialog):
         return self.current_vars
 
 class PreferencesDialog(QDialog):
-    """Dialogue de préférences du projet"""
-    
+    """Dialogue de préférences — onglets verticaux à droite."""
+
     def __init__(self, preferences: ProjectPreferences, parent=None):
         super().__init__(parent)
         self.preferences = preferences
-        self.setWindowTitle("⚙️ Préférences du Projet")
-        self.resize(600, 500)
-        
+        self.setWindowTitle("⚙️ Préférences")
+        self.resize(780, 560)
         self._setup_ui()
         self._load_preferences()
-    
+
+    # ─────────────────────────────────────────────────────────────────────────
     def _setup_ui(self):
-        """Configure l'interface"""
-        layout = QVBoxLayout()
-        
-        # ========== GROUPE 1 : Chemins ==========
-        paths_group = QGroupBox("📁 Chemins et Fichiers")
-        paths_layout = QFormLayout()
-        
-        # Chemin par défaut du projet
-        path_layout = QHBoxLayout()
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
+
+        # ── QTabWidget avec onglets à gauche (West = vertical) ────────────────
+        self._tabs = QTabWidget()
+        self._tabs.setTabPosition(QTabWidget.TabPosition.West)
+        self._tabs.setDocumentMode(False)
+        self._tabs.setStyleSheet("""
+            QTabBar::tab {
+                min-width: 140px;
+                min-height: 36px;
+                padding: 6px 12px;
+                text-align: left;
+                font-size: 10pt;
+            }
+            QTabBar::tab:selected {
+                font-weight: bold;
+            }
+        """)
+
+        self._tabs.addTab(self._build_paths_tab(),    "📁  Chemins")
+        self._tabs.addTab(self._build_units_tab(),    "📏  Unités")
+        self._tabs.addTab(self._build_save_tab(),     "💾  Sauvegarde")
+        self._tabs.addTab(self._build_perf_tab(),     "⚡  Performances")
+
+        root.addWidget(self._tabs, stretch=1)
+
+        # ── Boutons OK / Annuler ──────────────────────────────────────────────
+        btn_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        root.addWidget(btn_box)
+
+    # ── Onglet 1 : Chemins ────────────────────────────────────────────────────
+    def _build_paths_tab(self) -> QWidget:
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        layout.addWidget(QLabel("<b>📁 Chemins et Fichiers</b>"))
+
+        form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+
+        path_row = QHBoxLayout()
         self.project_path_input = QLineEdit()
         self.project_path_input.setReadOnly(True)
         self.project_path_input.setPlaceholderText("Aucun chemin par défaut")
-        path_layout.addWidget(self.project_path_input)
-        
-        browse_btn = QPushButton("📂 Parcourir")
+        path_row.addWidget(self.project_path_input)
+
+        browse_btn = QPushButton("📂 Parcourir…")
         browse_btn.clicked.connect(self._browse_project_path)
-        path_layout.addWidget(browse_btn)
-        
+        path_row.addWidget(browse_btn)
+
         clear_btn = QPushButton("✖")
-        clear_btn.setMaximumWidth(40)
+        clear_btn.setMaximumWidth(36)
+        clear_btn.setToolTip("Effacer")
         clear_btn.clicked.connect(lambda: self.project_path_input.clear())
-        path_layout.addWidget(clear_btn)
-        
-        paths_layout.addRow("Dossier par défaut :", path_layout)
-        
-        # Info
-        info_label = QLabel(
-            "💡 Les nouveaux projets seront créés dans ce dossier par défaut."
+        path_row.addWidget(clear_btn)
+
+        form.addRow("Dossier par défaut :", path_row)
+        layout.addLayout(form)
+
+        info = QLabel(
+            "💡 Les nouveaux projets seront ouverts dans ce dossier par défaut."
         )
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
-        paths_layout.addRow("", info_label)
-        
-        paths_group.setLayout(paths_layout)
-        layout.addWidget(paths_group)
-        
-        # ========== GROUPE 2 : Unités ==========
-        units_group = QGroupBox("📏 Système d'Unités")
-        units_layout = QVBoxLayout()
-        
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #666; font-size: 9pt; padding: 4px;")
+        layout.addWidget(info)
+        layout.addStretch()
+        return w
+
+    # ── Onglet 2 : Unités ─────────────────────────────────────────────────────
+    def _build_units_tab(self) -> QWidget:
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        layout.addWidget(QLabel("<b>📏 Système d'Unités</b>"))
+
         form = QFormLayout()
-        
         self.unit_system_combo = QComboBox()
-        self.unit_system_combo.addItem("SI - Système International (m, kg, s, N, Pa)", UnitSystem.SI)
-        self.unit_system_combo.addItem("CGS - Centimètre-Gramme-Seconde (cm, g, s)", UnitSystem.CGS)
+        self.unit_system_combo.addItem(
+            "SI — Système International  (m, kg, s, N, Pa)", UnitSystem.SI)
+        self.unit_system_combo.addItem(
+            "CGS — Centimètre-Gramme-Seconde  (cm, g, s)",   UnitSystem.CGS)
         self.unit_system_combo.currentIndexChanged.connect(self._update_unit_preview)
         form.addRow("Système :", self.unit_system_combo)
-        
-        units_layout.addLayout(form)
-        
-        # Aperçu des unités
+        layout.addLayout(form)
+
+        layout.addWidget(QLabel("<b>Aperçu des unités :</b>"))
         self.units_preview = QLabel()
         self.units_preview.setWordWrap(True)
         self.units_preview.setStyleSheet(
-            "background-color: #f0f0f0; padding: 10px; border-radius: 5px; font-family: monospace;"
+            "background-color: #f0f0f0; padding: 10px; "
+            "border-radius: 5px; font-family: monospace;"
         )
-        units_layout.addWidget(QLabel("<b>Aperçu des unités :</b>"))
-        units_layout.addWidget(self.units_preview)
-        
-        units_group.setLayout(units_layout)
-        layout.addWidget(units_group)
-        
-        # ========== GROUPE 3 : Sauvegarde Automatique ==========
-        autosave_group = QGroupBox("💾 Sauvegarde Automatique")
-        autosave_layout = QFormLayout()
-        
+        layout.addWidget(self.units_preview)
+        layout.addStretch()
+        return w
+
+    # ── Onglet 3 : Sauvegarde + Projets récents ───────────────────────────────
+    def _build_save_tab(self) -> QWidget:
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
+
+        # Sauvegarde automatique
+        auto_group = QGroupBox("💾 Sauvegarde automatique")
+        auto_form  = QFormLayout()
+
         self.auto_save_check = QCheckBox("Activer la sauvegarde automatique")
-        autosave_layout.addRow("", self.auto_save_check)
-        
+        auto_form.addRow("", self.auto_save_check)
+
         self.auto_save_interval = QSpinBox()
         self.auto_save_interval.setMinimum(60)
         self.auto_save_interval.setMaximum(3600)
         self.auto_save_interval.setSingleStep(60)
         self.auto_save_interval.setSuffix(" secondes")
-        autosave_layout.addRow("Intervalle :", self.auto_save_interval)
-        
-        self.backup_check = QCheckBox("Créer des sauvegardes de sécurité")
-        autosave_layout.addRow("", self.backup_check)
-        
-        autosave_group.setLayout(autosave_layout)
-        layout.addWidget(autosave_group)
-        
-        # ========== GROUPE 4 : Projets Récents ==========
-        recent_group = QGroupBox("🕐 Projets Récents")
-        recent_layout = QFormLayout()
-        
+        auto_form.addRow("Intervalle :", self.auto_save_interval)
+
+        self.backup_check = QCheckBox("Créer des sauvegardes de sécurité (.bak)")
+        auto_form.addRow("", self.backup_check)
+
+        auto_group.setLayout(auto_form)
+        layout.addWidget(auto_group)
+
+        # Projets récents
+        recent_group = QGroupBox("🕐 Projets récents")
+        recent_form  = QFormLayout()
+
         self.max_recent_spin = QSpinBox()
         self.max_recent_spin.setMinimum(0)
         self.max_recent_spin.setMaximum(20)
-        recent_layout.addRow("Nombre max de projets récents :", self.max_recent_spin)
-        
+        recent_form.addRow("Nombre maximum :", self.max_recent_spin)
+
         clear_recent_btn = QPushButton("🗑️ Effacer l'historique")
         clear_recent_btn.clicked.connect(self._clear_recent_projects)
-        recent_layout.addRow("", clear_recent_btn)
-        
-        recent_group.setLayout(recent_layout)
+        recent_form.addRow("", clear_recent_btn)
+
+        recent_group.setLayout(recent_form)
         layout.addWidget(recent_group)
-        
-        # ========== GROUPE 5 : Performance / Affichage Granulométrie ==========
-        perf_group = QGroupBox("⚡ Performance — Affichage Granulométrie")
-        perf_layout = QVBoxLayout()
+
+        layout.addStretch()
+        return w
+
+    # ── Onglet 4 : Performances / Affichage avatars ───────────────────────────
+    def _build_perf_tab(self) -> QWidget:
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        layout.addWidget(QLabel("<b>⚡ Performances — Affichage des avatars</b>"))
+
+        # Granulo
+        granulo_group = QGroupBox("🎲 Granulométrie")
+        granulo_layout = QVBoxLayout()
 
         self.show_granulo_check = QCheckBox(
             "Afficher les avatars granulométriques individuellement"
         )
         self.show_granulo_check.setToolTip(
-            "Coché : chaque avatars apparaît dans l'arbre, les listes DOF et PostPro.\n"
-            "Décoché (recommandé avec >500 particules) : seuls les GROUPES sont visibles.\n"
-            "Si décoché, le stockage dans un groupe devient obligatoire lors de la génération."
+            "Coché : chaque avatar apparaît dans l'arbre, les listes DOF et PostPro.\n"
+            "Décoché (recommandé >500 particules) : seuls les groupes sont visibles."
         )
-        perf_layout.addWidget(self.show_granulo_check)
+        granulo_layout.addWidget(self.show_granulo_check)
 
-        # Option: créer ou non les objets pylmgc lors d'une génération massive
         self.create_pylmgc_check = QCheckBox(
-            "Créer les objets pylmgc lors de la génération massive (lent)"
+            "Créer les objets pylmgc lors de la génération massive  (plus lent)"
         )
         self.create_pylmgc_check.setToolTip(
-            "Coché : les objets pylmgc (corps) sont créés immédiatement lors de la génération.\n"
-            "Décoché : optimisation pour génération massive — les objets pylmgc ne sont pas créés,\n"
-            "ce qui accélère fortement la génération (vous pourrez les créer plus tard si nécessaire)."
+            "Décoché : génération massive accélérée — objets pylmgc créés à la demande."
         )
-        perf_layout.addWidget(self.create_pylmgc_check)
+        granulo_layout.addWidget(self.create_pylmgc_check)
 
-        self._perf_info = QLabel(
-            "ℹ️  Quand cette option est décochée :\n"
-            "  • Les  avatars ne s'affichent pas une par une dans l'arbre\n"
-            "  • Les listes DOF et Post-Pro ne montrent que les groupes\n"
+        info = QLabel(
+            "ℹ️  Quand l'affichage individuel est désactivé :\n"
+            "  • Les avatars n'apparaissent pas un par un dans l'arbre\n"
+            "  • Les listes DOF et Post-Pro ne montrent que les groupes"
         )
-        self._perf_info.setWordWrap(True)
-        self._perf_info.setStyleSheet(
+        info.setWordWrap(True)
+        info.setStyleSheet(
             "color: #555; font-size: 9pt; padding: 6px; "
             "background-color: #f5f5f5; border-radius: 4px;"
         )
-        perf_layout.addWidget(self._perf_info)
+        granulo_layout.addWidget(info)
+        granulo_group.setLayout(granulo_layout)
+        layout.addWidget(granulo_group)
 
-        perf_group.setLayout(perf_layout)
-        layout.addWidget(perf_group)
-        
-        # Boutons OK/Annuler
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | 
-            QDialogButtonBox.StandardButton.Cancel
+        # Visualisation 3D
+        viewer_group = QGroupBox("🎨 Visualisation 3D")
+        viewer_layout = QVBoxLayout()
+
+        self.auto_refresh_viewer_check = QCheckBox(
+            "Rafraîchir automatiquement la vue 3D après chaque modification"
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-        
-        self.setLayout(layout)
-    
+        self.auto_refresh_viewer_check.setToolTip(
+            "Décocher si la vue 3D ralentit l'interface (nombreux avatars)."
+        )
+        viewer_layout.addWidget(self.auto_refresh_viewer_check)
+
+        viewer_group.setLayout(viewer_layout)
+        layout.addWidget(viewer_group)
+
+        layout.addStretch()
+        return w
+
+    # ── Méthodes utilitaires ──────────────────────────────────────────────────
     def _browse_project_path(self):
-        """Sélectionne le dossier par défaut"""
-        current = self.project_path_input.text()
+        current   = self.project_path_input.text()
         start_dir = current if current else str(Path.home())
-        
         directory = QFileDialog.getExistingDirectory(
             self, "Sélectionner le dossier par défaut", start_dir
         )
-        
         if directory:
             self.project_path_input.setText(directory)
-    
+
     def _update_unit_preview(self):
-        """Met à jour l'aperçu des unités"""
         unit_system = self.unit_system_combo.currentData()
-        
-        # Créer une préférence temporaire pour obtenir les labels
-        temp_prefs = ProjectPreferences(unit_system=unit_system)
-        labels = temp_prefs.get_unit_labels()
-        
-        preview_text = (
-            f"Longueur : {labels['length']}\n"
-            f"Masse : {labels['mass']}\n"
-            f"Temps : {labels['time']}\n"
-            f"Force : {labels['force']}\n"
-            f"Pression : {labels['pressure']}\n"
-            f"Énergie : {labels['energy']}\n"
-            f"Densité : {labels['density']}\n"
-            f"Vitesse : {labels['velocity']}\n"
-            f"Accélération : {labels['acceleration']}"
+        temp_prefs  = ProjectPreferences(unit_system=unit_system)
+        labels      = temp_prefs.get_unit_labels()
+        self.units_preview.setText(
+            f"Longueur      : {labels['length']}\n"
+            f"Masse         : {labels['mass']}\n"
+            f"Temps         : {labels['time']}\n"
+            f"Force         : {labels['force']}\n"
+            f"Pression      : {labels['pressure']}\n"
+            f"Énergie       : {labels['energy']}\n"
+            f"Densité       : {labels['density']}\n"
+            f"Vitesse       : {labels['velocity']}\n"
+            f"Accélération  : {labels['acceleration']}"
         )
-        
-        self.units_preview.setText(preview_text)
-    
+
     def _clear_recent_projects(self):
-        """Efface l'historique des projets récents"""
-        from PyQt6.QtWidgets import QMessageBox
-        
         reply = QMessageBox.question(
             self, "Confirmer",
             "Effacer l'historique des projets récents ?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        
         if reply == QMessageBox.StandardButton.Yes:
             self.preferences.recent_projects.clear()
-            QMessageBox.information(self, "Historique effacé", "L'historique a été effacé.")
-    
+            QMessageBox.information(self, "Historique effacé",
+                                    "L'historique a été effacé.")
+
     def _load_preferences(self):
-        """Charge les préférences dans le formulaire"""
         # Chemin
         if self.preferences.default_project_path:
             self.project_path_input.setText(str(self.preferences.default_project_path))
-        
+
         # Unités
         for i in range(self.unit_system_combo.count()):
             if self.unit_system_combo.itemData(i) == self.preferences.unit_system:
                 self.unit_system_combo.setCurrentIndex(i)
                 break
-        
-        # Sauvegarde auto
+        self._update_unit_preview()
+
+        # Sauvegarde
         self.auto_save_check.setChecked(self.preferences.auto_save)
         self.auto_save_interval.setValue(self.preferences.auto_save_interval)
         self.backup_check.setChecked(self.preferences.backup_enabled)
-        
-        # Projets récents
+
+        # Récents
         self.max_recent_spin.setValue(self.preferences.max_recent_projects)
 
-        # Performance granulo
+        # Performances
         self.show_granulo_check.setChecked(
             getattr(self.preferences, 'show_granulo_individually', True)
         )
-        # Création pylmgc lors de génération massive
         self.create_pylmgc_check.setChecked(
             getattr(self.preferences, 'create_pylmgc_on_generate', True)
         )
-        
-        # Mise à jour de l'aperçu
-        self._update_unit_preview()
-    
-    def get_preferences(self) -> ProjectPreferences:
-        """Retourne les préférences depuis le formulaire"""
-        # Chemin
-        path_text = self.project_path_input.text().strip()
-        default_path = Path(path_text) if path_text else None
-        
-        # Mettre à jour les préférences
-        self.preferences.default_project_path = default_path
-        self.preferences.unit_system = self.unit_system_combo.currentData()
-        self.preferences.auto_save = self.auto_save_check.isChecked()
-        self.preferences.auto_save_interval = self.auto_save_interval.value()
-        self.preferences.backup_enabled = self.backup_check.isChecked()
-        self.preferences.max_recent_projects = self.max_recent_spin.value()
+        self.auto_refresh_viewer_check.setChecked(
+            getattr(self.preferences, 'auto_refresh_viewer', True)
+        )
 
-        self.preferences.show_granulo_individually = self.show_granulo_check.isChecked()
-        # Sauvegarder préférence création pylmgc lors de génération
-        self.preferences.create_pylmgc_on_generate = self.create_pylmgc_check.isChecked()
-        
+    def get_preferences(self) -> ProjectPreferences:
+        path_text = self.project_path_input.text().strip()
+        self.preferences.default_project_path = Path(path_text) if path_text else None
+        self.preferences.unit_system          = self.unit_system_combo.currentData()
+        self.preferences.auto_save            = self.auto_save_check.isChecked()
+        self.preferences.auto_save_interval   = self.auto_save_interval.value()
+        self.preferences.backup_enabled       = self.backup_check.isChecked()
+        self.preferences.max_recent_projects  = self.max_recent_spin.value()
+
+        self.preferences.show_granulo_individually  = self.show_granulo_check.isChecked()
+        self.preferences.create_pylmgc_on_generate  = self.create_pylmgc_check.isChecked()
+        self.preferences.auto_refresh_viewer        = self.auto_refresh_viewer_check.isChecked()
+
         return self.preferences
+class DuplicateDialog(QDialog):
+    """
+    Dialogue de duplication d'un avatar ou d'un groupe d'avatars.
+
+    Permet à l'utilisateur de choisir :
+      - Le nombre de copies à créer
+      - Le décalage (offset) X / Y / Z appliqué à chaque copie
+      - Un nom de groupe destination (optionnel)
+
+    Le mode ('avatar' ou 'group') est passé en paramètre pour adapter
+    le titre et le libellé informatif.
+    """
+
+    def __init__(self, source_label: str, dimension: int,
+                 mode: str = 'avatar', parent=None):
+        """
+        Args:
+            source_label: Texte décrivant la source (affiché dans le dialogue).
+            dimension:    2 (2D) ou 3 (3D) — détermine si le champ Z est visible.
+            mode:         'avatar' ou 'group'.
+            parent:       Widget parent Qt.
+        """
+        super().__init__(parent)
+        self._dimension = dimension
+        self._mode      = mode
+
+        title = "📋 Dupliquer un avatar" if mode == 'avatar' \
+                else "📋 Dupliquer un groupe"
+        self.setWindowTitle(title)
+        self.setMinimumWidth(420)
+        self._setup_ui(source_label)
+
+    # ── Construction de l'interface ───────────────────────────────────────────
+    def _setup_ui(self, source_label: str):
+        layout = QVBoxLayout(self)
+
+        # Bandeau d'information
+        info = QLabel(
+            f"<b>Source :</b> {source_label}<br>"
+            "Chaque copie <i>k</i> est positionnée à :<br>"
+            "&nbsp;&nbsp;&nbsp;<code>center + k × offset</code>"
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet(
+            "background-color: #e8f5e9; padding: 10px; border-radius: 5px;"
+        )
+        layout.addWidget(info)
+
+        # ── Nombre de copies ─────────────────────────────────────────────────
+        copies_group = QGroupBox("Nombre de copies")
+        copies_form  = QFormLayout()
+
+        self._n_spin = QSpinBox()
+        self._n_spin.setRange(1, 10000)
+        self._n_spin.setValue(1)
+        self._n_spin.setToolTip("Nombre de séries de copies à créer.")
+        copies_form.addRow("Nombre de copies :", self._n_spin)
+
+        copies_group.setLayout(copies_form)
+        layout.addWidget(copies_group)
+
+        # ── Offset ───────────────────────────────────────────────────────────
+        offset_group = QGroupBox("Décalage par copie (offset)")
+        offset_form  = QFormLayout()
+
+        from PyQt6.QtWidgets import QDoubleSpinBox as _DSB
+
+        def _make_dspin(val=0.0):
+            w = _DSB()
+            w.setRange(-1e6, 1e6)
+            w.setDecimals(6)
+            w.setSingleStep(0.01)
+            w.setValue(val)
+            w.setSuffix(" m")
+            return w
+
+        self._dx = _make_dspin()
+        self._dy = _make_dspin()
+        self._dz = _make_dspin()
+
+        offset_form.addRow("Offset X :", self._dx)
+        offset_form.addRow("Offset Y :", self._dy)
+
+        self._dz_label = QLabel("Offset Z :")
+        offset_form.addRow(self._dz_label, self._dz)
+
+        # Masquer Z en 2D
+        self._dz_label.setVisible(self._dimension == 3)
+        self._dz.setVisible(self._dimension == 3)
+
+        offset_group.setLayout(offset_form)
+        layout.addWidget(offset_group)
+
+        # ── Groupe destination ────────────────────────────────────────────────
+        grp_group = QGroupBox("Groupe destination (optionnel)")
+        grp_form  = QFormLayout()
+
+        self._group_check = QCheckBox("Stocker les copies dans un groupe")
+        self._group_check.setChecked(True)
+        self._group_check.toggled.connect(self._on_group_toggled)
+        grp_form.addRow(self._group_check)
+
+        self._group_input = QLineEdit()
+        self._group_input.setPlaceholderText("Ex: mur_copie, pile_2…")
+        grp_form.addRow("Nom du groupe :", self._group_input)
+
+        grp_group.setLayout(grp_form)
+        layout.addWidget(grp_group)
+
+        # ── Aperçu ────────────────────────────────────────────────────────────
+        self._preview_label = QLabel()
+        self._preview_label.setWordWrap(True)
+        self._preview_label.setStyleSheet(
+            "color: #555; font-size: 9pt; padding: 4px;"
+        )
+        layout.addWidget(self._preview_label)
+
+        self._n_spin.valueChanged.connect(self._update_preview)
+        self._dx.valueChanged.connect(self._update_preview)
+        self._dy.valueChanged.connect(self._update_preview)
+        self._dz.valueChanged.connect(self._update_preview)
+        self._update_preview()
+
+        # ── Boutons OK / Annuler ──────────────────────────────────────────────
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    # ── Slots ─────────────────────────────────────────────────────────────────
+    def _on_group_toggled(self, checked: bool):
+        self._group_input.setEnabled(checked)
+
+    def _update_preview(self):
+        n  = self._n_spin.value()
+        dx = self._dx.value()
+        dy = self._dy.value()
+        dz = self._dz.value() if self._dimension == 3 else 0.0
+
+        if self._dimension == 3:
+            off_str = f"({dx:.4g}, {dy:.4g}, {dz:.4g})"
+        else:
+            off_str = f"({dx:.4g}, {dy:.4g})"
+
+        noun = "avatar" if self._mode == 'avatar' else "groupe"
+        self._preview_label.setText(
+            f"ℹ️  {n} copie(s) du {noun} avec offset {off_str} par copie."
+        )
+
+    def _on_accept(self):
+        # Vérifier qu'au moins un axe a un offset non nul
+        dx = self._dx.value()
+        dy = self._dy.value()
+        dz = self._dz.value() if self._dimension == 3 else 0.0
+
+        if dx == 0.0 and dy == 0.0 and dz == 0.0:
+            reply = QMessageBox.question(
+                self, "Offset nul",
+                "L'offset est nul sur tous les axes : les copies seront\n"
+                "superposées à la source. Continuer quand même ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        if self._group_check.isChecked() and not self._group_input.text().strip():
+            QMessageBox.warning(
+                self, "Nom requis",
+                "Entrez un nom de groupe ou décochez l'option."
+            )
+            return
+
+        self.accept()
+
+    # ── Accesseurs (appelés par tree_view après accept()) ─────────────────────
+    def get_n_copies(self) -> int:
+        """Retourne le nombre de copies demandé."""
+        return self._n_spin.value()
+
+    def get_offset(self) -> list:
+        """Retourne l'offset sous forme [dx, dy] ou [dx, dy, dz]."""
+        if self._dimension == 3:
+            return [self._dx.value(), self._dy.value(), self._dz.value()]
+        return [self._dx.value(), self._dy.value()]
+
+    def get_group_name(self) -> str:
+        """Retourne le nom du groupe destination, ou '' si non demandé."""
+        if self._group_check.isChecked():
+            return self._group_input.text().strip()
+        return ""

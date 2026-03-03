@@ -453,6 +453,126 @@ class ProjectController(QObject):
             return self.state.avatars.copy()
         else:
             return [a for a in self.state.avatars if a.origin == AvatarOrigin.MANUAL]
+
+    def duplicate_avatar(self, index: int, n_copies: int, offset: list, group_name: str = None) -> list:
+        """
+        Duplique un avatar n_copies fois en décalant chaque copie de offset.
+
+        Args:
+            index:      Index de l'avatar source dans state.avatars.
+            n_copies:   Nombre de copies à créer (≥ 1).
+            offset:     Décalage appliqué à chaque copie, sous la forme
+                        [dx, dy] ou [dx, dy, dz].
+                        La k-ième copie est placée à center + k*offset.
+            group_name: Si fourni, toutes les nouvelles copies sont ajoutées
+                        à ce groupe (créé si inexistant).
+
+        Returns:
+            Liste des indices des copies créées dans state.avatars.
+
+        Raises:
+            IndexError: Si index est hors bornes.
+            ValueError: Si n_copies < 1 ou offset vide.
+        """
+        import copy as _copy
+
+        if not (0 <= index < len(self.state.avatars)):
+            raise IndexError(f"Index avatar {index} hors bornes.")
+        if n_copies < 1:
+            raise ValueError("n_copies doit être ≥ 1.")
+        if not offset:
+            raise ValueError("offset ne peut pas être vide.")
+
+        source       = self.state.avatars[index]
+        new_indices  = []
+        dim          = len(source.center)
+
+        self._batch_mode = True
+        try:
+            for k in range(1, n_copies + 1):
+                clone        = _copy.deepcopy(source)
+                clone.center = [
+                    source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
+                    for i in range(dim)
+                ]
+                idx = self.add_avatar(clone)
+                new_indices.append(idx)
+        finally:
+            self._batch_mode = False
+
+        if group_name:
+            self.state.avatar_groups.setdefault(group_name, []).extend(new_indices)
+
+        self.state_changed.emit()
+        return new_indices
+
+    def duplicate_group(
+        self,
+        group_name: str,
+        n_copies: int,
+        offset: list,
+        new_group_prefix: str = None
+    ) -> dict:
+        """
+        Duplique tous les avatars d'un groupe n_copies fois.
+
+        Args:
+            group_name:        Nom du groupe source.
+            n_copies:          Nombre de séries de copies à créer (≥ 1).
+            offset:            Décalage appliqué à chaque série, sous la forme
+                               [dx, dy] ou [dx, dy, dz].
+                               La k-ième série est décalée de k*offset par
+                               rapport aux positions du groupe source.
+            new_group_prefix:  Si fourni, chaque série k est stockée dans un
+                               groupe nommé "{new_group_prefix}_{k}".
+                               Si None, les copies sont ajoutées dans
+                               "{group_name}_copie_{k}".
+
+        Returns:
+            Dictionnaire {nom_groupe: [indices]} pour chaque série créée.
+
+        Raises:
+            KeyError:   Si group_name est inconnu.
+            ValueError: Si n_copies < 1 ou offset vide.
+        """
+        import copy as _copy
+
+        if group_name not in self.state.avatar_groups:
+            raise KeyError(f"Groupe '{group_name}' introuvable.")
+        if n_copies < 1:
+            raise ValueError("n_copies doit être ≥ 1.")
+        if not offset:
+            raise ValueError("offset ne peut pas être vide.")
+
+        source_indices = self.state.avatar_groups[group_name]
+        prefix         = new_group_prefix or group_name
+        result         = {}
+
+        self._batch_mode = True
+        try:
+            for k in range(1, n_copies + 1):
+                serie_indices = []
+                for src_idx in source_indices:
+                    if not (0 <= src_idx < len(self.state.avatars)):
+                        continue
+                    source       = self.state.avatars[src_idx]
+                    dim          = len(source.center)
+                    clone        = _copy.deepcopy(source)
+                    clone.center = [
+                        source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
+                        for i in range(dim)
+                    ]
+                    idx = self.add_avatar(clone)
+                    serie_indices.append(idx)
+
+                grp = f"{prefix}_copie_{k}"
+                self.state.avatar_groups.setdefault(grp, []).extend(serie_indices)
+                result[grp] = serie_indices
+        finally:
+            self._batch_mode = False
+
+        self.state_changed.emit()
+        return result
     
     # ========== LOIS DE CONTACT ==========
     

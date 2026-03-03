@@ -621,8 +621,9 @@ class MeshIntroPage(QWizardPage):
             "<li>✅ Générer le maillage</li>"
             "</ol>"
             "<p><b>💡 Astuce :</b> Les maillages permettent de simuler la déformation de solides.</p>"
-            "<p><b>💡 Astuce :</b> Le maillage est construit via <code>buildMesh2D</code> "
+            "<p>     Le maillage est construit via <code>buildMesh2D</code> "
             "ou <code>buildMeshH8</code> de pylmgc90 puis converti en avatar MAILx.</p>"
+            "<p><i>⏱️ Temps estimé : 2-3 minutes</i></p>"
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)

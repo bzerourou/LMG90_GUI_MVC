@@ -19,6 +19,8 @@ from .tabs import (
 )
 from .tree_view import ModelTreeView
 from ..core.models import UnitSystem
+from ..core.app_logger import get_logger, get_log_path, get_log_dir, get_recent_logs
+_log = get_logger('main_window')
 from ..gui.dialogs.fast_granulo_dialg import GranuloFastDialog
 
 
@@ -38,7 +40,7 @@ class MainWindow(QMainWindow):
             self.controller.state.preferences = ProjectPreferences()
         
         # Configuration fenêtre
-        self.setWindowTitle(f"LMGC90_GUI v0.3.0 - {self.controller.state.name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.3.5 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
@@ -98,35 +100,46 @@ class MainWindow(QMainWindow):
         file_menu.addAction(save_as_action)
 
         file_menu.addSeparator()
-    
-        wizard_action = QAction("🧙 Assistant de Projet...", self)
-        wizard_action.setShortcut(QKeySequence("Ctrl+Shift+N"))
-        wizard_action.triggered.connect(self._on_project_wizard)
-        file_menu.addAction(wizard_action)
-        
-
-        wizard_action = QAction("🧙 Assistant de granulométrie...", self)
-        wizard_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
-        wizard_action.triggered.connect(self._on_granulo_wizard)
-        file_menu.addAction(wizard_action)
-
-        fast_granulo = QAction(" ⚡ Génération granulométrie numpy... (bêta)", self)
-        fast_granulo.triggered.connect(self._open_fast_granulo)
-        file_menu.addAction(fast_granulo)
-
-        wizard_action = QAction("🧙 Assistant de déformable...", self)
-        wizard_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
-        wizard_action.triggered.connect(self._on_deformable_wizard)
-        file_menu.addAction(wizard_action)
-
-
-        file_menu.addSeparator()
-        
         quit_action = QAction("Quitter", self)
         quit_action.setShortcut(QKeySequence("Ctrl+Q"))
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
+    
+        # Menu Assistants
+        assistants_menu = menubar.addMenu("🧙 Assistants...")
+
+        project_wizard_action = QAction("🧙 Assistant de Projet...", self)
+        project_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+N"))
+        project_wizard_action.triggered.connect(self._on_project_wizard)
+        assistants_menu.addAction(project_wizard_action)
+
+        assistants_menu.addSeparator()
+
+        granulo_wizard_action = QAction("🎲 Assistant de granulométrie...", self)
+        granulo_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        granulo_wizard_action.triggered.connect(self._on_granulo_wizard)
+        assistants_menu.addAction(granulo_wizard_action)
+
+        fast_granulo_action = QAction("⚡ Génération granulométrie numpy... (bêta)", self)
+        fast_granulo_action.triggered.connect(self._open_fast_granulo)
+        assistants_menu.addAction(fast_granulo_action)
+
+        assistants_menu.addSeparator()
+
+        deformable_wizard_action = QAction("🔧 Assistant de déformable...", self)
+        deformable_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        deformable_wizard_action.triggered.connect(self._on_deformable_wizard)
+        assistants_menu.addAction(deformable_wizard_action)
+
+        assistants_menu.addSeparator()
+
+        masonry_wizard_action = QAction("🧱 Assistant de maçonnerie...", self)
+        masonry_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        masonry_wizard_action.triggered.connect(self._on_masonry_wizard)
+        assistants_menu.addAction(masonry_wizard_action)
+
         
+
         # Menu Outils
         tools_menu = menubar.addMenu("Outils")
         #Préférences
@@ -167,6 +180,16 @@ class MainWindow(QMainWindow):
         gen_script_action = QAction("📄 Générer Script Calcul", self)
         gen_script_action.triggered.connect(self._on_generate_compute_script)
         compute_menu.addAction(gen_script_action)
+
+        logs_action = QAction("📄 Voir Logs LMGC90", self)
+        logs_action.setShortcut("F6")
+        logs_action.triggered.connect(self._on_show_logs)
+        compute_menu.addAction(logs_action)
+
+        app_logs_action = QAction("📋 Journal de l'application", self)
+        app_logs_action.setShortcut("F7")
+        app_logs_action.triggered.connect(self._on_show_app_log)
+        compute_menu.addAction(app_logs_action)
         
         # menu tabs
         tabs_menu = menubar.addMenu("📑 Onglets")
@@ -396,7 +419,7 @@ class MainWindow(QMainWindow):
         paraview_btn.setMinimumHeight(40)
         paraview_btn.clicked.connect(self._on_paraview)
         viz_layout.addWidget(paraview_btn)
-        
+           
         viz_group.setLayout(viz_layout)
         layout.addWidget(viz_group)
         self.render_widget.setLayout(layout)
@@ -414,8 +437,7 @@ class MainWindow(QMainWindow):
         self.model_tab.model_created.connect(self._refresh_all)
         self.model_tab.model_updated.connect(self._refresh_all)
         self.model_tab.model_deleted.connect(self._refresh_all)
-        self.model_tab.dimension_changed.connect(self.avatar_tab._update_avatar_types)
-        #self.model_tab.dimension_changed.connect(self.empty_avatar_tab.sync_dimension)
+        self.model_tab.dimension_changed.connect( self.avatar_tab._update_avatar_types)
 
         #avatars
         self.avatar_tab.avatar_created.connect(self._refresh_all)
@@ -478,7 +500,7 @@ class MainWindow(QMainWindow):
         if ok and name.strip():
             name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name.strip())
             self.controller.new_project(name)
-            self.setWindowTitle(f"LMGC90_GUI v0.3.0 - {name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.3.5 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
@@ -496,7 +518,7 @@ class MainWindow(QMainWindow):
         if filepath:
             try:
                 self.controller.load_project(Path(filepath))
-                self.setWindowTitle(f"LMGC90_GUI v0.3.0 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.3.5 - {self.controller.state.name}")
                 self.project_loaded.emit()
                 self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
@@ -644,9 +666,10 @@ class MainWindow(QMainWindow):
         """Affiche À propos"""
         QMessageBox.information(
             self, "À propos",
-            "LMGC90_GUI v0.3.0\n\n"
-            "Architecture MVC refactorisée\n"
-            "par Zerourou B.\n\n"
+            "LMGC90_GUI v0.3.5\n"
+            "UI pour LMGC90\n"
+            "par Zerourou B.\n"
+            "bachir.zerourou@yahoo.fr\n"
             "© 2025 - Open Source"
         )
 
@@ -731,7 +754,7 @@ class MainWindow(QMainWindow):
         """Ouvre un projet récent"""
         try:
             self.controller.load_project(filepath)
-            self.setWindowTitle(f"LMGC90_GUI v0.3.0 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.3.5 - {self.controller.state.name}")
             self.project_loaded.emit()
             self.statusBar().showMessage(f"Projet chargé", 5000)
             
@@ -779,6 +802,7 @@ class MainWindow(QMainWindow):
         
         wizard = ProjectSetupWizard(self.controller, self)
         if wizard.exec():
+            self.setWindowTitle(f"LMGC90_GUI v0.3.5 - {self.controller.state.name}")
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
 
@@ -804,6 +828,15 @@ class MainWindow(QMainWindow):
         dlg = GranuloFastDialog(self.controller, parent=self)
         dlg.granulo_generated.connect(self._refresh_all)
         dlg.exec()
+
+    def _on_masonry_wizard(self) :
+        """Lance l'assistant de maçonnerie"""
+        from ..gui.dialogs.masonery_wizard import MasonryWizard
+        
+        wizard = MasonryWizard(self.controller, self)
+        if wizard.exec():
+            self._refresh_all()
+            self.statusBar().showMessage("✅ Maçonnerie générée", 5000)
         
     # ========== VISUALISATION ET GÉNÉRATION ==========
     
@@ -905,6 +938,18 @@ class MainWindow(QMainWindow):
     
 
     # =======Menu calcul ===================
+    def _on_show_app_log(self):
+        """Ouvre le journal global de l'application dans une fenêtre dédiée."""
+        from ..gui.dialogs.app_log_dialog import AppLogDialog
+        dlg = AppLogDialog(parent=self)
+        dlg.show()
+
+    def _on_show_logs(self):
+        """Switche vers l'onglet Calcul et affiche le panneau de logs."""
+        self._add_tab('compute')
+        self.tabs.setCurrentWidget(self.compute_tab)
+        self.compute_tab.show_log_panel()
+
     def _on_compute_setup(self):
         """Ouvre l'onglet calcul"""
         for i in range(self.tabs.count()):

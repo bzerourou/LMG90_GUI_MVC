@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QPushButton, QMessageBox, QGroupBox, QTextEdit, QProgressBar, QLabel, 
-    QScrollArea, QCheckBox
+    QScrollArea, QCheckBox, QTabWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from ...core.validators import ValidationError
@@ -405,6 +405,21 @@ class ComputeTab(QWidget):
                 f"Le calcul a rencontré une erreur.\n\n"
                 "Consultez la console pour les détails de l'erreur."
             )
+
+    def show_log_panel(self):
+        """Appelé depuis main_window pour switcher vers l'onglet logs."""
+        # Trouver le QTabWidget parent (bottom_tabs) et sélectionner l'onglet logs
+        for child in self.findChildren(QTabWidget):
+            for i in range(child.count()):
+                if "Log" in child.tabText(i):
+                    child.setCurrentIndex(i)
+                    break
+
+        # Recharger si un log existe
+        if self.controller.project_path:
+            log_path = self.controller.project_path / "lmgc90.log"
+            if log_path.exists():
+                self.log_panel.set_log_path(log_path)
     
     def refresh(self):
         """Rafraîchit (appelé par main_window)"""

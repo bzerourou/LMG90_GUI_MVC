@@ -257,7 +257,8 @@ class GranuloIntroPage(QWizardPage):
             "<li>✅ Choisir le type de conteneur</li>"
             "<li>✅ Prévisualiser et générer</li>"
             "</ol>"
-            "<p><b>💡 Astuce :</b> L'algorithme de dépôt place les particules par gravité sans chevauchement.</p>"
+            "<p><b>💡 Astuce : API utilisé  : :</b> <code> granulo_Random(nb, r_min, r_max, ) </code> pour la distribution.</p>"
+            "<p><i>⏱️ Temps estimé : 2-3 minutes</i></p>"    
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)

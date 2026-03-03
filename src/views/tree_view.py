@@ -5,12 +5,13 @@
 Vue arborescente du modèle.
 Affiche la structure du projet dans un QTreeWidget.
 """
-from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QMenu, QMessageBox
 from PyQt6.QtCore import Qt, QObject
 from PyQt6.QtGui import QBrush, QColor
 
 from ..controllers.project_controller import ProjectController
 from ..core.models import AvatarOrigin
+from ..views.dialogs import DuplicateDialog
 from PyQt6.QtCore import pyqtSignal
 
 
@@ -30,6 +31,10 @@ class ModelTreeView(QObject):
 
         #connecter le signal de sélection
         self.tree.itemClicked.connect(self._on_item_clicked)
+
+        #menu contextuel 
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._on_context_menu)
     
     def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """Quand un item est cliqué """
@@ -38,6 +43,121 @@ class ModelTreeView(QObject):
         if item_type and item_data is not None:
             self.item_selected.emit(item_type, item_data)
 
+    # ── Menu contextuel ──────────────────────────────────────────────────────
+    def _on_context_menu(self, pos):
+        """Affiche le menu contextuel selon l'élément cliqué."""
+        item = self.tree.itemAt(pos)
+        if item is None:
+            return
+
+        item_type = item.data(0, Qt.ItemDataRole.UserRole)
+        item_data = item.data(1, Qt.ItemDataRole.UserRole)
+
+        menu = QMenu(self.tree)
+
+        if item_type == "avatar":
+            dup_action = menu.addAction("📋 Dupliquer cet avatar…")
+            action = menu.exec(self.tree.viewport().mapToGlobal(pos))
+            if action == dup_action:
+                self._on_duplicate_avatar(item_data)
+
+        elif item_type == "group" or (
+            item_type is None and item.text(1) == "Groupe"
+        ):
+            # Le nœud groupe stocke son nom dans la colonne 0
+            group_name = item.text(0)
+            dup_action = menu.addAction("📋 Dupliquer ce groupe…")
+            action = menu.exec(self.tree.viewport().mapToGlobal(pos))
+            if action == dup_action:
+                self._on_duplicate_group(group_name)
+
+    def _dimension(self) -> int:
+        """Retourne la dimension du projet (2 ou 3)."""
+        return getattr(self.controller.state, 'dimension', 2)
+
+    def _on_duplicate_avatar(self, index: int):
+        """Ouvre le dialogue et duplique l'avatar à l'index donné."""
+        avatar = self.controller.get_avatar(index)
+        if avatar is None:
+            QMessageBox.warning(
+                self.tree, "Avatar introuvable",
+                f"Aucun avatar à l'index {index}."
+            )
+            return
+
+        label = (
+            f"Avatar #{index} — {avatar.avatar_type.value} "
+            f"({', '.join(f'{x:.3f}' for x in avatar.center)})"
+        )
+        dlg = DuplicateDialog(
+            source_label=label,
+            dimension=self._dimension(),
+            mode='avatar',
+            parent=self.tree
+        )
+        if dlg.exec() != DuplicateDialog.DialogCode.Accepted:
+            return
+
+        n_copies   = dlg.get_n_copies()
+        offset     = dlg.get_offset()
+        group_name = dlg.get_group_name() or None
+
+        try:
+            new_indices = self.controller.duplicate_avatar(
+                index, n_copies, offset, group_name
+            )
+            msg = f"{len(new_indices)} copie(s) créée(s)"
+            if group_name:
+                msg += f" dans le groupe '{group_name}'"
+            QMessageBox.information(self.tree, "✅ Duplication réussie", msg + ".")
+        except Exception as e:
+            QMessageBox.critical(
+                self.tree, "Erreur de duplication", str(e)
+            )
+
+    def _on_duplicate_group(self, group_name: str):
+        """Ouvre le dialogue et duplique le groupe donné."""
+        groups = self.controller.state.avatar_groups
+        if group_name not in groups:
+            QMessageBox.warning(
+                self.tree, "Groupe introuvable",
+                f"Le groupe '{group_name}' n'existe pas."
+            )
+            return
+
+        count = len(groups[group_name])
+        label = f"Groupe '{group_name}' ({count} avatar(s))"
+        dlg = DuplicateDialog(
+            source_label=label,
+            dimension=self._dimension(),
+            mode='group',
+            parent=self.tree
+        )
+        if dlg.exec() != DuplicateDialog.DialogCode.Accepted:
+            return
+
+        n_copies = dlg.get_n_copies()
+        offset   = dlg.get_offset()
+        prefix   = dlg.get_group_name() or None
+
+        try:
+            result = self.controller.duplicate_group(
+                group_name, n_copies, offset, prefix
+            )
+            total = sum(len(v) for v in result.values())
+            grp_list = ", ".join(f"'{k}'" for k in result)
+            QMessageBox.information(
+                self.tree, "✅ Duplication réussie",
+                f"{total} avatar(s) créé(s) dans {len(result)} groupe(s) : {grp_list}."
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self.tree, "Erreur de duplication", str(e)
+            )
+    
+
+
+    # ── les ajouts et rafraîchissement  ──────────────────────────────────────────────────────
     def refresh(self):
         """Rafraîchit l'arbre complet"""
         self.tree.clear()
