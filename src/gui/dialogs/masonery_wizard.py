@@ -195,7 +195,7 @@ class MasonryWizard(QWizard):
             self.controller._bodies_container.addAvatar(body)
             self.controller._pylmgc_bodies.append(body)
             # wall_params pour reconstruction au rechargement
-            wp = {'l': bx, 'h': by}
+            wp = {'l': bx, 'h': by, 'brick_name': brick_name}
             if bz is not None:
                 wp['lz'] = bz
             av = Avatar(

@@ -329,7 +329,7 @@ class Avatar:
         if isinstance(data['center'], list):
             center = data['center']
         # Reconstruire wall_params
-        wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg','lx', 'ly', 'lz','ra', 'rb', 'faces']
+        wall_keys = ['l', 'h', 'r', 'rmin', 'rmax', 'nb_vertex', 'nb_polyg','lx', 'ly', 'lz','ra', 'rb', 'faces', 'brick_name']
         wall_params = {k: data[k] for k in wall_keys if k in data}
         
         return cls(
@@ -650,6 +650,9 @@ class ProjectPreferences:
     max_recent_projects: int = 10
     show_granulo_individually: bool = True
     create_pylmgc_on_generate: bool = True
+
+    script_use_loop:bool = True
+
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
@@ -663,6 +666,7 @@ class ProjectPreferences:
             'max_recent_projects': self.max_recent_projects,
             'show_granulo_individually': self.show_granulo_individually,
             'create_pylmgc_on_generate': self.create_pylmgc_on_generate,
+            'script_use_loop': self.script_use_loop,
         }
     
     @classmethod
@@ -678,6 +682,7 @@ class ProjectPreferences:
             max_recent_projects=data.get('max_recent_projects', 10),
             show_granulo_individually=data.get('show_granulo_individually', True),
             create_pylmgc_on_generate=data.get('create_pylmgc_on_generate', True),
+            script_use_loop=data.get('script_use_loop', True),
         )
     
     def get_unit_labels(self) -> Dict[str, str]:

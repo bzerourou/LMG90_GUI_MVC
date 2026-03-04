@@ -34,13 +34,22 @@ _DEPOSIT_PARAMS = {
     "Cylinder3D": ["r"],
 }
 
+_MASONRY_WALL_KEYS = {'l', 'h', 'lz', 'brick_name'}
+
 class ScriptGenerator:
     """Génère un script Python reproductible du projet"""
     
     def __init__(self, controller: ProjectController):
         self.controller = controller
         self.state = controller.state
-    
+        
+    @property
+    def _use_loop(self) -> bool :
+        """True -> boucles compactes (script court) ; False -> element par element."""
+        return bool(getattr(
+            getattr(self.state, 'preferences', None),
+            'script_use_loop', True
+        ))
     def generate(self, output_path: Path) -> None:
         """Génère le script complet"""
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -97,8 +106,8 @@ class ScriptGenerator:
                 for key, value in (mat.properties).items():
                     f.write(',\n    ')
                     f.write(f"{key}='{value}'" if isinstance(value, str) else f"{key}={value}")
-                f.write('\n)\n')
-                f.write(f"mats.addMaterial(mat_{mat.name})\n\n")
+            f.write('\n)\n')
+            f.write(f"mats.addMaterial(mat_{mat.name})\n\n")
     
     # ── Modèles ───────────────────────────────────────────────────────────────
     def _write_models(self, f: TextIO):
@@ -127,10 +136,198 @@ class ScriptGenerator:
             return
         
         f.write('# Avatars manuels\n')
+
+        if self._use_loop : 
+                self._write_avatars_manual_loop(f)
+        else:
+            for av in manual_avatars:
+                self._write_single_avatar(f, av, "bodies")
+
+        f.write('\n')
         for i, av in enumerate(manual_avatars):
             self._write_single_avatar(f, av, f"bodies")
         f.write('\n')
     
+    # ---- Mode boucle --------------------------------------------------------
+    def _write_avatars_manual_loop(self, f: TextIO):
+        """
+        Regroupe les avatars par groupe (avatar_groups).
+        Chaque groupe homogene -> boucle compacte.
+        Avatars sans groupe ou groupes heterogenes -> ecriture individuelle.
+        """
+        avatar_groups   = getattr(self.state, 'avatar_groups', {}) or {}
+        written_indices: set = set()
+
+        for group_name, indices in avatar_groups.items():
+            group_avs = []
+            for idx in indices:
+                if idx < len(self.state.avatars):
+                    av = self.state.avatars[idx]
+                    if av.origin == AvatarOrigin.MANUAL:
+                        group_avs.append((idx, av))
+            if not group_avs:
+                continue
+            ok = self._try_write_group_as_loop(f, group_name, group_avs)
+            if ok:
+                written_indices.update(idx for idx, _ in group_avs)
+
+        # Avatars restants (hors groupe ou groupe heterogene)
+        for i, av in enumerate(self.state.avatars):
+            if av.origin != AvatarOrigin.MANUAL:
+                continue
+            if i in written_indices:
+                continue
+            self._write_single_avatar(f, av, "bodies")
+
+    def _try_write_group_as_loop(
+        self, f: TextIO, group_name: str, group_avs: list
+    ) -> bool:
+        """
+        Tente d'ecrire le groupe comme boucle compacte.
+        Retourne True si reussi (groupe homogene), False sinon.
+        """
+        if not group_avs:
+            return False
+
+        _, ref = group_avs[0]
+        atype  = ref.avatar_type.value
+
+        # --- Briques de maconnerie -------------------------------------------
+        if (atype == "emptyAvatar"
+                and ref.wall_params
+                and 'l' in ref.wall_params
+                and 'h' in ref.wall_params):
+            wp0 = ref.wall_params
+            for _, av in group_avs[1:]:
+                wp = av.wall_params or {}
+                if (av.material_name       != ref.material_name
+                        or av.model_name   != ref.model_name
+                        or av.color        != ref.color
+                        or wp.get('brick_name') != wp0.get('brick_name')
+                        or wp.get('l')     != wp0.get('l')
+                        or wp.get('h')     != wp0.get('h')
+                        or wp.get('lz')    != wp0.get('lz')):
+                    return False
+            self._write_masonry_group_loop(f, group_name, group_avs)
+            return True
+
+        # --- Avatars standards homogenes -------------------------------------
+        if atype not in ("emptyAvatar", "mesh"):
+            for _, av in group_avs[1:]:
+                if (av.avatar_type.value  != atype
+                        or av.material_name   != ref.material_name
+                        or av.model_name      != ref.model_name
+                        or av.color           != ref.color
+                        or av.radius          != ref.radius
+                        or av.generation_type != ref.generation_type):
+                    return False
+            self._write_standard_group_loop(f, group_name, group_avs)
+            return True
+
+        return False  # mesh ou emptyAvatar classique -> individuel
+
+    def _write_masonry_group_loop(
+        self, f: TextIO, group_name: str, group_avs: list
+    ):
+        """
+        Genere :
+            _centers_<group> = [[x,y], ...]
+            _brick_<group>   = pre.brick2D/3D(name, ...)
+            for _c in _centers_<group>:
+                body = _brick_<group>.rigidBrick(center=_c, ...)
+                bodies.addAvatar(body)
+                bodies_list.append(body)
+        """
+        _, ref     = group_avs[0]
+        wp         = ref.wall_params
+        brick_name = wp.get('brick_name', 'std')
+        bx         = wp['l']
+        by         = wp['h']
+        bz         = wp.get('lz')
+        mat        = ref.material_name
+        mod        = ref.model_name
+        color      = ref.color
+        dim        = len(ref.center)
+        safe       = group_name.replace(' ', '_').replace('-', '_')
+
+        lines = ['[']
+        for _, av in group_avs:
+            lines.append(f'    {list(av.center)},')
+        lines.append(']')
+        centers_repr = '\n'.join(lines)
+
+        f.write(f'# Groupe maconnerie : {group_name} ({len(group_avs)} briques)\n')
+        f.write(f'_centers_{safe} = {centers_repr}\n\n')
+
+        if dim == 2:
+            f.write(f"_brick_{safe} = pre.brick2D('{brick_name}', {bx}, {by})\n")
+        else:
+            if bz is None:
+                bz = by
+            f.write(f"_brick_{safe} = pre.brick3D('{brick_name}', {bx}, {by}, {bz})\n")
+
+        f.write(f'for _c in _centers_{safe}:\n')
+        f.write(f"    body = _brick_{safe}.rigidBrick(\n")
+        f.write(f"        center=_c,\n")
+        f.write(f"        model=mods['{mod}'],\n")
+        f.write(f"        material=mats['{mat}'],\n")
+        f.write(f"        color='{color}'\n")
+        f.write(f"    )\n")
+        f.write(f"    bodies.addAvatar(body)\n")
+        f.write(f"    bodies_list.append(body)\n")
+        f.write('\n')
+
+    def _write_standard_group_loop(
+        self, f: TextIO, group_name: str, group_avs: list
+    ):
+        """
+        Genere :
+            _centers_<group> = [[x,y], ...]
+            for _c in _centers_<group>:
+                body = pre.<type>(center=_c, model=..., ...)
+                bodies.addAvatar(body)
+                bodies_list.append(body)
+        """
+        _, ref  = group_avs[0]
+        atype   = ref.avatar_type.value
+        mat     = ref.material_name
+        mod     = ref.model_name
+        color   = ref.color
+        safe    = group_name.replace(' ', '_').replace('-', '_')
+
+        lines = ['[']
+        for _, av in group_avs:
+            lines.append(f'    {list(av.center)},')
+        lines.append(']')
+        centers_repr = '\n'.join(lines)
+
+        f.write(f'# Groupe : {group_name} ({len(group_avs)} avatars)\n')
+        f.write(f'_centers_{safe} = {centers_repr}\n\n')
+        f.write(f'for _c in _centers_{safe}:\n')
+        f.write(f"    body = pre.{atype}(\n")
+        f.write(f"        center=_c,\n")
+        f.write(f"        model=mods['{mod}'],\n")
+        f.write(f"        material=mats['{mat}'],\n")
+        f.write(f"        color='{color}'")
+        if ref.radius is not None:
+            f.write(f",\n        r={ref.radius}")
+        if ref.generation_type:
+            f.write(f",\n        generation_type='{ref.generation_type}'")
+        if ref.nb_vertices:
+            key = 'nb_disk' if ref.avatar_type == AvatarType.RIGID_CLUSTER \
+                  else 'nb_vertices'
+            f.write(f",\n        {key}={ref.nb_vertices}")
+        if ref.is_hollow:
+            f.write(",\n        is_Hollow=True")
+        if ref.wall_params:
+            for k, v in ref.wall_params.items():
+                if k not in _MASONRY_WALL_KEYS:
+                    f.write(f",\n        {k}={v}")
+        f.write("\n    )\n")
+        f.write("    bodies.addAvatar(body)\n")
+        f.write("    bodies_list.append(body)\n")
+        f.write('\n')
+
     def _write_single_avatar(self, f, avatar, container="bodies"):
         """Écrit un avatar individuel"""
         atype = avatar.avatar_type.value
@@ -246,8 +443,42 @@ class ScriptGenerator:
             f.write("\n")
             return
 
+        # ── Brique de maçonnerie (EMPTY_AVATAR issu du masonry_wizard) ────────
+        #  emptyAvatar dont wall_params contient 'l' et 'h'
+        if atype == "emptyAvatar" and avatar.wall_params and \
+                'l' in avatar.wall_params and 'h' in avatar.wall_params:
+            wp         = avatar.wall_params
+            brick_name = wp.get('brick_name', 'std')
+            bx         = wp['l']        # longueur
+            by         = wp['h']        # hauteur (2D) ou profondeur (3D)
+            bz         = wp.get('lz')   # hauteur 3D, None en 2D
+            dim        = len(avatar.center)
+
+            f.write(f"# Brique de maçonnerie — {brick_name}\n")
+            if dim == 2:
+                f.write(f"_brick = pre.brick2D('{brick_name}', {bx}, {by})\n")
+                f.write(f"body = _brick.rigidBrick(\n")
+                f.write(f"    center={center},\n")
+                f.write(f"    model=mods['{mod}'],\n")
+                f.write(f"    material=mats['{mat}'],\n")
+                f.write(f"    color='{color}'\n")
+                f.write(f")\n")
+            else:
+                if bz is None:
+                    bz = by
+                f.write(f"_brick = pre.brick3D('{brick_name}', {bx}, {by}, {bz})\n")
+                f.write(f"body = _brick.rigidBrick(\n")
+                f.write(f"    center={center},\n")
+                f.write(f"    model=mods['{mod}'],\n")
+                f.write(f"    material=mats['{mat}'],\n")
+                f.write(f"    color='{color}'\n")
+                f.write(f")\n")
+            f.write(f"{container}.addAvatar(body)\n")
+            f.write(f"bodies_list.append(body)\n\n")
+            return
+
         # emptyAvatar
-        if atype == "emptyAvatar":
+        if atype == "emptyAvatar" :
             f.write(f"# Avatar vide avec contacteurs personnalisés\n")
             f.write(f"body = pre.avatar(dimension={self.state.dimension})\n")
             
@@ -298,6 +529,8 @@ class ScriptGenerator:
         has_r_in_wall_params = False
         if avatar.wall_params:
             for k, v in avatar.wall_params.items():
+                if k in _MASONRY_WALL_KEYS:
+                    continue
                 args.append(f"{k}={v}")
                 if k == 'r':
                     has_r_in_wall_params = True
@@ -307,8 +540,6 @@ class ScriptGenerator:
         if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
             if avatar.generation_type in ["full", "bevel"]:
                 exclude_r = True
-        print(not exclude_r)
-        print(not has_r_in_wall_params)
 
         # 3. Ajouter r seulement si :
         #    - il existe,
@@ -585,25 +816,27 @@ class ScriptGenerator:
             
             container_params_str = ', '.join(f"{k}={v}" for k, v in gen.container_params.items())
             
-            f.write(f"radii_{i}, coords_{i} = pre.pre.granuloRandom(\n")
+            f.write(f"radii_{i} = pre.granulo_Random(\n")
             f.write(f"    nb={gen.nb_particles},\n")
-            f.write(f"    rmin={gen.radius_min},\n")
-            f.write(f"    rmax={gen.radius_max}")
+            f.write(f"    r_min={gen.radius_min},\n")
+            f.write(f"    r_max={gen.radius_max}")
             if gen.seed:
                 f.write(f",\n    seed={gen.seed}")
-            if container_params_str:
-                f.write(f",\n    {container_params_str}")
+   
             f.write(f"\n)\n\n")
             # 2. Dépôt dans le conteneur
             deposit_func = _DEPOSIT_FUNC.get(gen.container_type, "depositInBox2D")
             deposit_keys = _DEPOSIT_PARAMS.get(gen.container_type, ["lx", "ly"])
 
-            f.write(f"_coords_{i} = pre.{deposit_func}(\n")
-            f.write(f"    radii=_radii_{i},\n")
+            f.write(f"_nb_remaining, _coords_{i} = pre.{deposit_func}(\n")
+            f.write(f"    radii=radii_{i},\n")
             for key in deposit_keys:
                 val = gen.container_params.get(key, 1.0)
                 f.write(f"    {key}={val},\n")
             f.write(f")\n\n")
+            f.write(f"# Reshape coordinates\n")
+            f.write(f"_coords_{i}.shape = [_coords_{i}.size//2,2]\n")
+            f.write(f"radii_{i} = radii_{i}[:_nb_remaining]\n\n")
 
             # 3. Boucle for de création des avatars
             f.write(f"# Création des avatars — dépôt {i+1}\n")
@@ -611,26 +844,26 @@ class ScriptGenerator:
             if not show_individually:
                 # Pas de stockage individuel : avatars non indexés
                 f.write(f"# (avatars non indexés — préférence 'affichage groupes uniquement')\n")
-                f.write(f"for j in range(len(_radii_{i})):\n")
+                f.write(f"for j in range(len(radii_{i})):\n")
                 f.write(f"    av = pre.{gen.avatar_type}(\n")
                 f.write(f"        center=_coords_{i}[j],\n")
                 f.write(f"        model=mod_{gen.model_name},\n")
                 f.write(f"        material=mat_{gen.material_name},\n")
                 f.write(f"        color='{gen.color}',\n")
-                f.write(f"        r=float(_radii_{i}[j])\n")
+                f.write(f"        r=float(radii_{i}[j])\n")
                 f.write(f"    )\n")
                 f.write(f"    bodies.addAvatar(av)\n\n")
             else:
                 # Stockage individuel + groupe optionnel
                 if gen.group_name:
                     f.write(f"group_{gen.group_name} = []\n")
-                f.write(f"for j in range(len(_radii_{i})):\n")
+                f.write(f"for j in range(len(radii_{i})):\n")
                 f.write(f"    av = pre.{gen.avatar_type}(\n")
                 f.write(f"        center=_coords_{i}[j],\n")
                 f.write(f"        model=mod_{gen.model_name},\n")
                 f.write(f"        material=mat_{gen.material_name},\n")
                 f.write(f"        color='{gen.color}',\n")
-                f.write(f"        r=float(_radii_{i}[j])\n")
+                f.write(f"        r=float(radii_{i}[j])\n")
                 f.write(f"    )\n")
                 f.write(f"    bodies.addAvatar(av)\n")
                 f.write(f"    bodies_list.append(av)\n")
@@ -706,11 +939,16 @@ class ScriptGenerator:
             if cmd.target_type and cmd.target_value is not None:
                 f.write(f"# Commande avec cible: {cmd.target_type} = {cmd.target_value}\n")
                 f.write(f"# rigid_set = [...]  # À définir selon la cible\n")
-                f.write(f"# post_cmd_{i} = pre.postpro_command(\n")
-                f.write(f"#     name='{cmd.name}',\n")
-                f.write(f"#     step={cmd.step},\n")
-                f.write(f"#     rigid_set={cmd.target_value}n")
-                f.write(f"# )\n")
+                f.write(f"post_cmd_{i} = pre.postpro_command(\n")
+                f.write(f"     name='{cmd.name}',\n")
+                f.write(f"     step={cmd.step},\n")
+                if cmd.target_type == 'avatar':
+                    f.write(f"     rigid_set=[bodies[{cmd.target_value}]]\n")
+                elif cmd.target_type == 'group':
+                    #récupérer les indices des avatars du groupe
+                    f.write(f"     rigid_set = [bodies[i] for i in group_{cmd.target_value}]\n")
+                
+                f.write(f" )\n")
                 f.write(f"posts.addCommand(post_cmd_{i})\n")
             else:
                 f.write(f"post_cmd_{i} = pre.postpro_command(\n")

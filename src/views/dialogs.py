@@ -623,6 +623,20 @@ class PreferencesDialog(QDialog):
         viewer_group.setLayout(viewer_layout)
         layout.addWidget(viewer_group)
 
+        for_group = QGroupBox(" génération script en boucles ")
+        for_layout = QVBoxLayout()
+
+        self.script_use_loop_check = QCheckBox(
+            "Créer des boucles sur vos avatars lor de la génération de vos scripts python "
+        )
+        self.script_use_loop_check.setToolTip(
+            "Décocher si vous souhaiter sauvegarder vos avatars un par un (manuellement)."
+        )
+        for_layout.addWidget(self.script_use_loop_check)
+
+        for_group.setLayout(for_layout)
+        layout.addWidget(for_group)
+
         layout.addStretch()
         return w
 
@@ -693,6 +707,9 @@ class PreferencesDialog(QDialog):
         self.auto_refresh_viewer_check.setChecked(
             getattr(self.preferences, 'auto_refresh_viewer', True)
         )
+        self.script_use_loop_check.setChecked(
+            getattr(self.preferences, 'script_use_loop', True)
+        )
 
     def get_preferences(self) -> ProjectPreferences:
         path_text = self.project_path_input.text().strip()
@@ -706,6 +723,7 @@ class PreferencesDialog(QDialog):
         self.preferences.show_granulo_individually  = self.show_granulo_check.isChecked()
         self.preferences.create_pylmgc_on_generate  = self.create_pylmgc_check.isChecked()
         self.preferences.auto_refresh_viewer        = self.auto_refresh_viewer_check.isChecked()
+        self.preferences.script_use_loop           = self.script_use_loop_check.isChecked()
 
         return self.preferences
 class DuplicateDialog(QDialog):

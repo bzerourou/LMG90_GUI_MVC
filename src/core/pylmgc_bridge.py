@@ -193,6 +193,28 @@ class LMGC90Bridge:
             )
         
         elif atype == AvatarType.EMPTY_AVATAR:
+            # Reconstruction via pre.brick2D / pre.brick3D + rigidBrick()
+            wp = avatar.wall_params or {}
+            if 'l' in wp and 'h' in wp:
+                brick_name = wp.get('brick_name', 'std')
+                bx  = wp['l']       # longueur
+                by  = wp['h']       # hauteur (2D) ou profondeur (3D)
+                bz  = wp.get('lz')  # hauteur 3D, None en 2D
+                dim = len(center)
+                if dim == 2:
+                    # brick2D(name, lx, ly) : lx=longueur, ly=hauteur
+                    brick = pre.brick2D(brick_name, bx, by)
+                else:
+                    # brick3D(name, lx, ly, lz) : lx=longueur, ly=profondeur, lz=hauteur
+                    if bz is None:
+                        bz = by  # fallback de securite
+                    brick = pre.brick3D(brick_name, bx, by, bz)
+                return brick.rigidBrick(
+                    center=np.array(center),
+                    model=model_obj,
+                    material=material_obj,
+                    color=color
+                )
             # Avatar vide avec contacteurs personnalisés
             body = pre.avatar(dimension=len(center))
             
