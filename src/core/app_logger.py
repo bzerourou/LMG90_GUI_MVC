@@ -57,42 +57,71 @@ _DATE_FMT    = "%Y-%m-%d %H:%M:%S"
 
 # ── Redirigeur stdout/stderr → logger ────────────────────────────────────────
 class _StreamToLogger:
-    """Redirige un flux texte (stdout/stderr) vers le logger."""
+    """
+    Redirige un flux texte (stdout/stderr) vers le logger.
+
+    Fonctionne en mode dev (original = console) ET en mode prod PyInstaller
+    (original peut etre None quand l'exe est construit sans console
+    --noconsole / --windowed).
+    """
+
+    # Messages a ne pas stocker dans le log (bruit inutile)
+    _IGNORE = (
+        "pkg_resources is deprecated",
+        "pkg_resources package is slated",
+        "vtk display not available",
+        "to activate it install python",
+    )
 
     def __init__(self, logger: logging.Logger, level: int, original):
         self._logger   = logger
         self._level    = level
-        self._original = original
+        # original peut etre None en prod frozen sans console
+        self._original = original if original is not None else None
         self._buf      = ""
 
     def write(self, msg: str):
-        # Toujours écrire sur le flux original (console visible en dev)
-        self._original.write(msg)
-        self._original.flush()
-        # Accumuler les lignes incomplètes
+        if not msg:
+            return
+        # Ecrire sur la console originale seulement si elle existe
+        if self._original is not None:
+            try:
+                self._original.write(msg)
+                self._original.flush()
+            except Exception:
+                pass  # console fermee ou indisponible : on continue quand meme
+
+        # Accumuler et envoyer au logger ligne par ligne
         self._buf += msg
         while "\n" in self._buf:
             line, self._buf = self._buf.split("\n", 1)
             line = line.rstrip()
-            if line:
-                # Filtrer les warnings pkg_resources / vtk déjà supprimés
-                if any(p in line for p in (
-                    "pkg_resources is deprecated",
-                    "pkg_resources package is slated",
-                    "vtk display not available",
-                    "to activate it install python",
-                )):
-                    continue
+            if line and not any(p in line for p in self._IGNORE):
                 self._logger.log(self._level, line)
 
     def flush(self):
-        self._original.flush()
+        if self._original is not None:
+            try:
+                self._original.flush()
+            except Exception:
+                pass
 
     def fileno(self):
-        return self._original.fileno()
+        # fileno() est requis par certains modules C (ex: Fortran via ctypes).
+        # Si le flux original n'existe pas, on leve UnsupportedOperation
+        # plutot qu'un AttributeError ou NoneType.
+        if self._original is not None:
+            try:
+                return self._original.fileno()
+            except Exception:
+                pass
+        import io
+        raise io.UnsupportedOperation("fileno")
 
     def isatty(self):
-        return getattr(self._original, 'isatty', lambda: False)()
+        if self._original is not None:
+            return getattr(self._original, 'isatty', lambda: False)()
+        return False
 
 
 # ── Gestionnaire d'exceptions non gérées ─────────────────────────────────────
@@ -167,10 +196,15 @@ def init_logger(log_dir: Optional[Path] = None, level: int = logging.DEBUG) -> l
     _logger.addHandler(fh)
 
     # ── Handler console (WARNING+ uniquement pour ne pas polluer) ─────────────
-    ch = logging.StreamHandler(sys.__stdout__)
-    ch.setLevel(logging.WARNING)
-    ch.setFormatter(logging.Formatter(_FMT_CONSOLE))
-    _logger.addHandler(ch)
+    # sys.__stdout__ peut etre None en prod frozen sans console (--windowed).
+    # Dans ce cas on n'ajoute pas de handler console : les messages vont
+    # uniquement dans le fichier log.
+    _real_stdout = sys.__stdout__
+    if _real_stdout is not None:
+        ch = logging.StreamHandler(_real_stdout)
+        ch.setLevel(logging.WARNING)
+        ch.setFormatter(logging.Formatter(_FMT_CONSOLE))
+        _logger.addHandler(ch)
 
     # ── En-tête du fichier log ────────────────────────────────────────────────
     _logger.info("=" * 70)
@@ -183,8 +217,11 @@ def init_logger(log_dir: Optional[Path] = None, level: int = logging.DEBUG) -> l
     _logger.info("=" * 70)
 
     # ── Redirection stdout / stderr → logger ──────────────────────────────────
-    sys.stdout = _StreamToLogger(_logger, logging.INFO,    sys.__stdout__)
-    sys.stderr = _StreamToLogger(_logger, logging.WARNING, sys.__stderr__)
+    # On capture les flux ACTUELS (avant tout remplacement PyInstaller).
+    # sys.stdout / sys.stderr peuvent deja etre None en prod frozen
+    # (--windowed) : _StreamToLogger gere ce cas proprement.
+    sys.stdout = _StreamToLogger(_logger, logging.INFO,    sys.stdout)
+    sys.stderr = _StreamToLogger(_logger, logging.WARNING, sys.stderr)
 
     # ── Hook exceptions non gérées ────────────────────────────────────────────
     sys.excepthook = _handle_exception

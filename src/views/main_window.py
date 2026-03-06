@@ -142,12 +142,6 @@ class MainWindow(QMainWindow):
 
         # Menu Outils
         tools_menu = menubar.addMenu("Outils")
-        #Préférences
-        prefs_action = QAction("⚙️ Préférences...", self)
-        prefs_action.setShortcut(QKeySequence("Ctrl+,"))  # Raccourci standard
-        prefs_action.triggered.connect(self._on_preferences)
-        tools_menu.addAction(prefs_action)
-        tools_menu.addSeparator()
 
         datbox_action = QAction("Générer DATBOX", self)
         datbox_action.triggered.connect(self._on_generate_datbox)
@@ -162,14 +156,24 @@ class MainWindow(QMainWindow):
         vars_action = QAction("Variables dynamiques", self)
         vars_action.triggered.connect(self._on_dynamic_vars)
         tools_menu.addAction(vars_action)
+
+        tools_menu.addSeparator()
+
+        #Préférences
+        prefs_action = QAction("⚙️ Préférences...", self)
+        prefs_action.setShortcut(QKeySequence("Ctrl+,"))  # Raccourci standard
+        prefs_action.triggered.connect(self._on_preferences)
+        tools_menu.addAction(prefs_action)
+
         
         # Menu calcul
         compute_menu = menubar.addMenu("Calcul")
         
+
         setup_action = QAction("⚙️ Paramètres de Calcul", self)
         setup_action.triggered.connect(self._on_compute_setup)
         compute_menu.addAction(setup_action)
-        
+
         run_action = QAction("▶️ Lancer le Calcul", self)
         run_action.setShortcut(QKeySequence("F5"))
         run_action.triggered.connect(self._on_run_compute)
