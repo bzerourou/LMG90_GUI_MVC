@@ -55,6 +55,7 @@ class ScriptGenerator:
         with open(output_path, 'w', encoding='utf-8') as f:
             self._write_header(f)
             self._write_imports(f)
+            self._write_dynamic_vars(f)
             self._write_containers(f)
             self._write_materials(f)
             self._write_models(f)
@@ -79,7 +80,88 @@ class ScriptGenerator:
         f.write('from pylmgc90 import pre\n')
         f.write('import numpy as np\n')
         f.write('import math\n\n')
-    
+        # ── Variables dynamiques ──────────────────────────────────────────────────
+    def _write_dynamic_vars(self, f: TextIO):
+        """
+        Injecte les variables dynamiques du projet dans le script genere.
+
+        Chaque variable est evaluee dans l'ordre de definition pour resoudre
+        les dependances entre variables (ex: radius = thickness * 2).
+        Les expressions referençant avatar[], group[], material[] ou model[]
+        sont converties en valeur concrete au moment de la generation.
+
+        Les objets proxy non serialisables (listes d'avatars, etc.) sont
+        ecrits en commentaire avec la valeur litterale de l'expression.
+        """
+        dyn_vars = getattr(self.state, 'dynamic_vars', {}) or {}
+        if not dyn_vars:
+            return
+
+        f.write('# ── Variables dynamiques ─────────────────────────────────────\n')
+
+        # Contexte complet avec proxies (avatar, group, material, model, ...)
+        from ..utils.safe_eval import build_eval_context
+        full_ctx  = build_eval_context(self.controller)
+        evaluated: dict = {}
+        written   = 0
+
+        for var_name, var_expr in dyn_vars.items():
+            if not var_name.isidentifier():
+                f.write(f'# Variable ignoree (nom invalide) : {var_name!r}\n')
+                continue
+
+            # Evaluer avec le contexte complet + variables deja evaluees
+            raw_value = var_expr
+            if isinstance(var_expr, str):
+                try:
+                    ctx = {**full_ctx, **evaluated}
+                    raw_value = eval(var_expr, {"__builtins__": {}}, ctx)
+                except Exception:
+                    raw_value = var_expr  # garder brut si echec
+
+            evaluated[var_name] = raw_value
+
+            # Serialiser en representation Python litterale
+            script_value = self._format_dynamic_var_value(raw_value)
+            if script_value is not None:
+                f.write(f'{var_name} = {script_value}\n')
+                written += 1
+            else:
+                # Objet proxy ou type non serialisable
+                f.write(
+                    f'# {var_name} = {var_expr!r}'
+                    f'  # valeur non serialisable — a recalculer\n'
+                )
+
+        if written > 0:
+            f.write('\n')
+
+    def _format_dynamic_var_value(self, value) -> 'str | None':
+        """
+        Convertit une valeur evaluee en representation Python litterale.
+        Retourne None si la valeur n'est pas serialisable (proxy, objet...).
+        """
+        if isinstance(value, bool):
+            return repr(value)
+        if isinstance(value, int):
+            return repr(value)
+        if isinstance(value, float):
+            return repr(value)
+        if isinstance(value, str):
+            return repr(value)
+        if isinstance(value, (list, tuple)):
+            parts = []
+            for item in value:
+                part = self._format_dynamic_var_value(item)
+                if part is None:
+                    return None
+                parts.append(part)
+            if isinstance(value, tuple):
+                return f'({", ".join(parts)})'
+            return f'[{", ".join(parts)}]'
+        # Tout autre type (proxy, ndarray, objet) : non serialisable
+        return None
+
     def _write_containers(self, f: TextIO):
         f.write('# Conteneurs\n')
         f.write('mats = pre.materials()\n')
@@ -144,9 +226,7 @@ class ScriptGenerator:
                 self._write_single_avatar(f, av, "bodies")
 
         f.write('\n')
-        for i, av in enumerate(manual_avatars):
-            self._write_single_avatar(f, av, f"bodies")
-        f.write('\n')
+
     
     # ---- Mode boucle --------------------------------------------------------
     def _write_avatars_manual_loop(self, f: TextIO):
@@ -230,43 +310,202 @@ class ScriptGenerator:
         self, f: TextIO, group_name: str, group_avs: list
     ):
         """
-        Genere :
-            _centers_<group> = [[x,y], ...]
-            _brick_<group>   = pre.brick2D/3D(name, ...)
-            for _c in _centers_<group>:
-                body = _brick_<group>.rigidBrick(center=_c, ...)
-                bodies.addAvatar(body)
-                bodies_list.append(body)
+        Genere la boucle de creation des briques du groupe en reconstituant
+        exactement les memes boucles for row/col que le masonry_wizard.
+
+        Si les parametres du pattern sont disponibles dans state.masonry_patterns,
+        on genere la boucle structuree (double for row/col ou paneresse_simple)
+        identique au wizard  ->  script ultra-compact.
+
+        Sinon (ancien projet sans masonry_patterns), fallback sur une liste
+        de centers + for _c in _centers.
         """
         _, ref     = group_avs[0]
         wp         = ref.wall_params
-        brick_name = wp.get('brick_name', 'std')
-        bx         = wp['l']
-        by         = wp['h']
-        bz         = wp.get('lz')
-        mat        = ref.material_name
-        mod        = ref.model_name
-        color      = ref.color
-        dim        = len(ref.center)
         safe       = group_name.replace(' ', '_').replace('-', '_')
+        masonry_patterns = getattr(self.state, 'masonry_patterns', {}) or {}
+        mp = masonry_patterns.get(group_name)
 
-        lines = ['[']
-        for _, av in group_avs:
-            lines.append(f'    {list(av.center)},')
-        lines.append(']')
-        centers_repr = '\n'.join(lines)
+        if mp:
+            self._write_masonry_pattern_loop(f, group_name, safe, mp)
+        else:
+            self._write_masonry_centers_loop(f, group_name, safe, group_avs, wp, ref)
 
-        f.write(f'# Groupe maconnerie : {group_name} ({len(group_avs)} briques)\n')
-        f.write(f'_centers_{safe} = {centers_repr}\n\n')
+    def _write_masonry_pattern_loop(
+        self, f: TextIO, group_name: str, safe: str, mp: dict
+    ):
+        """
+        Genere la double boucle for row/col en reconstituant les formules
+        de position exactement comme dans masonry_wizard._generate_masonry().
 
+        Patterns supportes :
+          Standard         : decalage lx/2 sur rangs impairs
+          Running Bond     : decalage (row%3)*(lx/3) par rang
+          Stack Bond       : grille reguliere sans decalage
+          Flemish Bond     : alternance panneresse (lx) / boutisse (lx/2)
+          Paneresse simple : via pre.paneresse_simple
+        """
+        pattern   = mp['pattern']
+        lx        = mp['lx']
+        ly        = mp['ly']
+        lz        = mp.get('lz')
+        nb_rows   = mp['nb_rows']
+        nb_cols   = mp['nb_cols']
+        offset_x  = mp['offset_x']
+        offset_y  = mp['offset_y']
+        offset_z  = mp.get('offset_z', 0.0)
+        joint     = mp['joint']
+        bname     = mp['brick_name']
+        mat       = mp['mat']
+        mod       = mp['mod']
+        color     = mp['color']
+        dim       = mp['dim']
+        _lz       = lz if lz is not None else ly
+
+        f.write(f"# Mur de maconnerie : {group_name}"
+                f" — pattern '{pattern}' ({nb_rows} rangs x {nb_cols} cols)\n")
+
+        # ---- lignes de creation du body (appelees dans chaque boucle) ------
+        def body_block(indent, ce, br=None):
+            br = br or f"_brick_{safe}"
+            i  = indent
+            return (
+                f"{i}body = {br}.rigidBrick(\n"
+                f"{i}    center={ce},\n"
+                f"{i}    model=mods['{mod}'],\n"
+                f"{i}    material=mats['{mat}'],\n"
+                f"{i}    color='{color}'\n"
+                f"{i})\n"
+                f"{i}bodies.addAvatar(body)\n"
+                f"{i}bodies_list.append(body)\n"
+            )
+
+        # ---- Standard -------------------------------------------------------
+        if pattern == 'Standard':
+            f.write(f"_brick_{safe} = pre.brick2D('{bname}', {lx}, {ly})\n"
+                    if dim == 2 else
+                    f"_brick_{safe} = pre.brick3D('{bname}', {lx}, {ly}, {_lz})\n")
+            f.write(f"for _row in range({nb_rows}):\n")
+            f.write(f"    _row_off = ({lx} / 2.0) if (_row % 2 == 1) else 0.0\n")
+            f.write(f"    for _col in range({nb_cols}):\n")
+            f.write(f"        _cx = {offset_x} + _col * ({lx} + {joint}) + _row_off + {lx} / 2.0\n")
+            f.write(f"        _cy = {offset_y} + _row * ({ly} + {joint}) + {ly} / 2.0\n")
+            ce = "[_cx, _cy]" if dim == 2 else f"[_cx, _cy, {offset_z}]"
+            f.write(body_block("        ", ce))
+
+        # ---- Running Bond ---------------------------------------------------
+        elif pattern == 'Running Bond':
+            f.write(f"_brick_{safe} = pre.brick2D('{bname}', {lx}, {ly})\n"
+                    if dim == 2 else
+                    f"_brick_{safe} = pre.brick3D('{bname}', {lx}, {ly}, {_lz})\n")
+            f.write(f"for _row in range({nb_rows}):\n")
+            f.write(f"    _row_off = (_row % 3) * ({lx} / 3.0)\n")
+            f.write(f"    for _col in range({nb_cols}):\n")
+            f.write(f"        _cx = {offset_x} + _col * ({lx} + {joint}) + _row_off + {lx} / 2.0\n")
+            f.write(f"        _cy = {offset_y} + _row * ({ly} + {joint}) + {ly} / 2.0\n")
+            ce = "[_cx, _cy]" if dim == 2 else f"[_cx, _cy, {offset_z}]"
+            f.write(body_block("        ", ce))
+
+        # ---- Stack Bond -----------------------------------------------------
+        elif pattern == 'Stack Bond':
+            f.write(f"_brick_{safe} = pre.brick2D('{bname}', {lx}, {ly})\n"
+                    if dim == 2 else
+                    f"_brick_{safe} = pre.brick3D('{bname}', {lx}, {ly}, {_lz})\n")
+            f.write(f"for _row in range({nb_rows}):\n")
+            f.write(f"    for _col in range({nb_cols}):\n")
+            f.write(f"        _cx = {offset_x} + _col * ({lx} + {joint}) + {lx} / 2.0\n")
+            f.write(f"        _cy = {offset_y} + _row * ({ly} + {joint}) + {ly} / 2.0\n")
+            ce = "[_cx, _cy]" if dim == 2 else f"[_cx, _cy, {offset_z}]"
+            f.write(body_block("        ", ce))
+
+        # ---- Flemish Bond ---------------------------------------------------
+        # Panneresse (lx) si (row+col)%2==0, boutisse (lx/2) sinon.
+        # Deux briques de reference car brick_lx est variable.
+        elif pattern == 'Flemish Bond':
+            lx_bou = lx / 2.0
+            if dim == 2:
+                f.write(f"_brick_{safe}_pan = pre.brick2D('{bname}', {lx}, {ly})\n")
+                f.write(f"_brick_{safe}_bou = pre.brick2D('{bname}', {lx_bou}, {ly})\n")
+            else:
+                f.write(f"_brick_{safe}_pan = pre.brick3D('{bname}', {lx}, {ly}, {_lz})\n")
+                f.write(f"_brick_{safe}_bou = pre.brick3D('{bname}', {lx_bou}, {ly}, {_lz})\n")
+            f.write(f"for _row in range({nb_rows}):\n")
+            f.write(f"    _x_cur = {offset_x}\n")
+            f.write(f"    for _col in range({nb_cols}):\n")
+            f.write(f"        _is_pan = (_row + _col) % 2 == 0\n")
+            f.write(f"        _blx = {lx} if _is_pan else {lx_bou}\n")
+            f.write(f"        _br  = _brick_{safe}_pan if _is_pan else _brick_{safe}_bou\n")
+            f.write(f"        _cx  = _x_cur + _blx / 2.0\n")
+            f.write(f"        _cy  = {offset_y} + _row * ({ly} + {joint}) + {ly} / 2.0\n")
+            ce = "[_cx, _cy]" if dim == 2 else f"[_cx, _cy, {offset_z}]"
+            f.write(body_block("        ", ce, "_br"))
+            f.write(f"        _x_cur += _blx + {joint}\n")
+
+        # ---- Paneresse simple (pylmgc90) ------------------------------------
+        elif pattern == 'Paneresse simple (pylmgc90)':
+            disposition = mp.get('disposition', 'paneresse')
+            first_type  = mp.get('first_type',  '1')
+            if dim == 2:
+                f.write(f"_bref_{safe} = pre.brick3D('{bname}', {lx}, 1.0, {ly})\n")
+            else:
+                f.write(f"_bref_{safe} = pre.brick3D('{bname}', {lx}, {ly}, {_lz})\n")
+            origin = f"[{offset_x}, {offset_y}, {offset_z}]" if dim == 3                      else f"[{offset_x}, {offset_y}, 0.0]"
+            f.write(f"_wall_{safe} = pre.paneresse_simple(brick_ref=_bref_{safe}, disposition='{disposition}')\n")
+            f.write(f"_wall_{safe}.setNumberOfRows({nb_rows})\n")
+            f.write(f"_wall_{safe}.setJointThicknessBetweenRows({joint})\n")
+            f.write(f"_wall_{safe}.computeHeight()\n")
+            f.write(f"_wall_{safe}.setFirstRowByNumberOfBricks(\n")
+            f.write(f"    first_brick_type='{first_type}',\n")
+            f.write(f"    nb_bricks={nb_cols},\n")
+            f.write(f"    joint_thickness={joint}\n")
+            f.write(f")\n")
+            f.write(f"_bodies_{safe} = _wall_{safe}.buildRigidWall(\n")
+            f.write(f"    origin={origin},\n")
+            f.write(f"    model=mods['{mod}'],\n")
+            f.write(f"    material=mats['{mat}'],\n")
+            f.write(f"    colors=['{color}', '{color}']\n")
+            f.write(f")\n")
+            f.write(f"for _body in _bodies_{safe}:\n")
+            f.write(f"    bodies.addAvatar(_body)\n")
+            f.write(f"    bodies_list.append(_body)\n")
+
+        else:
+            f.write(f"# Pattern inconnu '{pattern}' -> fallback liste de centers\n")
+            for _, av in getattr(self, '_last_group_avs', []):
+                f.write(f"# center={list(av.center)}\n")
+
+        f.write('\n')
+
+    def _write_masonry_centers_loop(
+        self, f: TextIO, group_name: str, safe: str,
+        group_avs: list, wp: dict, ref
+    ):
+        """
+        Fallback : liste de centers + boucle for _c.
+        Utilise quand masonry_patterns n'est pas disponible (ancien projet).
+        """
+        brick_name = wp.get('brick_name', 'std')
+        bx  = wp['l']
+        by  = wp['h']
+        bz  = wp.get('lz')
+        mat   = ref.material_name
+        mod   = ref.model_name
+        color = ref.color
+        dim   = len(ref.center)
+
+        f.write(f"# Groupe maconnerie (fallback) : {group_name} ({len(group_avs)} briques)\n")
         if dim == 2:
             f.write(f"_brick_{safe} = pre.brick2D('{brick_name}', {bx}, {by})\n")
         else:
             if bz is None:
                 bz = by
             f.write(f"_brick_{safe} = pre.brick3D('{brick_name}', {bx}, {by}, {bz})\n")
-
-        f.write(f'for _c in _centers_{safe}:\n')
+        lines = ['[']
+        for _, av in group_avs:
+            lines.append(f'    {list(av.center)},')
+        lines.append(']')
+        f.write(f"_centers_{safe} = " + '\n'.join(lines) + "\n\n")
+        f.write(f"for _c in _centers_{safe}:\n")
         f.write(f"    body = _brick_{safe}.rigidBrick(\n")
         f.write(f"        center=_c,\n")
         f.write(f"        model=mods['{mod}'],\n")

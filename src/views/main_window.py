@@ -178,7 +178,7 @@ class MainWindow(QMainWindow):
         run_action.setShortcut(QKeySequence("F5"))
         run_action.triggered.connect(self._on_run_compute)
         compute_menu.addAction(run_action)
-        
+
         compute_menu.addSeparator()
         
         gen_script_action = QAction("📄 Générer Script Calcul", self)
@@ -649,7 +649,7 @@ class MainWindow(QMainWindow):
 
     def _reopen_default_tabs(self):
         """Rouvre les onglets par défaut"""
-        default_tabs = ['material', 'model', 'avatar', 'dof', 'visibility', 'postpro']
+        default_tabs = ['material', 'model', 'avatar', 'dof', 'contact','visibility', 'postpro']
         
         for tab_id in default_tabs:
             self._add_tab(tab_id)

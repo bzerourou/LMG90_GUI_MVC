@@ -11,15 +11,41 @@ from PyQt6.QtWidgets import (
     QGroupBox, QFileDialog, QSpinBox, QCheckBox, QComboBox, QMessageBox
 )
 
-from PyQt6.QtCore import Qt
+
 from typing import Dict, Any
 from pathlib import Path
-from typing import Optional
-from ..core.models import Material, MaterialType, ProjectPreferences, UnitSystem
-
+from ..core.models import  ProjectPreferences, UnitSystem
+from ..utils.safe_eval import SafeEvaluator, build_eval_context
 
 class DynamicVarsDialog(QDialog):
-    """Dialogue pour gérer les variables dynamiques avec support des références internes"""
+    """
+    Dialogue de gestion des variables dynamiques.
+
+    Chaque variable est une expression Python evaluee de maniere securisee.
+    Les expressions ont acces au contexte projet complet :
+      avatar[i], group['nom'], material['nom'], model['nom'],
+      avatars_by_color(), avatars_by_material(), avatars_by_type(),
+      avatars_by_origin(), math, np, sqrt, pi, e, abs, min, max, ...
+    """
+    # Exemples affiches dans le dialogue
+    _EXAMPLES = [
+        ("Constante simple",           "thickness = 0.5"),
+        ("Expression math",            "radius = thickness * 2 + 0.1"),
+        ("Coordonnee X avatar 0",      "x0 = avatar[0].x"),
+        ("Centre Y avatar 1",          "y1 = avatar[1].center[1]"),
+        ("Noeud principal (pylmgc90)", "cx = avatar[0].nodes[1].coor[0]"),
+        ("Rayon avatar 2",             "r2 = avatar[2].radius"),
+        ("Brick lx groupe mur",        "blx = group['mur_briques'][0].brick_lx"),
+        ("Densite materiau",           "rho = material['beton'].density"),
+        ("Modele physique",            "phys = model['rigid'].physics"),
+        ("Nb avatars total",           "nb = len(avatar)"),
+        ("Nb avatars d'un groupe",     "nb_mur = len(group['mur_briques'])"),
+        ("Filtrer par couleur",        "bleus = avatars_by_color('BLUEx')"),
+        ("Filtrer par materiau",       "corps = avatars_by_material('beton')"),
+        ("Filtrer par type",           "disques = avatars_by_type('rigidDisk')"),
+        ("Distance entre avatars",
+         "dist = sqrt((avatar[1].x - avatar[0].x)**2 + (avatar[1].y - avatar[0].y)**2)"),
+    ]
     
     def __init__(self, current_vars: Dict[str, Any], controller, parent=None):
         super().__init__(parent)
@@ -37,12 +63,16 @@ class DynamicVarsDialog(QDialog):
         # Info en haut
         info = QLabel(
             "<b>💡 Variables Dynamiques Avancées</b><br>"
-            "Définissez des variables réutilisables dans tout le projet.<br><br>"
-            "<b>Types supportés :</b><br>"
-            "• <b>Constantes</b> : thickness = 0.5<br>"
-            "• <b>Expressions</b> : radius = thickness * 2<br>"
-            "• <b>Références avatars</b> : x_pos = avatar[0].nodes[1].coor[0]<br>"
-            "• <b>Propriétés matériaux</b> : dens = material['MAT1'].density"
+            "<b>Types supportes :</b><br>"
+            "  <b>Constante</b> :  <code>thickness = 0.5</code><br>"
+            "  <b>Expression</b> : <code>radius = thickness * 2</code><br>"
+            "  <b>Avatar</b> :     <code>x0 = avatar[0].x</code> &nbsp; "
+            "<code>avatar[0].nodes[1].coor[0]</code><br>"
+            "  <b>Groupe</b> :     <code>group['mur'][0].center</code><br>"
+            "  <b>Materiau</b> :   <code>material['beton'].density</code><br>"
+            "  <b>Filtres</b> :    <code>avatars_by_color('BLUEx')</code> &nbsp; "
+            "<code>avatars_by_material('beton')</code>"
+
         )
         info.setWordWrap(True)
         info.setStyleSheet("background-color: #e3f2fd; padding: 10px; border-radius: 5px;")
@@ -54,6 +84,7 @@ class DynamicVarsDialog(QDialog):
         self.table.setColumnWidth(0, 150)
         self.table.setColumnWidth(1, 250)
         self.table.setColumnWidth(2, 150)
+        self.table.itemClicked.connect(self._on_table_click)
         self._populate_table()
         layout.addWidget(self.table)
         
@@ -79,28 +110,25 @@ class DynamicVarsDialog(QDialog):
         layout.addWidget(form_group)
         
         # Exemples
-        examples_group = QGroupBox("📋 Exemples d'Expressions")
-        examples_layout = QVBoxLayout()
+        ex_group = QGroupBox("Exemples d'expressions")
+        ex_layout = QVBoxLayout()
+        for title, example in self._EXAMPLES:
+            btn = QPushButton(f"  {title} :  {example}")
+            btn.setStyleSheet("text-align: left; padding: 3px 8px;")
+            btn.clicked.connect(
+                lambda checked, e=example: self._load_example(e)
+            )
+            ex_layout.addWidget(btn)
+        ex_group.setLayout(ex_layout)
         
-        examples = [
-            ("Constante simple", "thickness = 0.5"),
-            ("Expression mathématique", "radius = thickness * 2 + 0.1"),
-            ("Centre X du 1er avatar", "x0 = avatar[0].center[0]"),
-            ("Rayon du 3ème avatar", "r3 = avatar[2].radius"),
-            ("Densité d'un matériau", "dens = material['MAT1'].density"),
-            ("Nombre total d'avatars", "nb_avatars = len(avatar)"),
-            ("Distance entre 2 avatars", "dist = sqrt((avatar[1].center[0] - avatar[0].center[0])**2)"),
-        ]
-        
-        for title, example in examples:
-            btn = QPushButton(f"{title}: {example}")
-            btn.setStyleSheet("text-align: left; padding: 5px;")
-            btn.clicked.connect(lambda checked, e=example: self._load_example(e))
-            examples_layout.addWidget(btn)
-        
-        examples_group.setLayout(examples_layout)
-        layout.addWidget(examples_group)
-        
+        # Scroll si beaucoup d'exemples
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidget(ex_group)
+        scroll.setWidgetResizable(True)
+        scroll.setMaximumHeight(200)
+        layout.addWidget(scroll)
+
         # Boutons actions
         btn_layout = QHBoxLayout()
         
@@ -113,7 +141,7 @@ class DynamicVarsDialog(QDialog):
         btn_layout.addWidget(del_btn)
         
         refresh_btn = QPushButton("🔄 Rafraîchir Tout")
-        refresh_btn.clicked.connect(self._refresh_all_values)
+        refresh_btn.clicked.connect(self._populate_table)
         btn_layout.addWidget(refresh_btn)
         
         btn_layout.addStretch()
@@ -129,275 +157,165 @@ class DynamicVarsDialog(QDialog):
         layout.addWidget(button_box)
         
         self.setLayout(layout)
-    
-    def _load_example(self, example: str):
-        """Charge un exemple dans le formulaire"""
-        if '=' in example:
-            name, expr = example.split('=', 1)
-            self.name_input.setText(name.strip())
-            self.expr_input.setText(expr.strip())
-    
+    # =========================================================================
+    # Evaluation securisee — utilise SafeEvaluator + build_eval_context
+    # =========================================================================
+
+    def _build_context(self) -> Dict[str, Any]:
+        """Construit le contexte d'evaluation complet via safe_eval."""
+        return build_eval_context(self.controller)
+
+    def _evaluate_expression(self, expr: str) -> Any:
+        """
+        Evalue une expression avec le contexte projet complet.
+        Utilise SafeEvaluator (check AST) — aucun eval() nu.
+        """
+        ev = SafeEvaluator(allowed_names=self._build_context())
+        return ev.eval_expression(expr)
+
+    def _evaluate_all_vars(self) -> Dict[str, Any]:
+        """Evalue toutes les variables dans l'ordre de definition."""
+        ctx = self._build_context()
+        evaluated: Dict[str, Any] = {}
+        ev = SafeEvaluator(allowed_names=ctx)
+        for name, expr in self.current_vars.items():
+            try:
+                if isinstance(expr, str):
+                    ev.allowed_names = {**ctx, **evaluated}
+                    evaluated[name] = ev.eval_expression(expr)
+                else:
+                    evaluated[name] = expr
+            except Exception:
+                evaluated[name] = expr
+        return evaluated
+
+    # =========================================================================
+    # Slots
+    # =========================================================================
+
     def _on_expr_changed(self):
-        """Quand l'expression change, évaluer en temps réel"""
         expr = self.expr_input.text().strip()
         if not expr:
             self.preview_label.setText("<i>Entrez une expression</i>")
             self.preview_label.setStyleSheet("color: #666;")
             return
-        
         try:
             value = self._evaluate_expression(expr)
-            self.preview_label.setText(f"✅ Résultat : {value} (type: {type(value).__name__})")
-            self.preview_label.setStyleSheet("color: green;")
+            type_name = type(value).__name__
+            # Formater les listes longues
+            if isinstance(value, list) and len(value) > 6:
+                display = f"[{value[0]}, {value[1]}, ... ({len(value)} elements)]"
+            elif isinstance(value, float):
+                display = f"{value:.8g}"
+            else:
+                display = str(value)
+            self.preview_label.setText(
+                f"<b>Resultat :</b> {display} &nbsp; <i>({type_name})</i>"
+            )
+            self.preview_label.setStyleSheet("color: #2e7d32;")
         except Exception as e:
-            self.preview_label.setText(f"❌ Erreur : {str(e)}")
-            self.preview_label.setStyleSheet("color: red;")
-    
-    def _evaluate_expression(self, expr: str) -> Any:
-        """Évalue une expression avec accès aux avatars et matériaux"""
-        import math
-        import numpy as np
-        
-        evaluated_vars = {}
-        for var_name, var_expr in self.current_vars.items():
-            try:
-                if isinstance(var_expr, str):
-                    # Évaluer récursivement
-                    evaluated_vars[var_name] = self._evaluate_single(var_expr, evaluated_vars)
-                else:
-                    evaluated_vars[var_name] = var_expr
-            except:
-                evaluated_vars[var_name] = var_expr
-        # Créer le contexte d'évaluation
-        context = {
-            'math': math,
-            'np': np,
-            'sqrt': math.sqrt,
-            'pi': math.pi,
-            'e': math.e,
-            'abs': abs,
-            'min': min,
-            'max': max,
-            'sum': sum,
-            'len': len,
-            'avatar': self._create_avatar_proxy(),
-            'material': self._create_material_proxy(),
-            'model': self._create_model_proxy(),
-        }
-        
-        # Ajouter les variables déjà définies
-        context.update(evaluated_vars)
-        
-        # Évaluer de manière sécurisée
-        try:
-            result = eval(expr, {"__builtins__": {}}, context)
-            return result
-        except Exception as e:
-            raise ValueError(f"Expression invalide : {e}")
-    
-    def _evaluate_single(self, expr: str, existing_vars: dict) -> Any:
-        """Évalue une seule expression avec variables existantes"""
-        import math
-        import numpy as np
-        
-        context = {
-            'math': math,
-            'np': np,
-            'sqrt': math.sqrt,
-            'pi': math.pi,
-            'e': math.e,
-            'abs': abs,
-            'min': min,
-            'max': max,
-            'sum': sum,
-            'len': len,
-            'avatar': self._create_avatar_proxy(),
-            'material': self._create_material_proxy(),
-            'model': self._create_model_proxy(),
-        }
-        
-        context.update(existing_vars)
-        
-        return eval(expr, {"__builtins__": {}}, context)    
-    
-    def _create_avatar_proxy(self):
-        """Crée un proxy pour accéder aux avatars comme avatar[i].center[0]"""
-        class AvatarProxy:
-            def __init__(self, controller):
-                self.controller = controller
-            
-            def __getitem__(self, index):
-                avatars = self.controller.state.avatars
-                if not isinstance(index, int) or index < 0 or index >= len(avatars):
-                    raise IndexError(f"Avatar index {index} invalide (0-{len(avatars)-1})")
-                return self._avatar_to_dict(avatars[index])
-            
-            def __len__(self):
-                return len(self.controller.state.avatars)
-            
-            def _avatar_to_dict(self, avatar):
-                """Convertit un avatar en dict accessible"""
-                class AvatarDict(dict):
-                    def __init__(self, av):
-                        super().__init__()
-                        self['center'] = av.center
-                        self['radius'] = av.radius
-                        self['color'] = av.color
-                        self['material_name'] = av.material_name
-                        self['model_name'] = av.model_name
-                        self['avatar_type'] = av.avatar_type.value
-                        # Simuler nodes (pour compatibilité)
-                        self['nodes'] = [{'coor': av.center}]
-                    
-                    def __getattr__(self, name):
-                        return self.get(name)
-                
-                return AvatarDict(avatar)
-        
-        return AvatarProxy(self.controller)
-    
-    def _create_material_proxy(self):
-        """Crée un proxy pour accéder aux matériaux comme material['MAT1'].density"""
-        class MaterialProxy:
-            def __init__(self, controller):
-                self.controller = controller
-            
-            def __getitem__(self, name):
-                mat = self.controller.get_material(name)
-                if not mat:
-                    raise KeyError(f"Matériau '{name}' introuvable")
-                
-                class MaterialDict(dict):
-                    def __init__(self, m):
-                        super().__init__()
-                        self['name'] = m.name
-                        self['density'] = m.density
-                        self['material_type'] = m.material_type.value
-                        self.update(m.properties)
-                    
-                    def __getattr__(self, name):
-                        return self.get(name)
-                
-                return MaterialDict(mat)
-        
-        return MaterialProxy(self.controller)
-    
-    def _create_model_proxy(self):
-        """Crée un proxy pour accéder aux modèles"""
-        class ModelProxy:
-            def __init__(self, controller):
-                self.controller = controller
-            
-            def __getitem__(self, name):
-                mod = self.controller.get_model(name)
-                if not mod:
-                    raise KeyError(f"Modèle '{name}' introuvable")
-                
-                class ModelDict(dict):
-                    def __init__(self, m):
-                        super().__init__()
-                        self['name'] = m.name
-                        self['physics'] = m.physics
-                        self['element'] = m.element
-                        self['dimension'] = m.dimension
-                        self.update(m.options)
-                    
-                    def __getattr__(self, name):
-                        return self.get(name)
-                
-                return ModelDict(mod)
-        
-        return ModelProxy(self.controller)
-    
-    def _populate_table(self):
-        """Remplit le tableau"""
-        self.table.clear()
-        evaluated = {}
-        for name, expr in self.current_vars.items():
-            # Évaluer la valeur
-            try:
-                if isinstance(expr, str):
-                    value = self._evaluate_single(expr, evaluated)
-                else:
-                    value = expr
-                evaluated[name] = value
-                value_str = str(value)
-                if isinstance(value, float):
-                    value_str = f"{value:.6g}"
-                
-                type_str = type(value).__name__
-                status = "✅"
-            except Exception as e:
-                value_str = f"Erreur: {e}"
-                type_str = "error"
-                status = "❌"
-            
-            item = QTreeWidgetItem([
-                name,
-                str(expr),
-                value_str,
-                type_str
-            ])
-            
-            # Colorer selon le statut
-            if status == "❌":
-                from PyQt6.QtGui import QBrush, QColor
-                item.setForeground(2, QBrush(QColor("red")))
-            
-            self.table.addTopLevelItem(item)
-    
+            self.preview_label.setText(f"Erreur : {e}")
+            self.preview_label.setStyleSheet("color: #c62828;")
+
+    def _on_table_click(self, item: QTreeWidgetItem):
+        """Charge la variable cliquee dans le formulaire."""
+        self.name_input.setText(item.text(0))
+        self.expr_input.setText(item.text(1))
+
+    def _load_example(self, example: str):
+        """Charge un exemple dans le formulaire."""
+        if '=' in example:
+            name, expr = example.split('=', 1)
+            self.name_input.setText(name.strip())
+            self.expr_input.setText(expr.strip())
+        else:
+            self.expr_input.setText(example.strip())
+
     def _on_add(self):
-        """Ajoute ou modifie une variable"""
         name = self.name_input.text().strip()
         expr = self.expr_input.text().strip()
-        
+
         if not name:
-            QMessageBox.warning(self, "Nom requis", "Entrez un nom de variable")
+            QMessageBox.warning(self, "Nom requis", "Entrez un nom de variable.")
             return
-        
+        if not name.isidentifier():
+            QMessageBox.warning(
+                self, "Nom invalide",
+                f"Le nom '{name}' n'est pas un identifiant Python valide."
+            )
+            return
         if not expr:
-            QMessageBox.warning(self, "Expression requise", "Entrez une expression")
+            QMessageBox.warning(self, "Expression requise", "Entrez une expression.")
             return
-        
-        # Vérifier que l'expression est valide
+
+        # Verifier que l'expression est valide avant d'enregistrer
         try:
             self._evaluate_expression(expr)
         except Exception as e:
-            QMessageBox.critical(self, "Expression invalide", f"Erreur : {e}")
+            QMessageBox.critical(
+                self, "Expression invalide",
+                f"L'expression '{expr}' est invalide :\n{e}"
+            )
             return
-        
-        # Ajouter ou modifier
+
         self.current_vars[name] = expr
         self._populate_table()
-        
-        # Réinitialiser le formulaire
         self.name_input.clear()
         self.expr_input.clear()
-    
-    def _on_delete(self):
-        """Supprime la variable sélectionnée"""
-        selected = self.table.currentItem()
-        if selected:
-            name = selected.text(0)
-            
-            reply = QMessageBox.question(
-                self, "Confirmer",
-                f"Supprimer la variable '{name}' ?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                del self.current_vars[name]
-                self._populate_table()
-    
-    def _refresh_all_values(self):
-        """Rafraîchit toutes les valeurs évaluées"""
-        self._populate_table()
-    
-    def get_vars(self) -> Dict[str, Any]:
-        """Retourne les variables"""
-        return self.current_vars
 
+    def _on_delete(self):
+        item = self.table.currentItem()
+        if not item:
+            return
+        name = item.text(0)
+        reply = QMessageBox.question(
+            self, "Confirmer",
+            f"Supprimer la variable '{name}' ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            del self.current_vars[name]
+            self._populate_table()
+
+    # =========================================================================
+    # Tableau
+    # =========================================================================
+
+    def _populate_table(self):
+        """Remplit le tableau avec les variables et leurs valeurs evaluees."""
+        self.table.clear()
+        evaluated = self._evaluate_all_vars()
+
+        for name, expr in self.current_vars.items():
+            value = evaluated.get(name, expr)
+            try:
+                if isinstance(value, list) and len(value) > 6:
+                    value_str = f"[{value[0]}, ... ({len(value)} elements)]"
+                elif isinstance(value, float):
+                    value_str = f"{value:.8g}"
+                else:
+                    value_str = str(value)
+                type_str = type(value).__name__
+                ok = True
+            except Exception as e:
+                value_str = f"Erreur: {e}"
+                type_str  = "error"
+                ok = False
+
+            item = QTreeWidgetItem([name, str(expr), value_str, type_str])
+            if not ok:
+                from PyQt6.QtGui import QBrush, QColor
+                item.setForeground(2, QBrush(QColor("red")))
+            self.table.addTopLevelItem(item)
+
+    # =========================================================================
+    # Accesseur
+    # =========================================================================
+
+    def get_vars(self) -> Dict[str, Any]:
+        """Retourne les variables definies (expressions brutes)."""
+        return self.current_vars
+ 
 class PreferencesDialog(QDialog):
     """Dialogue de préférences — onglets verticaux à droite."""
 
