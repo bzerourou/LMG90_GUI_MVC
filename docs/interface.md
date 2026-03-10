@@ -2,9 +2,9 @@
 
 LMGC90_GUI est une interface graphique moderne et intuitive conçue pour faciliter la création de vos modèles numériques avec le module **pre** (pré-processeur) de **LMGC90**.
 
-Il aussi possible de lancer vos calculs seulement sur les rigides.
+Il est tout à fait possible de lancer vos calculs sur LMGC90_GUI (module **chipy**).
 
-L'interface est organisée de manière claire et ergonomique pour accompagner l'utilisateur du début à la fin du processus de modélisation : création des éléments, conditions aux limites, post-traitement, puis génération des fichiers de simulation et enfin calculs.
+L'interface est organisée de manière claire et ergonomique pour accompagner l'utilisateur du début à la fin du processus de modélisation : création des éléments, conditions aux limites, post-traitement,  génération des fichiers et enfin calculs.
 
 Voici cette vidéo qui explique la vue d'ensemble des différentes parties de l'interface.
 
@@ -41,37 +41,67 @@ L'interface est divisée en **quatre zones principales** :
   - Sauvegarder (Ctrl+S)
   Sert à sauvegarder vos projets dans votre disque dur, cliquez sur le bouton "sauvegarder" de la barre d'outils, ou de cliquez sur le menu "Fichier"-> "Sauvegarder", ou avec le raccourci clavier "Ctrl+S",
   - Sauvegarder sous... (Ctrl+Shift+S)
+  - Quiter (Ctrl+Q)
+
+- **Assistants**
+
   - Assistant de configuration de projets (Ctrl+Shift+N)
   Est un assistant qui vous guidera pas à pas pour créer et configurer votre projet
 
   ![](captures/assistant_projet.JPG)
 
   - Assistant de granulométrie (Ctrl+Shift+G)
-  Est un assistant pour générer une granulométrie rapidement avec les routines liées à pylmgc90, idéal pour les dépôt qui ne dépasse pas 2000 avatars, sinon l'application prend beaucoup plus de temps afin de rafraichir l'UI, parfois plante complètement.
+  Est un assistant pour générer une granulométrie rapidement avec les routines liées à pylmgc90, idéal pour les dépôt qui ne dépasse pas 8000 avatars, sinon l'application prend beaucoup plus de temps afin de rafraichir l'UI, parfois plante complètement.
 
   ![](captures/assistant_granulo_pylmgc90.JPG)
 
   - Génération granulométrie numpy... (bêta)
-  Est une boite de dialogue qui génère et dépose des avatars à base de numpy sans passer par les routines pylmgc90, idéal pour la génération plus de 5000 avatars 
+  Est une boite de dialogue qui sert à générer et dépose des avatars à base de numpy sans passer par les routines pylmgc90, idéal pour la génération plus de 5000 avatars 
 
   ![](captures/assistant_granulo_numpy.JPG) 
+  
+  - Assistant de déformable.. (Ctrl+Shift+D)
+  Est un assistant qui vous guidera dans la création ou importation de vos éléments déformables
 
+  ![](captures/assistant_defor_page1.JPG)
 
-  - Quitter (Ctrl+Q)
+  - Assistant de maçonnerie (Ctrl+Shift+M)
+  Est un assistant spécialisé dans la maçonnerie, il va vous permettre de créer vos empilement de brick2D/brick3D sous différentes façons  
+
+  ![](captures/assistant_maçon_page1.JPG)
+
+**Important**  : Vous pourrez utiliser les assistants autant de fois que vous vouliez  
+
 - **Outils** :
-  - Préférences (Ctrl+,)
-  - Générer DATBOX
-  - Générer Script Python 
-  - Définir variables dynamiques
-- **Calcul**
-  - Paramètres de calcul
-  - Lancer calcul
-  - Générer Script Calcul 
-- **Onglets**
-- **Help** :
-  - À propos
 
-### Barre d'outils
+  - Générer DATBOX 
+  - Générer Script Python  
+  - Variables dynamiques (Ctrl+V) 
+    Cette boite de dialogue vous permet de créer des variables que vous pourriez utiliser afin d'automatiser saisies, il est aussi une fenêtre vers les propriétés de vos objets LMGC90, 
+    ![](captures/variables.JPG)
+
+  - Préférences (Ctrl+,) : [Préférences](#5-préférences)
+- **Calcul**
+  - Paramètres de calcul (Ctrl+F5)
+  - Lancer calcul (F5)
+  - Générer Script Calcul 
+  - Voir logs LMGC90 (F6)
+  - Journal de l'application (F7)  :
+
+  Cette boîte de dialogue sera en quelque sorte une brèche de LMGC90_GUI vers le code LMGC90 afin de voir certaines erreurs non gérées par l'application
+  
+  ![](captures/journal_app.JPG)
+
+- **Onglets**
+  - Ouvrir : [Onglets de création](#3-onglets-de-création-zone-centrale-supérieure)
+  - Fermer les autres 
+  - Fermer tous (sauf essentiels) 
+  - Onglets par défauts (Ctrl+Alt+D)
+- **Help** :
+  - À propos 
+  - Aide en ligne
+
+  ### Barre d'outils
 I'interface comporte une barre d'outils pour  les actions les plus fréquentes :
 - Nouveau projet
 - Ouvrir projet
@@ -117,7 +147,7 @@ Zone principale de travail avec des onglets dédiés à chaque étape de modéli
 - **Postpro** : commandes de sortie (énergie, suivi de corps, etc.)
 - **Visualisation** : Ouvre un onglet pour visualisation des avatars de vos modèles
 
-Chaque onglet contient les champs nécessaires et les boutons **Créer / Modifier / Supprimer**.
+Des raccourcis clavier sont disponibles pour les neuf premiers onglets.(Ctrl+ 1,2,3, etc)
 
 
 
@@ -144,7 +174,7 @@ Vous avez la possibilité de spécifier quatre choses :
 ![](captures/preferences.JPG)
 
 
-### 6. Barre d'état (en bas)
+### 6. Barre d'état 
 
 Affiche des messages d'informations sur l'état des opérations en cours.
 

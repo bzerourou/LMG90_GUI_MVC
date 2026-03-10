@@ -57,8 +57,7 @@ Par cas d'usage
 
 
 ## Astuces
-- Le champ Propriétés accèpte la syntaxe Python-like
-- Utilisez les variables dynamiques si définies (menu Outils -> définir variables dynamiques)
+- Utilisez les variables dynamiques si définies (menu Outils -> Variables dynamiques) ou racourci clavier (Ctrl+V)
 - Faites attention aux matériaux choisis pour les éléments rigides du code LMGC90
 
 ## Modification/suppression
@@ -68,10 +67,10 @@ Vous avez aussi la possibilité de modifier ou de supprimer un matériau, pour c
 
 ## Variables dynamiques 
 
-Il est tout à fait possible de créer des variables dynamiques ainsi que des expressions pour pouvoir les utilisés dans les champs des onglets afin d'automatiser vos valeurs.
+Il est tout à fait possible de créer des variables dynamiques ainsi que des expressions pour pouvoir les utilisés dans les champs des onglets de créations afin d'automatiser vos valeurs.
 Dans le menu "Outils"-> "Variables dynamiques", vous aurez cette boite de dialogue,
 
 ![](captures/variables.JPG)
 
 ### Exemples et expressions
-Si je clique sur le premier exemple (Constante simple thickness = 0.5), et je modifie le nom de la variable à "radius ", je lui attribut la valeur de 0.25, puis de cliquer sur le bouton "Ajouter ou modifier", puis sur "OK", vous aurez la possibilité de l'utiliser dans tous les champs.
+Si je clique sur le premier exemple (Constante simple thickness = 0.5), et je modifie le nom de la variable à "radius ", je lui attribut la valeur de 0.25, puis de cliquer sur le bouton "Ajouter ou modifier", puis sur "OK", vous aurez la possibilité de l'utiliser dans tous les champs de l'application LMGC90_GUI.

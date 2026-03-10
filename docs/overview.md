@@ -1,6 +1,6 @@
 # Documentation LMGC90_GUI
 
-Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI v0.3.0, qui n'est q'une brève introduction, 
+Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI v0.3.5, qui n'est q'une brève introduction, 
 
 ## Navigation
 - [Interface](interface.md)
@@ -11,6 +11,7 @@ Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI
 - [Avatar vide](empty_avatar.md)
 - [Templates](templates.md)
 - [Déformables](meshed.md)
+- [x][Maçonnerie](masonry.md)
 - [Boucles paramétriques](loops.md)
 - [Granulométrie](granulometry.md)
 - [Conditions aux limites](dof.md)

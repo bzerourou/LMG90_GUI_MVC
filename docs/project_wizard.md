@@ -49,4 +49,4 @@ Nous arriverons enfin au récapulatif de notre assistant, en cliquant sur le bou
 
 ![](captures/projet_assistant_recap.JPG)
 
-Une fois la boite de dialgue valider, tous vos éléments seront crées, après vous pouvez apporté des modifications.
+Une fois la boîte de dialogue validée, tous vos éléments seront créés, après vous pouvez apporter des modifications.
