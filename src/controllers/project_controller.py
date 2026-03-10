@@ -495,7 +495,7 @@ class ProjectController(QObject):
                     source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
                     for i in range(dim)
                 ]
-                idx = self.add_avatar(clone)
+                idx = self._add_avatar_no_validate(clone)
                 new_indices.append(idx)
         finally:
             self._batch_mode = False
@@ -562,7 +562,7 @@ class ProjectController(QObject):
                         source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
                         for i in range(dim)
                     ]
-                    idx = self.add_avatar(clone)
+                    idx = self._add_avatar_no_validate(clone)
                     serie_indices.append(idx)
 
                 grp = f"{prefix}_copie_{k}"
@@ -573,7 +573,29 @@ class ProjectController(QObject):
 
         self.state_changed.emit()
         return result
-    
+        
+    def _add_avatar_no_validate(
+        self, avatar: "Avatar", create_pylmgc: bool = True) -> int:
+        """
+        Ajoute un avatar SANS validation.
+        Utilise uniquement pour la duplication d'avatars deja valides
+        (ex: EMPTY_AVATAR maconnerie avec contactors=[]).
+        """
+        if create_pylmgc:
+            mat_obj = self._pylmgc_materials.get(avatar.material_name)
+            mod_obj = self._pylmgc_models.get(avatar.model_name)
+            if mat_obj and mod_obj:
+                body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
+                self._bodies_container.addAvatar(body_obj)
+                self._pylmgc_bodies.append(body_obj)
+            else:
+                self._pylmgc_bodies.append(None)
+        else:
+            self._pylmgc_bodies.append(None)
+        self.state.avatars.append(avatar)
+        if not self._batch_mode:
+            self.state_changed.emit()
+        return len(self.state.avatars) - 1
     # ========== LOIS DE CONTACT ==========
     
     def add_contact_law(self, law: ContactLaw) -> None:
