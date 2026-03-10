@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
         tools_menu.addSeparator()
         
         vars_action = QAction("Variables dynamiques", self)
+        vars_action.setShortcut(QKeySequence("Ctrl+V"))
         vars_action.triggered.connect(self._on_dynamic_vars)
         tools_menu.addAction(vars_action)
 
@@ -171,6 +172,7 @@ class MainWindow(QMainWindow):
         
 
         setup_action = QAction("⚙️ Paramètres de Calcul", self)
+        setup_action.setShortcut(QKeySequence("Ctrl+F5"))
         setup_action.triggered.connect(self._on_compute_setup)
         compute_menu.addAction(setup_action)
 
@@ -218,6 +220,9 @@ class MainWindow(QMainWindow):
         
         for tab_id, tab_name in all_tab_actions:
             action = open_submenu.addAction(tab_name)
+
+            action.setShortcut(QKeySequence(f"Ctrl+{len(open_submenu.actions())}"))   # sans 10, 11 et 12
+
             action.triggered.connect(lambda checked, tid=tab_id: self._add_tab(tid))
         
         tabs_menu.addSeparator()
@@ -231,6 +236,7 @@ class MainWindow(QMainWindow):
         tabs_menu.addSeparator()
         
         defaults_action = tabs_menu.addAction("🔄 Onglets par défaut")
+        defaults_action.setShortcut(QKeySequence("Ctrl+Alt+D"))
         defaults_action.triggered.connect(self._reopen_default_tabs)
 
         # Menu Aide
@@ -649,7 +655,7 @@ class MainWindow(QMainWindow):
 
     def _reopen_default_tabs(self):
         """Rouvre les onglets par défaut"""
-        default_tabs = ['material', 'model', 'avatar', 'dof', 'contact','visibility', 'postpro']
+        default_tabs = ['material', 'model', 'avatar', 'dof', 'contact','visibility', 'postpro', 'viewer']
         
         for tab_id in default_tabs:
             self._add_tab(tab_id)

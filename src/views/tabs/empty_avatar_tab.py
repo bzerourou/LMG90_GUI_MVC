@@ -319,8 +319,31 @@ class EmptyAvatarTab(BaseTab):
             row.params_input.setText("byrd=0.5, High=1.0")
             row.params_label.setText("Params (radius, height) :")
         elif shape == "POLYR":
-            row.params_input.setText("nb_vertices=4, vertices=[[-1.,-1.,-1.],[1.,-1.,-1.],[1.,1.,-1.],[-1.,1.,-1.],[-1.,-1.,1.],[1.,-1.,1.],[1.,1.,1.],[-1.,1.,1.]]")
-            row.params_label.setText("Params (vertices) :")
+            row.params_input.setText(
+                "nb_vertices=8, "
+                "vertices=[[-0.5, -0.5, -0.5], "
+                "[0.5, -0.5, -0.5], "
+                "[0.5, 0.5, -0.5], "
+                "[-0.5, 0.5, -0.5], "
+                "[-0.5, -0.5, 0.5], "
+                "[0.5, -0.5, 0.5], "
+                "[0.5, 0.5, 0.5], "
+                "[-0.5, 0.5, 0.5]], "
+                "nb_faces=12, "
+                "connectivity=[[1, 2, 3], "
+                "[1, 3, 4], "
+                "[1, 2, 6], "
+                "[1, 6, 5], "
+                "[2, 3, 7], "
+                "[2, 7, 6], "
+                "[1, 4, 8], "
+                "[1, 8, 5], "
+                "[3, 4, 8], "
+                "[3, 8, 7], "
+                "[5, 7, 8], "
+                "[5, 6, 7]]"
+            )
+            row.params_label.setText("Params (vertices et faces) :")
         
         
     def _remove_contactor_row(self, row):
@@ -582,47 +605,62 @@ class EmptyAvatarTab(BaseTab):
         return avatar
     
     def _parse_params(self, params_text: str) -> dict:
-        import re
-        import ast
-        
+
         params = {}
-        
-        pattern = r'(\w+)\s*=\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?|\[(?:[^\[\]]|\[[^\]]*\])*\])'
-        
-        matches = re.findall(pattern, params_text)
-        
-        if not matches:
-            for pair in params_text.split(','):
-                if '=' in pair:
-                    key, val = pair.split('=', 1)
-                    key = key.strip()
-                    val = val.strip()
-                    
-                    try:
-                        params[key] = self.eval_float(val, field_name=f"Paramètre {key}")
-                    except:
-                        params[key] = val
-            
+        if not params_text or not params_text.strip():
             return params
-        
-        for key, value_str in matches:
-            key = key.strip()
-            value_str = value_str.strip()
-            
-            if value_str.startswith('['):
-                try:
-                    value = ast.literal_eval(value_str)
-                    if not isinstance(value, list):
-                        raise ValueError(f"{key} : attendu une liste")
-                    params[key] = value
-                except Exception as e:
-                    raise ValueError(f"Format de liste invalide pour '{key}': {value_str}")
+
+        # ── Etape 1 : decouper en paires "cle=valeur" ────────────────────────
+        # On parcourt caractere par caractere en comptant la profondeur
+        # des crochets pour ne pas couper a l'interieur d'une liste.
+        pairs_raw = []
+        depth = 0
+        current = []
+        for ch in params_text:
+            if ch == '[':
+                depth += 1
+                current.append(ch)
+            elif ch == ']':
+                depth -= 1
+                current.append(ch)
+            elif ch == ',' and depth == 0:
+                pairs_raw.append(''.join(current).strip())
+                current = []
             else:
-                try:
-                    params[key] = self.eval_float(value_str, field_name=f"Paramètre {key}")
-                except:
-                    params[key] = value_str
-        
+                current.append(ch)
+        if current:
+            pairs_raw.append(''.join(current).strip())
+
+        # ── Etape 2 : evaluer chaque paire ───────────────────────────────────
+        for pair in pairs_raw:
+            if '=' not in pair:
+                continue
+            key, _, value_str = pair.partition('=')
+            key       = key.strip()
+            value_str = value_str.strip()
+            if not key:
+                continue
+
+            # Evaluer via safe_eval (resout identifiants, listes, expressions)
+            try:
+                result = self._eval_expression(value_str, field_name=f"Parametre {key}")
+                if result is not None:
+                    params[key] = result
+                    continue
+            except Exception:
+                pass
+
+            # Fallback : ast.literal_eval (listes litterales pures)
+            import ast
+            try:
+                params[key] = ast.literal_eval(value_str)
+                continue
+            except Exception:
+                pass
+
+            # Dernier recours : garder la chaine brute
+            params[key] = value_str
+
         return params
     
     def load_for_edit(self, index: int, avatar: Avatar):

@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QPushButton, QMessageBox, QGroupBox, QTextEdit, QProgressBar, QLabel, 
-    QScrollArea, QCheckBox, QTabWidget
+    QScrollArea, QCheckBox, QTabWidget, QHBoxLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from ...core.validators import ValidationError
@@ -117,6 +117,7 @@ class ComputeTab(QWidget):
         super().__init__()
         self.controller = controller
         self.worker = None
+        self._chipy_params : dict = {}
         self._setup_ui()
     
     def _setup_ui(self):
@@ -196,15 +197,38 @@ class ComputeTab(QWidget):
         
         self.disable_log_check = QCheckBox("Désactiver les messages chipy (chipy.utilities_DisableLogMes)")
         self.disable_log_check.setChecked(True)
-        output_form.addRow("", self.disable_log_check)
+        #output_form.addRow("", self.disable_log_check)
         # pour les déformables 
         self.disable_deformable_check = QCheckBox("Désactiver les déformables chipy.ReadDatbox(deformable=False)")
         self.disable_deformable_check.setChecked(True)
-        output_form.addRow("", self.disable_deformable_check)
+        #output_form.addRow("", self.disable_deformable_check)
         
         output_group.setLayout(output_form)
         layout.addWidget(output_group)
 
+       # Bouton configuration routines chipy
+        chipy_btn_row = QHBoxLayout()
+        self.chipy_config_btn = QPushButton(
+            "🔩  Configurer les routines chipy  (modèle, contacteurs, extraction, pilotage)"
+        )
+        self.chipy_config_btn.setStyleSheet(
+            "padding: 8px; font-size: 10pt; font-weight: bold;"
+        )
+        self.chipy_config_btn.setToolTip(
+            "Ouvre le dialogue de configuration des routines chipy : "
+            "hypothèse mécanique, détecteurs de contact, corps déformables, "
+            "extraction, restart, critère d'arrêt, multi-pas."
+        )
+        self.chipy_config_btn.clicked.connect(self._open_chipy_dialog)
+        chipy_btn_row.addWidget(self.chipy_config_btn)
+
+        self._chipy_summary_lbl = QLabel(
+            "<i>ℹ️  Cliquez sur le bouton pour configurer les routines chipy.</i>"
+        )
+        self._chipy_summary_lbl.setWordWrap(True)
+        self._chipy_summary_lbl.setStyleSheet("color:#555; font-size:8pt; padding:2px;")
+        chipy_btn_row.addWidget(self._chipy_summary_lbl, stretch=1)
+        layout.addLayout(chipy_btn_row)
         
         # Barre de progression
         self.progress_bar = QProgressBar()
@@ -250,7 +274,7 @@ class ComputeTab(QWidget):
     
     def get_parameters(self):
         """Retourne les paramètres de calcul"""
-        return {
+        base = {
             'dt': float(self.dt_input.text()),
             'nb_steps': int(self.nb_steps_input.text()),
             'theta': float(self.theta_input.text()),
@@ -265,6 +289,51 @@ class ComputeTab(QWidget):
             'disable_log': self.disable_log_check.isChecked(),
             'disable_deformable': self.disable_deformable_check.isChecked()
         }
+        #fusionner avec les params chipy
+        base.update(self._chipy_params)
+        return base
+    
+    def _open_chipy_dialog(self):
+        """Ouvre le dialogue de configuration des routines chipy."""
+        from ...gui.dialogs.chipy_routines_dialog import ChipyRoutinesDialog
+        dlg = ChipyRoutinesDialog(
+            current_params=self._chipy_params,
+            controller=self.controller,
+            parent=self
+        )
+        if dlg.exec() == dlg.DialogCode.Accepted:
+            self._chipy_params = dlg.get_params()
+            self._update_chipy_summary()
+
+    def _update_chipy_summary(self):
+        """Met a jour le label recapitulatif apres configuration chipy."""
+        p = self._chipy_params
+        parts = []
+        if p.get('deformable'):
+            parts.append(f"Deformable ({p.get('physics','MECAx')})")
+        dim_str = {1:'CP',2:'DP',3:'3D'}.get(p.get('mhyp',1),'CP')
+        parts.append(f"mhyp={dim_str}")
+        tacts = [t for t in (
+            'DKDKx','DKJCx','DKKDx','PLPLx','CLALp','ALpALp',
+            'SPSPx','SPCDx','SPPLx','CDCDx','CDPLx','PRPRx',
+            'DKMECAx','ALpMECAx','SPMECAx','PT2Dx','PT3Dx','NODES'
+        ) if p.get(f'use_{t}')]
+        if tacts:
+            parts.append('Detecteurs : ' + ', '.join(tacts[:4])
+                         + ('...' if len(tacts)>4 else ''))
+        extras = []
+        if p.get('use_restart'):
+            extras.append('restart')
+        if p.get('use_stop_crit'):
+            extras.append('critere arret')
+        if p.get('use_multi_step'):
+            extras.append('multi-pas')
+        if extras:
+            parts.append(', '.join(extras))
+        summary = '  |  '.join(parts) if parts else 'valeurs par defaut'
+        self._chipy_summary_lbl.setText(
+            f"<b>Routines chipy :</b>  {summary}"
+        )
     
     def run_computation(self):
         """Lance le calcul avec protection totale contre les erreurs"""

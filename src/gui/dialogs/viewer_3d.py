@@ -546,7 +546,7 @@ class Viewer3D(QWidget):
 
         # Plotter PyVista
         self.plotter = QtInteractor(self)
-        self.plotter.set_background('#1a1a2e')   # fond sombre, contraste propre
+        self.plotter.set_background("#d6d6e4")   # fond sombre, contraste propre
         self.plotter.enable_anti_aliasing()
         layout.addWidget(self.plotter.interactor)
 
@@ -563,7 +563,7 @@ class Viewer3D(QWidget):
             i_size=10, j_size=10, i_resolution=10, j_resolution=10
         )
         self.plotter.add_mesh(
-            grid, color='#2a2a4a', opacity=0.4,
+            grid, color="#5d5d74", opacity=0.5,
             show_edges=True, edge_color='#404060'
         )
 
