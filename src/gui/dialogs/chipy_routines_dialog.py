@@ -1,17 +1,7 @@
-# ============================================================================
+# =============================================================================
 # chipy_routines_dialog.py  —  LMGC90_GUI
-# ============================================================================
-"""
-Dialogue de configuration des routines chipy pour la generation
-du script de calcul command.py.
-
-4 onglets :
-  1. Modele      — mhyp, deformable, physique FEM, Rloc_tol, info projet
-  2. Routines    — corps rigides (RBDY2/3), detecteurs 2D/3D, FEM, mixtes,
-                   routines speciales
-  3. Extraction  — visualisation, forces de contact, energie, champs FEM
-  4. Pilotage    — restart, critere d'arret, multi-pas (dt variable)
-"""
+# =============================================================================
+"""\nDialogue de configuration des routines chipy pour la generationdu script de calcul command.py.4 onglets :  1. Modele      — mhyp, deformable, physique FEM, Rloc_tol, info projet  2. Routines    — corps rigides (RBDY2/3), detecteurs 2D/3D, FEM, mixtes,                   routines speciales  3. Extraction  — logs, visualisation, visibilite avatars,                   GetBodyVector RBDY2/3 (6 vecteurs chacun),                   forces de contact, energie, champs FEM  4. Pilotage    — restart, critere d'arret, multi-pas (dt variable)"""
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
@@ -25,100 +15,85 @@ from PyQt6.QtGui import QFont
 from typing import Dict, Any, Optional
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helpers UI ────────────────────────────────────────────────────────────────
 
 def _section(title: str) -> QGroupBox:
     """QGroupBox avec titre en gras et bordure subtile."""
     gb = QGroupBox(title)
-    gb.setStyleSheet("""
-        QGroupBox {
-            font-weight: bold;
-            border: 1px solid #b8b8b8;
-            border-radius: 4px;
-            margin-top: 8px;
-            padding-top: 4px;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            left: 10px;
-            padding: 0 4px;
-            color: #2c3e50;
-        }
-    """)
+    gb.setStyleSheet(
+        "QGroupBox {"
+        "  font-weight: bold;"
+        "  border: 1px solid #b8b8b8;"
+        "  border-radius: 4px;"
+        "  margin-top: 8px;"
+        "  padding-top: 4px;"
+        "}"
+        "QGroupBox::title {"
+        "  subcontrol-origin: margin;"
+        "  left: 10px;"
+        "  padding: 0 4px;"
+        "  color: #2c3e50;"
+        "}"
+    )
     return gb
 
 
-def _scroll(w: QWidget) -> QScrollArea:
+def _scroll(widget: QWidget) -> QScrollArea:
+    """Enrobe un widget dans un QScrollArea sans cadre."""
     sc = QScrollArea()
-    sc.setWidget(w)
+    sc.setWidget(widget)
     sc.setWidgetResizable(True)
     sc.setFrameShape(QFrame.Shape.NoFrame)
     return sc
 
 
 def _cb(label: str, checked: bool = False, tip: str = "") -> QCheckBox:
+    """Cree une QCheckBox avec tooltip optionnel."""
     c = QCheckBox(label)
     c.setChecked(checked)
     if tip:
         c.setToolTip(tip)
     return c
 
+
 def _note(text: str) -> QLabel:
+    """Label de note informatif."""
     lbl = QLabel(text)
     lbl.setWordWrap(True)
     lbl.setStyleSheet(
-        "color:#555; font-size:8pt; "
+        "color:#555; font-size:8pt;"
         "background:#f7f7f7; padding:4px 6px; border-radius:3px;"
     )
     return lbl
 
 
-# ============================================================================
+# =============================================================================
 # ChipyRoutinesDialog
-# ============================================================================
+# =============================================================================
+
 # Vecteurs d'etat disponibles pour RBDY2 et RBDY3
-_GBV_VECTORS_2D = [
-    ("Coor0",          "Coordonnees de références  (x, y, angle)"),
-    ("Coor_",          "Coordonnees generalisees  (x, y, angle)"),
-    ("Coorb",          "Coordonnees premier pas  (x, y, angle)"),
-    ("Coorm",          "Coordonnees en detection  (x, y, angle)"),
-    ("X____",          "déplacements cumulés   (x, y, angle)"),
-    ("V____",          "Vitesses generalisees     (vx, vy, omega)"),
-    ("Vbeg_",          "vitesse  premier pas  (vx, vy, omega)"),
-    ("Vfree",          "vitesse  libre de contact  (vx, vy, omega)"),
-    ("Fext_",          "Forces externes           (Fx, Fy, Mz)"),
-    ("Fint_",          "Forces interne         (Fix, Fiy, Mz)"),
-    ("Reac_",          "Forces de reaction        (Rx, Ry, Rz)"),
-    ("Ireac",          "impulsion de contact       (Ix, Iy)"),
-
+_GBV_VECTORS = [
+    ("Coor0", "Position initiale                 (x0, y0[, z0])"),
+    ("Coor_", "Position courante                 (x, y[, z])"),
+    ("Coorb", "Position debut de pas             (xb, yb[, zb])"),
+    ("Coorm", "Position milieu de pas            (xm, ym[, zm])"),
+    ("X____", "Coordonnees generalisees          (x, y, angle[, ...])"),
+    ("V____", "Vitesses generalisees             (vx, vy, omega[, ...])"),
+    ("Vbeg_", "Vitesses debut de pas             (vxb, vyb[, ...])"),
+    ("Vfree", "Vitesses libres (sans contact)    (vxf, vyf[, ...])"),
+    ("Fext",  "Forces externes                   (Fx, Fy[, Fz, ...])"),
+    ("Fint_", "Forces internes                   (Fix, Fiy[, Fiz, ...])"),
+    ("Reac",  "Forces de reaction (contact)      (Rx, Ry[, Rz, ...])"),
+    ("Ireac", "Impulsions de reaction             (IRx, IRy[, IRz, ...])"),
 ]
 
-# en 3D
-_GBV_VECTORS_3D = [
-    ("Coor0",          "Coordonnees de références  (x, y, z, q0, q1, q2, q3)"),
-    ("Coor_",          "Coordonnees generalisees  (x, y, z, q0, q1, q2, q3)"),
-    ("Coorb",          "Coordonnees premier pas  (x, y, z, q0, q1, q2, q3)"),
-    ("Coorm",          "Coordonnees en detection  (x, y, z, q0, q1, q2, q3)"),
-    ("X____",          "déplacements cumulés   (x, y, z, q0, q1, q2, q3)"),
-    ("V____",          "Vitesses generalisees     (vx, vy, vz, wx, wy, wz)"),
-    ("Vbeg_",          "vitesse  premier pas  (vx, vy, vz, wx, wy, wz)"),
-    ("Vfree",          "vitesse  libre de contact  (vx, vy, vz, wx, wy, wz)"),
-    ("Fext_",          "Forces externes           (Fx, Fy, Fz, Mx, My, Mz)"),
-    ("Fint_",          "Forces interne         (Fix, Fiy, Fiz, Mx, My, Mz)"),
-    ("Reac_",          "Forces de reaction        (Rx, Ry, Rz)"),
-    ("Ireac",          "impulsion de contact       (Ix, Iy, Iz)"),
-]
+# Garde les anciennes listes pour compatibilite avec _load/_auto_detect
+_GBV_VECTORS_2D = _GBV_VECTORS
+_GBV_VECTORS_3D = _GBV_VECTORS
 
 
 class ChipyRoutinesDialog(QDialog):
-    """
-    Dialogue de configuration des routines chipy.
-
-    Utilisation :
-        dlg = ChipyRoutinesDialog(current_params, controller, parent)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            params = dlg.get_params()
-    """
+    """\n    Dialogue de configuration des routines chipy.    Utilisation :        dlg = ChipyRoutinesDialog(current_params, controller, parent)        if dlg.exec() == QDialog.DialogCode.Accepted:            params = dlg.get_params()    """
 
     # ── Valeurs par defaut ────────────────────────────────────────────────────
     DEFAULTS: Dict[str, Any] = {
@@ -167,24 +142,19 @@ class ChipyRoutinesDialog(QDialog):
         "visu_hydrFEM":       False,
         "display_in_loop":    True,
         # Visibilite avatars — listes d'IDs (ex: "1, 3, 5") ou "" = desactive
-        "vis_RBDY2_visible":   "",
-        "vis_RBDY2_invisible": "",
-        "vis_RBDY3_visible":   "",
-        "vis_RBDY3_invisible": "",
-        # GetBodyVector RBDY2 — booleen + frequence par vecteur
-        "gbv2_Coor":          False,  "gbv2_Coor_freq":          1,
-        "gbv2_Velo":          False,  "gbv2_Velo_freq":          1,
-        "gbv2_Fext":          False,  "gbv2_Fext_freq":          1,
-        "gbv2_Reac":          False,  "gbv2_Reac_freq":          1,
-        "gbv2_Acce":          False,  "gbv2_Acce_freq":          1,
-        "gbv2_RigidBodyMass": False,  "gbv2_RigidBodyMass_freq": 1,
+        # Visibilite — liste d'entrees dynamiques
+        # Chaque entree : {"action": "visible"|"invisible",
+        #   "dim": "2D"|"3D", "ids": str, "group": str,
+        #   "step_mode": "all"|"every_n"|"at_k"|"after",
+        #   "step_val": int}
+        "vis_entries": [],
+        # GetBodyVector RBDY2 — liste d'entrees configurables
+        # Chaque entree : {"vec": str, "ids": str, "group": str,
+        #   "step_mode": "all"|"every_n"|"at_k",
+        #   "step_val": int}  (N pour every_n, k pour at_k)
+        "gbv2_entries": [],
         # GetBodyVector RBDY3
-        "gbv3_Coor":          False,  "gbv3_Coor_freq":          1,
-        "gbv3_Velo":          False,  "gbv3_Velo_freq":          1,
-        "gbv3_Fext":          False,  "gbv3_Fext_freq":          1,
-        "gbv3_Reac":          False,  "gbv3_Reac_freq":          1,
-        "gbv3_Acce":          False,  "gbv3_Acce_freq":          1,
-        "gbv3_RigidBodyMass": False,  "gbv3_RigidBodyMass_freq": 1,
+        "gbv3_entries": [],
         # Forces de contact
         "extract_Rnod":       False,
         "extract_Vloc":       False,
@@ -195,6 +165,15 @@ class ChipyRoutinesDialog(QDialog):
         # Champs FEM
         "extract_fields":     False,
         "extract_internal":   False,
+        # ── Inspection 2D ────────────────────────────────────────────────────
+        # Chaque entree : {"func": str, "ids": str, "group": str,
+        #   "step_mode": "all"|"every_n"|"at_k",
+        #   "step_val": int, "store": str}
+        "insp2d_entries": [],
+        # ── Inspection 3D ────────────────────────────────────────────────────
+        "insp3d_entries": [],
+        # ── Inspection Interactions ───────────────────────────────────────────
+        "inspi_entries": [],
         # Onglet Pilotage — Restart
         "use_restart":        False,
         "restart_step":       0,
@@ -245,6 +224,9 @@ class ChipyRoutinesDialog(QDialog):
         self._tabs.addTab(self._tab_routines(), "Routines")
         self._tabs.addTab(self._tab_extract(),  "Extraction")
         self._tabs.addTab(self._tab_pilot(),    "Pilotage")
+        self._tabs.addTab(self._tab_insp_2d(),  "Inspect. 2D")
+        self._tabs.addTab(self._tab_insp_3d(),  "Inspect. 3D")
+        self._tabs.addTab(self._tab_insp_int(), "Inspect. Interact.")
         root.addWidget(self._tabs, stretch=1)
 
         btn_preview = QPushButton("Apercu du script command.py")
@@ -516,51 +498,40 @@ class ChipyRoutinesDialog(QDialog):
 
         # ── 3. Visibilite des avatars ─────────────────────────────────────────
         grp_visi = _section("Visibilite des avatars  (SetVisible / SetInvisible)")
-        fl_visi = QFormLayout()
+        vb_visi = QVBoxLayout()
 
-        # Chaque entree : label + QLineEdit IDs + bouton picker
-        # IDs = numeros 1-bases dans l'ordre des avatars du projet
-        self._edit_vis2_vis   = QLineEdit()
-        self._edit_vis2_invis = QLineEdit()
-        self._edit_vis3_vis   = QLineEdit()
-        self._edit_vis3_invis = QLineEdit()
+        # En-tete colonnes
+        hdr_vis = QHBoxLayout()
+        for _lbl_v, _w_v in [
+            ("Action",        110),
+            ("Dim.",           50),
+            ("IDs avatars",   120),
+            ("Groupe",        110),
+            ("Mode / Timing", 185),
+        ]:
+            _lv = QLabel("<b>{}</b>".format(_lbl_v))
+            _lv.setFixedWidth(_w_v)
+            hdr_vis.addWidget(_lv)
+        hdr_vis.addStretch()
+        vb_visi.addLayout(hdr_vis)
 
-        _vis_entries = [
-            ("RBDY2_SetVisible   (IDs avatars 2D a rendre visibles) :",
-             self._edit_vis2_vis,   "2D", "visible"),
-            ("RBDY2_SetInvisible (IDs avatars 2D a rendre invisibles) :",
-             self._edit_vis2_invis, "2D", "invisible"),
-            ("RBDY3_SetVisible   (IDs avatars 3D a rendre visibles) :",
-             self._edit_vis3_vis,   "3D", "visible"),
-            ("RBDY3_SetInvisible (IDs avatars 3D a rendre invisibles) :",
-             self._edit_vis3_invis, "3D", "invisible"),
-        ]
-        for lbl_txt, edit, dim_str, action in _vis_entries:
-            edit.setPlaceholderText("Ex : 1, 3, 5  (IDs separes par virgules)")
-            edit.setToolTip(
-                "Entrez les IDs des avatars {} (numerotation 1-based, "
-                "ordre de creation dans le projet). "
-                "Laisser vide pour desactiver cet appel.".format(dim_str)
-            )
-            row = QHBoxLayout()
-            row.addWidget(edit, stretch=1)
-            btn = QPushButton("Choisir...")
-            btn.setMaximumWidth(90)
-            btn.setToolTip("Ouvre la liste des avatars du projet pour selectionner les IDs.")
-            # Capturer edit et dim_str dans la closure
-            def _make_handler(e=edit, d=dim_str):
-                return lambda: self._pick_avatar_ids(e, d)
-            btn.clicked.connect(_make_handler())
-            row.addWidget(btn)
-            fl_visi.addRow(lbl_txt, row)
+        # Zone de lignes
+        self._vis_rows = []
+        self._vis_rows_widget = QWidget()
+        self._vis_rows_layout = QVBoxLayout(self._vis_rows_widget)
+        self._vis_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._vis_rows_layout.setSpacing(2)
+        vb_visi.addWidget(self._vis_rows_widget)
 
-        fl_visi.addRow(_note(
-            "chipy.RBDY2_SetVisible(id) / chipy.RBDY2_SetInvisible(id) "
-            "sont appeles avant la boucle, une fois par ID. "
-            "L'ID est le numero 1-base de l'avatar dans le projet. "
-            "Laisser un champ vide desactive l'appel correspondant."
+        btn_add_vis = QPushButton("+ Creer une visibilite")
+        btn_add_vis.clicked.connect(lambda: self._add_vis_row())
+        vb_visi.addWidget(btn_add_vis)
+        vb_visi.addWidget(_note(
+            "chipy.RBDY2_SetVisible(id) / chipy.RBDY2_SetInvisible(id) appeles avant "
+            "ou pendant la boucle selon le mode choisi. "
+            "IDs ou groupe : si les deux sont remplis les IDs ont la priorite."
         ))
-        grp_visi.setLayout(fl_visi)
+        grp_visi.setLayout(vb_visi)
         vb.addWidget(grp_visi)
 
         # ── 4. GetBodyVector RBDY2 ────────────────────────────────────────────
@@ -568,41 +539,36 @@ class ChipyRoutinesDialog(QDialog):
             "Extraction vecteurs d'etat RBDY2  (RBDY2_GetBodyVector)"
         )
         grp_gbv2.setToolTip(
-            "chipy.RBDY2_GetBodyVector('NomVecteur') retourne un tableau numpy "
-            "pour tous les corps rigides 2D. Le resultat est ecrit dans POSTPRO/."
+            "chipy.RBDY2_GetBodyVector(vecteur, id_avatar) retourne le vecteur "
+            "d'etat de l'avatar id. Le script genere une boucle for sur les IDs."
         )
-        fl_gbv2 = QFormLayout()
-        self._gbv2_checks: Dict[str, QCheckBox] = {}
-        self._gbv2_spins:  Dict[str, QSpinBox]  = {}
+        vb_gbv2 = QVBoxLayout()
+        self._gbv2_rows = []
 
-        for vec, desc in _GBV_VECTORS_2D:
-            row = QHBoxLayout()
-            cb = _cb(
-                "{:<18}  {}".format(vec, desc),
-                tip="chipy.RBDY2_GetBodyVector('{}')  --  {}".format(vec, desc),
-            )
-            self._gbv2_checks[vec] = cb
+        hdr2 = QHBoxLayout()
+        for _lbl, _w in [("Vecteur", 110), ("IDs avatars", 120),
+                          ("Groupe", 110), ("Mode / Timing", 185)]:
+            _l = QLabel("<b>{}</b>".format(_lbl))
+            _l.setFixedWidth(_w)
+            hdr2.addWidget(_l)
+        hdr2.addStretch()
+        vb_gbv2.addLayout(hdr2)
 
-            spin = QSpinBox()
-            spin.setRange(1, 100_000)
-            spin.setValue(1)
-            spin.setMaximumWidth(90)
-            spin.setToolTip("Ecrire {} tous les N pas de temps.".format(vec))
-            spin.setEnabled(False)
-            self._gbv2_spins[vec] = spin
+        self._gbv2_rows_widget = QWidget()
+        self._gbv2_rows_layout = QVBoxLayout(self._gbv2_rows_widget)
+        self._gbv2_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._gbv2_rows_layout.setSpacing(2)
+        vb_gbv2.addWidget(self._gbv2_rows_widget)
 
-            cb.toggled.connect(spin.setEnabled)
-            row.addWidget(cb, stretch=1)
-            row.addWidget(QLabel("  tous les"))
-            row.addWidget(spin)
-            row.addWidget(QLabel("pas"))
-            fl_gbv2.addRow(row)
-
-        fl_gbv2.addRow(_note(
-            "Vecteurs disponibles : Coor, Velo, Fext, Reac, Acce, RigidBodyMass. "
-            "Chaque vecteur est ecrit dans un fichier separe dans POSTPRO/."
+        btn_add2 = QPushButton("+ Ajouter une extraction RBDY2")
+        btn_add2.clicked.connect(lambda: self._add_gbv_row("2D"))
+        vb_gbv2.addWidget(btn_add2)
+        vb_gbv2.addWidget(_note(
+            "Vecteurs : Coor0, Coor_, Coorb, Coorm, X____, V____, Vbeg_, Vfree, "
+            "Fext, Fint_, Reac, Ireac.  "
+            "Le generateur produit une boucle for sur les IDs ou sur le groupe."
         ))
-        grp_gbv2.setLayout(fl_gbv2)
+        grp_gbv2.setLayout(vb_gbv2)
         vb.addWidget(grp_gbv2)
 
         # ── 5. GetBodyVector RBDY3 ────────────────────────────────────────────
@@ -610,41 +576,34 @@ class ChipyRoutinesDialog(QDialog):
             "Extraction vecteurs d'etat RBDY3  (RBDY3_GetBodyVector)"
         )
         grp_gbv3.setToolTip(
-            "chipy.RBDY3_GetBodyVector('NomVecteur') retourne un tableau numpy "
-            "pour tous les corps rigides 3D."
+            "chipy.RBDY3_GetBodyVector(vecteur, id_avatar) -- memes vecteurs que RBDY2."
         )
-        fl_gbv3 = QFormLayout()
-        self._gbv3_checks: Dict[str, QCheckBox] = {}
-        self._gbv3_spins:  Dict[str, QSpinBox]  = {}
+        vb_gbv3 = QVBoxLayout()
+        self._gbv3_rows = []
 
-        for vec, desc in _GBV_VECTORS_3D:
-            row = QHBoxLayout()
-            cb = _cb(
-                "{:<18}  {}".format(vec, desc),
-                tip="chipy.RBDY3_GetBodyVector('{}')  --  {}".format(vec, desc),
-            )
-            self._gbv3_checks[vec] = cb
+        hdr3 = QHBoxLayout()
+        for _lbl, _w in [("Vecteur", 110), ("IDs avatars", 120),
+                          ("Groupe", 110), ("Mode / Timing", 185)]:
+            _l = QLabel("<b>{}</b>".format(_lbl))
+            _l.setFixedWidth(_w)
+            hdr3.addWidget(_l)
+        hdr3.addStretch()
+        vb_gbv3.addLayout(hdr3)
 
-            spin = QSpinBox()
-            spin.setRange(1, 100_000)
-            spin.setValue(1)
-            spin.setMaximumWidth(90)
-            spin.setToolTip("Ecrire {} tous les N pas de temps.".format(vec))
-            spin.setEnabled(False)
-            self._gbv3_spins[vec] = spin
+        self._gbv3_rows_widget = QWidget()
+        self._gbv3_rows_layout = QVBoxLayout(self._gbv3_rows_widget)
+        self._gbv3_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._gbv3_rows_layout.setSpacing(2)
+        vb_gbv3.addWidget(self._gbv3_rows_widget)
 
-            cb.toggled.connect(spin.setEnabled)
-            row.addWidget(cb, stretch=1)
-            row.addWidget(QLabel("  tous les"))
-            row.addWidget(spin)
-            row.addWidget(QLabel("pas"))
-            fl_gbv3.addRow(row)
-
-        fl_gbv3.addRow(_note(
-            "Vecteurs disponibles : Coor (x,y,z,q0..q3), Velo, Fext, Reac, "
-            "Acce, RigidBodyMass. Chaque vecteur est ecrit dans POSTPRO/."
+        btn_add3 = QPushButton("+ Ajouter une extraction RBDY3")
+        btn_add3.clicked.connect(lambda: self._add_gbv_row("3D"))
+        vb_gbv3.addWidget(btn_add3)
+        vb_gbv3.addWidget(_note(
+            "Memes vecteurs que RBDY2. "
+            "Le generateur produit une boucle for sur les IDs ou sur le groupe."
         ))
-        grp_gbv3.setLayout(fl_gbv3)
+        grp_gbv3.setLayout(vb_gbv3)
         vb.addWidget(grp_gbv3)
 
         # ── 6. Forces de contact ──────────────────────────────────────────────
@@ -818,6 +777,433 @@ class ChipyRoutinesDialog(QDialog):
         vb.addStretch()
         return _scroll(w)
 
+
+    # =========================================================================
+    # Catalogues de fonctions chipy pour l'inspection
+    # =========================================================================
+
+    # ── Contacteurs 2D : (nom_chipy, description, nb_params)
+    # nb_params : 0 = pas d'ID, 1 = ID contacteur, 2 = ID corps
+    _INSP2D_FUNCS = [
+        # ---- DISKx ---------------------------------------------------------
+        ("DISKx_GetNbDISKx",          "Nombre total de contacteurs DISKx",                    0),
+        ("DISKx_GetBodyId",           "ID corps RBDY2 du contacteur i",                       1),
+        ("DISKx_GetPtrDISKx2BDYTY",   "Index local du contacteur dans son corps RBDY2",       1),
+        ("DISKx_GetPtrTactBehav",     "Loi de comportement associee au contacteur i",         1),
+        ("DISKx_GetRadius",           "Rayon du disque i",                                    1),
+        ("DISKx_GetCoor",             "Coordonnees du centre du disque i",                    1),
+        ("DISKx_GetVelocity",         "Vitesse du centre du disque i",                        1),
+        # ---- JONCx ---------------------------------------------------------
+        ("JONCx_GetNbJONCx",          "Nombre total de contacteurs JONCx (joncs/ellipses)",   0),
+        ("JONCx_GetBodyId",           "ID corps RBDY2 du jonc i",                             1),
+        ("JONCx_GetPtrJONCx2BDYTY",   "Index local du jonc dans son corps RBDY2",             1),
+        ("JONCx_GetPtrTactBehav",     "Loi de comportement associee au jonc i",               1),
+        ("JONCx_GetAxes",             "Demi-axes (a, b) du jonc i",                           1),
+        ("JONCx_GetCoor",             "Coordonnees du centre du jonc i",                      1),
+        # ---- POLYR ---------------------------------------------------------
+        ("POLYR_GetNbPOLYR",          "Nombre total de contacteurs POLYR (polygones rigides)", 0),
+        ("POLYR_GetBodyId",           "ID corps RBDY2 du polygone i",                         1),
+        ("POLYR_GetPtrPOLYR2BDYTY",   "Index local du polygone dans son corps RBDY2",         1),
+        ("POLYR_GetPtrTactBehav",     "Loi de comportement associee au polygone i",           1),
+        ("POLYR_GetNbVerti",          "Nombre de sommets du polygone i",                      1),
+        ("POLYR_GetVerti",            "Coordonnees des sommets du polygone i",                1),
+        ("POLYR_GetCoor",             "Coordonnees du centre de reference du polygone i",     1),
+        # ---- xKSID (cluster discret) ----------------------------------------
+        ("xKSID_GetNbxKSID",          "Nombre total de contacteurs xKSID (disques discrets)", 0),
+        ("xKSID_GetBodyId",           "ID corps RBDY2 du contacteur xKSID i",                 1),
+        ("xKSID_GetPtrxKSID2BDYTY",   "Index local du xKSID dans son corps RBDY2",            1),
+        ("xKSID_GetRadius",           "Rayon du disque discret i",                            1),
+        # ---- RBDY2 corps ---------------------------------------------------
+        ("RBDY2_GetNbRBDY2",          "Nombre total de corps rigides 2D",                     0),
+        ("RBDY2_KineticEnergy",       "Energie cinetique totale (tous corps RBDY2)",           0),
+        # ---- PT2Dx noeuds FEM 2D -------------------------------------------
+        ("PT2Dx_GetNbPT2Dx",          "Nombre de noeuds contacteurs 2D (FEM)",                0),
+        ("PT2Dx_GetBodyId",           "ID du corps FEM parent du noeud i",                    1),
+        ("PT2Dx_GetCoor",             "Coordonnees du noeud contacteur 2D i",                 1),
+    ]
+
+    # ── Contacteurs 3D
+    _INSP3D_FUNCS = [
+        # ---- SPHER ---------------------------------------------------------
+        ("SPHER_GetNbSPHER",          "Nombre total de contacteurs SPHER (spheres)",           0),
+        ("SPHER_GetBodyId",           "ID corps RBDY3 de la sphere i",                         1),
+        ("SPHER_GetPtrSPHER2BDYTY",   "Index local de la sphere dans son corps RBDY3",         1),
+        ("SPHER_GetPtrTactBehav",     "Loi de comportement associee a la sphere i",            1),
+        ("SPHER_GetRadius",           "Rayon de la sphere i",                                  1),
+        ("SPHER_GetCoor",             "Coordonnees du centre de la sphere i",                  1),
+        ("SPHER_GetVelocity",         "Vitesse du centre de la sphere i",                      1),
+        # ---- POLYH ---------------------------------------------------------
+        ("POLYH_GetNbPOLYH",          "Nombre total de contacteurs POLYH (polyedres)",         0),
+        ("POLYH_GetBodyId",           "ID corps RBDY3 du polyedre i",                          1),
+        ("POLYH_GetPtrPOLYH2BDYTY",   "Index local du polyedre dans son corps RBDY3",          1),
+        ("POLYH_GetPtrTactBehav",     "Loi de comportement associee au polyedre i",            1),
+        ("POLYH_GetNbFaces",          "Nombre de faces du polyedre i",                         1),
+        ("POLYH_GetNbVerti",          "Nombre de sommets du polyedre i",                       1),
+        ("POLYH_GetVerti",            "Coordonnees des sommets du polyedre i",                 1),
+        ("POLYH_GetCoor",             "Coordonnees du centre de reference du polyedre i",      1),
+        # ---- CYLND ---------------------------------------------------------
+        ("CYLND_GetNbCYLND",          "Nombre total de contacteurs CYLND (cylindres)",         0),
+        ("CYLND_GetBodyId",           "ID corps RBDY3 du cylindre i",                          1),
+        ("CYLND_GetPtrCYLND2BDYTY",   "Index local du cylindre dans son corps RBDY3",          1),
+        ("CYLND_GetPtrTactBehav",     "Loi de comportement associee au cylindre i",            1),
+        ("CYLND_GetRadius",           "Rayon du cylindre i",                                   1),
+        ("CYLND_GetLength",           "Longueur du cylindre i",                                1),
+        ("CYLND_GetCoor",             "Coordonnees du centre du cylindre i",                   1),
+        # ---- PLANE 3D (parois planes) ----------------------------------------
+        ("PLANE_GetNbPLANE",          "Nombre total de contacteurs PLANE (plans rigides 3D)",  0),
+        ("PLANE_GetBodyId",           "ID corps RBDY3 du plan i",                              1),
+        ("PLANE_GetNormal",           "Normale unitaire du plan i",                            1),
+        ("PLANE_GetCoor",             "Point d'ancrage du plan i",                             1),
+        # ---- RBDY3 corps ---------------------------------------------------
+        ("RBDY3_GetNbRBDY3",          "Nombre total de corps rigides 3D",                      0),
+        # ---- PT3Dx noeuds FEM 3D -------------------------------------------
+        ("PT3Dx_GetNbPT3Dx",          "Nombre de noeuds contacteurs 3D (FEM)",                 0),
+        ("PT3Dx_GetBodyId",           "ID du corps FEM parent du noeud 3D i",                  1),
+        ("PT3Dx_GetCoor",             "Coordonnees du noeud contacteur 3D i",                  1),
+    ]
+
+    # ── Interactions (paires de contacteurs)
+    _INSPI_FUNCS = [
+        # ---- DKDKx (Disque-Disque) -----------------------------------------
+        ("DKDKx_GetNbDKDKx",          "Nombre de paires actives Disque-Disque",                0),
+        ("DKDKx_GetBodyIds",          "IDs RBDY2 des deux corps de la paire i",                1),
+        ("DKDKx_GetTactors",          "IDs des deux contacteurs DISKx de la paire i",          1),
+        ("DKDKx_GetGapTT",            "Gap (jeu) de la paire i",                               1),
+        ("DKDKx_GetStatusTT",         "Statut de contact de la paire i (0=gap, 1=contact)",    1),
+        ("DKDKx_GetRlocTT",           "Reaction locale (Rn, Rt) de la paire i",                1),
+        ("DKDKx_GetVlocTT",           "Vitesse locale (Vn, Vt) de la paire i",                 1),
+        # ---- DKJCx (Disque-Jonc) --------------------------------------------
+        ("DKJCx_GetNbDKJCx",          "Nombre de paires actives Disque-Jonc",                  0),
+        ("DKJCx_GetBodyIds",          "IDs RBDY2 des deux corps de la paire i",                1),
+        ("DKJCx_GetTactors",          "IDs des deux contacteurs (DISKx, JONCx) de la paire i", 1),
+        ("DKJCx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("DKJCx_GetStatusTT",         "Statut de contact de la paire i",                       1),
+        ("DKJCx_GetRlocTT",           "Reaction locale (Rn, Rt) de la paire i",                1),
+        # ---- DKKDx (Disque-Corde) -------------------------------------------
+        ("DKKDx_GetNbDKKDx",          "Nombre de paires actives Disque-Corde",                 0),
+        ("DKKDx_GetBodyIds",          "IDs RBDY2 des deux corps de la paire i",                1),
+        ("DKKDx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("DKKDx_GetRlocTT",           "Reaction locale de la paire i",                         1),
+        # ---- PLPLx (Polygone-Polygone) ----------------------------------------
+        ("PLPLx_GetNbPLPLx",          "Nombre de paires actives Polygone-Polygone",            0),
+        ("PLPLx_GetBodyIds",          "IDs RBDY2 des deux corps de la paire i",                1),
+        ("PLPLx_GetTactors",          "IDs des deux contacteurs POLYR de la paire i",          1),
+        ("PLPLx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("PLPLx_GetStatusTT",         "Statut de contact de la paire i",                       1),
+        ("PLPLx_GetRlocTT",           "Reaction locale (Rn, Rt) de la paire i",                1),
+        ("PLPLx_GetVlocTT",           "Vitesse locale (Vn, Vt) de la paire i",                 1),
+        # ---- CLALp (Brique-Brique maconnerie) --------------------------------
+        ("CLALp_GetNbCLALp",          "Nombre de paires actives Brique-Brique (maconnerie)",   0),
+        ("CLALp_GetBodyIds",          "IDs des deux corps de la paire i",                      1),
+        ("CLALp_GetGapTT",            "Gap de la paire i",                                     1),
+        ("CLALp_GetStatusTT",         "Statut de contact de la paire i",                       1),
+        ("CLALp_GetRlocTT",           "Reaction locale de la paire i",                         1),
+        # ---- ALpALp ---------------------------------------------------------
+        ("ALpALp_GetNbALpALp",        "Nombre de paires actives ALp-ALp",                     0),
+        ("ALpALp_GetBodyIds",         "IDs des deux corps de la paire i",                      1),
+        ("ALpALp_GetGapTT",           "Gap de la paire i",                                     1),
+        ("ALpALp_GetRlocTT",          "Reaction locale de la paire i",                         1),
+        # ---- SPSPx (Sphere-Sphere) -------------------------------------------
+        ("SPSPx_GetNbSPSPx",          "Nombre de paires actives Sphere-Sphere",                0),
+        ("SPSPx_GetBodyIds",          "IDs RBDY3 des deux corps de la paire i",                1),
+        ("SPSPx_GetTactors",          "IDs des deux contacteurs SPHER de la paire i",          1),
+        ("SPSPx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("SPSPx_GetStatusTT",         "Statut de contact de la paire i",                       1),
+        ("SPSPx_GetRlocTT",           "Reaction locale (Rn, Rt, Rs) de la paire i",            1),
+        ("SPSPx_GetVlocTT",           "Vitesse locale (Vn, Vt, Vs) de la paire i",             1),
+        # ---- SPCDx (Sphere-Cylindre) -----------------------------------------
+        ("SPCDx_GetNbSPCDx",          "Nombre de paires actives Sphere-Cylindre",              0),
+        ("SPCDx_GetBodyIds",          "IDs RBDY3 des deux corps de la paire i",                1),
+        ("SPCDx_GetTactors",          "IDs des contacteurs (SPHER, CYLND) de la paire i",      1),
+        ("SPCDx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("SPCDx_GetRlocTT",           "Reaction locale de la paire i",                         1),
+        # ---- SPPLx (Sphere-Plan) ---------------------------------------------
+        ("SPPLx_GetNbSPPLx",          "Nombre de paires actives Sphere-Plan",                  0),
+        ("SPPLx_GetBodyIds",          "IDs RBDY3 des deux corps de la paire i",                1),
+        ("SPPLx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("SPPLx_GetRlocTT",           "Reaction locale de la paire i",                         1),
+        # ---- CDCDx (Cylindre-Cylindre) ----------------------------------------
+        ("CDCDx_GetNbCDCDx",          "Nombre de paires actives Cylindre-Cylindre",            0),
+        ("CDCDx_GetBodyIds",          "IDs RBDY3 des deux corps de la paire i",                1),
+        ("CDCDx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("CDCDx_GetRlocTT",           "Reaction locale de la paire i",                         1),
+        # ---- CDPLx (Cylindre-Plan) -------------------------------------------
+        ("CDPLx_GetNbCDPLx",          "Nombre de paires actives Cylindre-Plan",                0),
+        ("CDPLx_GetBodyIds",          "IDs RBDY3 des deux corps de la paire i",                1),
+        ("CDPLx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("CDPLx_GetRlocTT",           "Reaction locale de la paire i",                         1),
+        # ---- PRPRx (Polyedre-Polyedre) ----------------------------------------
+        ("PRPRx_GetNbPRPRx",          "Nombre de paires actives Polyedre-Polyedre",            0),
+        ("PRPRx_GetBodyIds",          "IDs RBDY3 des deux corps de la paire i",                1),
+        ("PRPRx_GetTactors",          "IDs des deux contacteurs POLYH de la paire i",          1),
+        ("PRPRx_GetGapTT",            "Gap de la paire i",                                     1),
+        ("PRPRx_GetStatusTT",         "Statut de contact de la paire i",                       1),
+        ("PRPRx_GetRlocTT",           "Reaction locale (Rn, Rt, Rs) de la paire i",            1),
+        # ---- DKMECAx / ALpMECAx / SPMECAx (rigide-deformable) ---------------
+        ("DKMECAx_GetNbDKMECAx",      "Nombre de paires actives Disque-MECAx (FEM)",           0),
+        ("DKMECAx_GetBodyIds",        "IDs des deux corps de la paire i",                      1),
+        ("DKMECAx_GetGapTT",          "Gap de la paire i",                                     1),
+        ("DKMECAx_GetRlocTT",         "Reaction locale de la paire i",                         1),
+        ("ALpMECAx_GetNbALpMECAx",    "Nombre de paires actives ALp-MECAx",                   0),
+        ("ALpMECAx_GetBodyIds",       "IDs des deux corps de la paire i",                      1),
+        ("ALpMECAx_GetRlocTT",        "Reaction locale de la paire i",                         1),
+        ("SPMECAx_GetNbSPMECAx",      "Nombre de paires actives Sphere-MECAx",                 0),
+        ("SPMECAx_GetBodyIds",        "IDs des deux corps de la paire i",                      1),
+        ("SPMECAx_GetRlocTT",         "Reaction locale de la paire i",                         1),
+    ]
+
+    def _make_insp_tab(
+        self,
+        dim_label: str,
+        funcs_catalog: list,
+        rows_list_attr: str,
+        rows_layout_attr: str,
+        add_cb_label: str,
+    ) -> "QWidget":
+        """
+        Construit un onglet d'inspection generique.
+        Parametres :
+            dim_label        : "2D", "3D" ou "INT"
+            funcs_catalog    : liste de tuples (nom_func, description, nb_params)
+            rows_list_attr   : nom de l'attribut self._insp??_rows
+            rows_layout_attr : nom de l'attribut self._insp??_rows_layout
+            add_cb_label     : texte du bouton "Ajouter"
+        """
+        w = QWidget()
+        vb = QVBoxLayout(w)
+        vb.setSpacing(6)
+
+        # ── Explication ──────────────────────────────────────────────────────
+        note_text = {
+            "2D":  ("Fonctions chipy pour inspecter les contacteurs 2D : "
+                    "DISKx, JONCx, POLYR, xKSID, PT2Dx, RBDY2. "
+                    "Les fonctions sans ID (GetNb...) s'appellent sans argument."),
+            "3D":  ("Fonctions chipy pour inspecter les contacteurs 3D : "
+                    "SPHER, POLYH, CYLND, PLANE, PT3Dx, RBDY3. "
+                    "Les fonctions sans ID (GetNb...) s'appellent sans argument."),
+            "INT": ("Fonctions chipy pour inspecter les interactions (paires de contacteurs) : "
+                    "DKDKx, DKJCx, DKKDx, PLPLx, CLALp, ALpALp, "
+                    "SPSPx, SPCDx, SPPLx, CDCDx, CDPLx, PRPRx, "
+                    "DKMECAx, ALpMECAx, SPMECAx. "
+                    "ID = index de la paire dans la liste chipy (1-based)."),
+        }.get(dim_label, "")
+        note_lbl = QLabel(note_text)
+        note_lbl.setWordWrap(True)
+        note_lbl.setStyleSheet(
+            "background:#e8f5e9; padding:6px; border-radius:4px; font-size:8pt;"
+        )
+        vb.addWidget(note_lbl)
+
+        # ── En-tete colonnes ─────────────────────────────────────────────────
+        hdr = QHBoxLayout()
+        for lbl_txt, lbl_w in [
+            ("Fonction chipy", 230),
+            ("IDs (paires/contacteurs)", 145),
+            ("Groupe", 110),
+            ("Mode / Timing", 185),
+            ("Var. Python", 110),
+        ]:
+            lbl = QLabel("<b>{}</b>".format(lbl_txt))
+            lbl.setFixedWidth(lbl_w)
+            hdr.addWidget(lbl)
+        hdr.addStretch()
+        vb.addLayout(hdr)
+
+        # ── Zone de lignes scrollable ─────────────────────────────────────────
+        rows_widget = QWidget()
+        rows_layout = QVBoxLayout(rows_widget)
+        rows_layout.setContentsMargins(0, 0, 0, 0)
+        rows_layout.setSpacing(2)
+
+        setattr(self, rows_list_attr,   [])
+        setattr(self, rows_layout_attr, rows_layout)
+
+        vb.addWidget(rows_widget)
+
+        # ── Bouton Ajouter ────────────────────────────────────────────────────
+        btn_add = QPushButton(add_cb_label)
+        btn_add.clicked.connect(
+            lambda checked=False, d=dim_label: self._add_insp_row(d)
+        )
+        vb.addWidget(btn_add)
+        vb.addStretch()
+        return _scroll(w)
+
+    def _tab_insp_2d(self) -> "QWidget":
+        """Onglet inspection contacteurs 2D."""
+        return self._make_insp_tab(
+            dim_label        = "2D",
+            funcs_catalog    = self._INSP2D_FUNCS,
+            rows_list_attr   = "_insp2d_rows",
+            rows_layout_attr = "_insp2d_rows_layout",
+            add_cb_label     = "+ Ajouter une inspection 2D",
+        )
+
+    def _tab_insp_3d(self) -> "QWidget":
+        """Onglet inspection contacteurs 3D."""
+        return self._make_insp_tab(
+            dim_label        = "3D",
+            funcs_catalog    = self._INSP3D_FUNCS,
+            rows_list_attr   = "_insp3d_rows",
+            rows_layout_attr = "_insp3d_rows_layout",
+            add_cb_label     = "+ Ajouter une inspection 3D",
+        )
+
+    def _tab_insp_int(self) -> "QWidget":
+        """Onglet inspection interactions (paires)."""
+        return self._make_insp_tab(
+            dim_label        = "INT",
+            funcs_catalog    = self._INSPI_FUNCS,
+            rows_list_attr   = "_inspi_rows",
+            rows_layout_attr = "_inspi_rows_layout",
+            add_cb_label     = "+ Ajouter une inspection interaction",
+        )
+
+    def _get_catalog_for_dim(self, dim: str) -> list:
+        return {
+            "2D":  self._INSP2D_FUNCS,
+            "3D":  self._INSP3D_FUNCS,
+            "INT": self._INSPI_FUNCS,
+        }.get(dim, self._INSP2D_FUNCS)
+
+    def _add_insp_row(self, dim: str, entry: dict = None):
+        """
+        Ajoute une ligne d'inspection dans l'onglet dim.
+        entry : dict optionnel {"func": str, "ids": str, "group": str,
+                                "in_loop": bool, "freq": int, "store": str}
+        """
+        entry = entry or {}
+        catalog = self._get_catalog_for_dim(dim)
+        func_names = [f[0] for f in catalog]
+
+        _dim_key = {"2D": "2d", "3D": "3d"}.get(dim)
+        rows_list   = getattr(self,
+            "_insp{}_rows".format(_dim_key) if _dim_key else "_inspi_rows")
+        rows_layout = getattr(self,
+            "_insp{}_rows_layout".format(_dim_key) if _dim_key else "_inspi_rows_layout")
+
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(4)
+
+        # ── ComboBox fonction ─────────────────────────────────────────────────
+        combo_func = QComboBox()
+        combo_func.setFixedWidth(230)
+        for fname, fdesc, _ in catalog:
+            combo_func.addItem(fname)
+            combo_func.setItemData(
+                combo_func.count() - 1, fdesc, 3  # Qt.ToolTipRole = 3
+            )
+        if entry.get("func") in func_names:
+            combo_func.setCurrentText(entry["func"])
+
+        def _update_tip(idx, cb=combo_func, cat=catalog):
+            if 0 <= idx < len(cat):
+                cb.setToolTip("{} -- {}".format(cat[idx][0], cat[idx][1]))
+        combo_func.currentIndexChanged.connect(_update_tip)
+        _update_tip(combo_func.currentIndex())
+        row_layout.addWidget(combo_func)
+
+        # ── IDs ───────────────────────────────────────────────────────────────
+        edit_ids = QLineEdit()
+        edit_ids.setFixedWidth(100)
+        edit_ids.setPlaceholderText("1, 3, 5")
+        edit_ids.setText(entry.get("ids", ""))
+        edit_ids.setToolTip(
+            "IDs (1-based) des contacteurs ou paires a inspecter. "
+            "Laisser vide si la fonction ne prend pas d'ID (GetNb...)."
+        )
+
+        btn_pick = QPushButton("...")
+        btn_pick.setFixedWidth(28)
+        btn_pick.setToolTip("Choisir depuis la liste du projet.")
+        pick_dim = "2D" if dim in ("2D", "INT") else "3D"
+        def _make_pick(e=edit_ids, d=pick_dim):
+            return lambda: self._pick_avatar_ids(e, d)
+        btn_pick.clicked.connect(_make_pick())
+        row_layout.addWidget(edit_ids)
+        row_layout.addWidget(btn_pick)
+
+        # ── Groupe ────────────────────────────────────────────────────────────
+        combo_grp = QComboBox()
+        combo_grp.setFixedWidth(110)
+        combo_grp.setEditable(True)
+        combo_grp.addItem("")
+        groups = list(
+            (getattr(getattr(self, "controller", None), "state", None)
+             and getattr(self.controller.state, "avatar_groups", {}) or {}).keys()
+        )
+        combo_grp.addItems(groups)
+        if entry.get("group"):
+            idx_g = combo_grp.findText(entry["group"])
+            if idx_g >= 0:
+                combo_grp.setCurrentIndex(idx_g)
+            else:
+                combo_grp.setCurrentText(entry["group"])
+        combo_grp.setToolTip(
+            "Groupe d'avatars. Si vide, les IDs ci-contre sont utilises. "
+            "Les IDs du groupe sont resolus au moment de la generation du script."
+        )
+        row_layout.addWidget(combo_grp)
+
+        # ── Mode d'execution (timing) ──────────────────────────────────────
+        _tc_i, _combo_mode_i, _spin_val_i = self._make_timing_widget(entry)
+        row_layout.addWidget(_tc_i)
+
+        # ── Variable de stockage ─────────────────────────────────────────────
+        edit_store = QLineEdit()
+        edit_store.setFixedWidth(110)
+        edit_store.setPlaceholderText("ex: res_Rn")
+        edit_store.setText(entry.get("store", ""))
+        edit_store.setToolTip(
+            "Nom de variable Python pour stocker le resultat. "
+            "Ex: res_Rn  =>  res_Rn = chipy.DKDKx_GetRlocTT(i). "
+            "Laisser vide si le resultat n'est pas utilise."
+        )
+        row_layout.addWidget(edit_store)
+
+        # ── Bouton supprimer ─────────────────────────────────────────────────
+        btn_del = QPushButton("x")
+        btn_del.setFixedWidth(24)
+        row_data = {
+            "widget":     row_widget,
+            "combo_func": combo_func,
+            "edit_ids":   edit_ids,
+            "combo_grp":  combo_grp,
+            "combo_mode": _combo_mode_i,
+            "spin_val":   _spin_val_i,
+            "edit_store": edit_store,
+            "dim":        dim,
+        }
+        def _make_del(rd=row_data, rl=rows_list, rlay=rows_layout):
+            def _do():
+                rl.remove(rd)
+                rlay.removeWidget(rd["widget"])
+                rd["widget"].deleteLater()
+            return _do
+        btn_del.clicked.connect(_make_del())
+        row_layout.addWidget(btn_del)
+        row_layout.addStretch()
+
+        rows_layout.addWidget(row_widget)
+        rows_list.append(row_data)
+
+    def _read_insp_row(self, row: dict) -> dict:
+        """Lit une ligne d'inspection et retourne un dict serialisable."""
+        _mode = row["combo_mode"].currentData()
+        return {
+            "func":      row["combo_func"].currentText(),
+            "ids":       row["edit_ids"].text().strip(),
+            "group":     row["combo_grp"].currentText().strip(),
+            "step_mode": _mode,
+            "step_val":  row["spin_val"].value(),
+            "store":     row["edit_store"].text().strip(),
+            # compat ascendante
+            "in_loop":   _mode != "after",
+            "freq":      row["spin_val"].value() if _mode == "every_n" else 1,
+        }
+
     # =========================================================================
     # Chargement initial des widgets depuis _params
     # =========================================================================
@@ -865,21 +1251,47 @@ class ChipyRoutinesDialog(QDialog):
         }.items():
             getattr(self, attr).setChecked(p.get(key, False))
 
-        # Visibilite — QLineEdit
-        self._edit_vis2_vis.setText(p.get("vis_RBDY2_visible", ""))
-        self._edit_vis2_invis.setText(p.get("vis_RBDY2_invisible", ""))
-        self._edit_vis3_vis.setText(p.get("vis_RBDY3_visible", ""))
-        self._edit_vis3_invis.setText(p.get("vis_RBDY3_invisible", ""))
+        # Visibilite — lignes dynamiques
+        self._vis_rows.clear()
+        while self._vis_rows_layout.count():
+            _wv = self._vis_rows_layout.takeAt(0).widget()
+            if _wv: _wv.deleteLater()
+        for _ve in p.get("vis_entries", []):
+            self._add_vis_row(_ve)
 
-        # GetBodyVector RBDY2/3
-        for vec, _ in _GBV_VECTORS_2D:
-            self._gbv2_checks[vec].setChecked(p.get("gbv2_{}".format(vec), False))
-            self._gbv2_spins[vec].setValue(p.get("gbv2_{}_freq".format(vec), 1))
-            self._gbv2_spins[vec].setEnabled(p.get("gbv2_{}".format(vec), False))
-        for vec, _ in _GBV_VECTORS_3D:
-            self._gbv3_checks[vec].setChecked(p.get("gbv3_{}".format(vec), False))
-            self._gbv3_spins[vec].setValue(p.get("gbv3_{}_freq".format(vec), 1))
-            self._gbv3_spins[vec].setEnabled(p.get("gbv3_{}".format(vec), False))
+        # Inspection 2D / 3D / Interactions — charger les entrees
+        self._insp2d_rows.clear()
+        while self._insp2d_rows_layout.count():
+            w2 = self._insp2d_rows_layout.takeAt(0).widget()
+            if w2: w2.deleteLater()
+        for entry in p.get("insp2d_entries", []):
+            self._add_insp_row("2D", entry)
+        self._insp3d_rows.clear()
+        while self._insp3d_rows_layout.count():
+            w3 = self._insp3d_rows_layout.takeAt(0).widget()
+            if w3: w3.deleteLater()
+        for entry in p.get("insp3d_entries", []):
+            self._add_insp_row("3D", entry)
+        self._inspi_rows.clear()
+        while self._inspi_rows_layout.count():
+            wi = self._inspi_rows_layout.takeAt(0).widget()
+            if wi: wi.deleteLater()
+        for entry in p.get("inspi_entries", []):
+            self._add_insp_row("INT", entry)
+
+        # GetBodyVector RBDY2/3 — charger les entrees depuis _params
+        self._gbv2_rows.clear()
+        while self._gbv2_rows_layout.count():
+            w = self._gbv2_rows_layout.takeAt(0).widget()
+            if w: w.deleteLater()
+        for entry in p.get("gbv2_entries", []):
+            self._add_gbv_row("2D", entry)
+        self._gbv3_rows.clear()
+        while self._gbv3_rows_layout.count():
+            w = self._gbv3_rows_layout.takeAt(0).widget()
+            if w: w.deleteLater()
+        for entry in p.get("gbv3_entries", []):
+            self._add_gbv_row("3D", entry)
 
         # Pilotage
         self._cb_restart.setChecked(p["use_restart"])
@@ -951,12 +1363,305 @@ class ChipyRoutinesDialog(QDialog):
     # Auto-detection depuis le projet courant
     # =========================================================================
 
+    # =========================================================================
+    # Gestion des lignes GetBodyVector (ajout / lecture)
+    # =========================================================================
+
+    _GBV_VECS = [
+        "Coor0", "Coor_", "Coorb", "Coorm",
+        "X____", "V____", "Vbeg_", "Vfree",
+        "Fext",  "Fint_", "Reac",  "Ireac",
+    ]
+
+    def _add_vis_row(self, entry: dict = None):
+        """
+        Ajoute une ligne de visibilite dans la section Visibilite.
+        entry : dict {"action": str, "dim": str, "ids": str, "group": str,
+                      "step_mode": str, "step_val": int}
+        """
+        entry = entry or {}
+
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(4)
+
+        # ── Action : SetVisible / SetInvisible ────────────────────────────
+        combo_action = QComboBox()
+        combo_action.setFixedWidth(110)
+        combo_action.addItem("SetVisible",   "visible")
+        combo_action.addItem("SetInvisible", "invisible")
+        combo_action.setToolTip(
+            "SetVisible   : chipy.RBDY2_SetVisible(id)\n"
+            "SetInvisible : chipy.RBDY2_SetInvisible(id)"
+        )
+        if entry.get("action") == "invisible":
+            combo_action.setCurrentIndex(1)
+        row_layout.addWidget(combo_action)
+
+        # ── Dimension 2D / 3D ─────────────────────────────────────────────
+        combo_dim = QComboBox()
+        combo_dim.setFixedWidth(55)
+        combo_dim.addItem("2D", "2D")
+        combo_dim.addItem("3D", "3D")
+        combo_dim.setToolTip("RBDY2 (2D) ou RBDY3 (3D)")
+        if entry.get("dim") == "3D":
+            combo_dim.setCurrentIndex(1)
+        row_layout.addWidget(combo_dim)
+
+        # ── IDs ───────────────────────────────────────────────────────────
+        edit_ids = QLineEdit()
+        edit_ids.setFixedWidth(100)
+        edit_ids.setPlaceholderText("1, 3, 5")
+        edit_ids.setText(entry.get("ids", ""))
+        edit_ids.setToolTip(
+            "IDs des avatars (1-based). "
+            "Prioritaire sur le groupe si les deux sont remplis."
+        )
+        btn_pick = QPushButton("...")
+        btn_pick.setFixedWidth(28)
+        btn_pick.setToolTip("Choisir depuis la liste des avatars du projet.")
+        def _make_pick(e=edit_ids, cb=combo_dim):
+            return lambda: self._pick_avatar_ids(e, cb.currentData())
+        btn_pick.clicked.connect(_make_pick())
+        row_layout.addWidget(edit_ids)
+        row_layout.addWidget(btn_pick)
+
+        # ── Groupe ────────────────────────────────────────────────────────
+        combo_grp = QComboBox()
+        combo_grp.setFixedWidth(110)
+        combo_grp.setEditable(True)
+        combo_grp.addItem("")
+        _groups = list(
+            (getattr(getattr(self, "controller", None), "state", None)
+             and getattr(self.controller.state, "avatar_groups", {}) or {}).keys()
+        )
+        combo_grp.addItems(_groups)
+        if entry.get("group"):
+            idx_g = combo_grp.findText(entry["group"])
+            if idx_g >= 0:
+                combo_grp.setCurrentIndex(idx_g)
+            else:
+                combo_grp.setCurrentText(entry["group"])
+        combo_grp.setToolTip(
+            "Groupe d'avatars. Si vide, les IDs ci-contre sont utilises. "
+            "Si les deux sont remplis, les IDs ont la priorite."
+        )
+        row_layout.addWidget(combo_grp)
+
+        # ── Mode / Timing (memes options que GBV/Inspection) ──────────────
+        _tc, _combo_mode, _spin_val = self._make_timing_widget(entry)
+        row_layout.addWidget(_tc)
+
+        # ── Bouton supprimer ──────────────────────────────────────────────
+        btn_del = QPushButton("x")
+        btn_del.setFixedWidth(24)
+        btn_del.setToolTip("Supprimer cette ligne.")
+        row_data = {
+            "widget":       row_widget,
+            "combo_action": combo_action,
+            "combo_dim":    combo_dim,
+            "edit_ids":     edit_ids,
+            "combo_grp":    combo_grp,
+            "combo_mode":   _combo_mode,
+            "spin_val":     _spin_val,
+        }
+        def _make_del(rd=row_data):
+            def _do():
+                self._vis_rows.remove(rd)
+                self._vis_rows_layout.removeWidget(rd["widget"])
+                rd["widget"].deleteLater()
+            return _do
+        btn_del.clicked.connect(_make_del())
+        row_layout.addWidget(btn_del)
+        row_layout.addStretch()
+
+        self._vis_rows_layout.addWidget(row_widget)
+        self._vis_rows.append(row_data)
+
+    def _read_vis_row(self, row: dict) -> dict:
+        """Lit une ligne de visibilite et retourne un dict serialisable."""
+        _mode = row["combo_mode"].currentData()
+        return {
+            "action":    row["combo_action"].currentData(),
+            "dim":       row["combo_dim"].currentData(),
+            "ids":       row["edit_ids"].text().strip(),
+            "group":     row["combo_grp"].currentText().strip(),
+            "step_mode": _mode,
+            "step_val":  row["spin_val"].value(),
+            "in_loop":   _mode != "after",
+        }
+
+    @staticmethod
+    def _make_timing_widget(entry: dict):
+        """
+        Construit un widget horizontal compact pour le mode d'execution :
+          [ComboBox mode] [SpinBox valeur]
+        Retourne (container_widget, combo_mode, spin_val).
+        step_mode : "all" | "every_n" | "at_k" | "after"
+        step_val  : N (every_n) ou k (at_k), ignore sinon
+        """
+        container = QWidget()
+        lay = QHBoxLayout(container)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(3)
+
+        combo = QComboBox()
+        combo.setFixedWidth(105)
+        combo.addItem("Tous les pas",   "all")
+        combo.addItem("Tous les N pas", "every_n")
+        combo.addItem("Au pas k =",     "at_k")
+        combo.addItem("Apres boucle",   "after")
+        combo.setToolTip(
+            "Tous les pas   : appel a chaque iteration.\n"
+            "Tous les N pas : appel si k % N == 0.\n"
+            "Au pas k =     : appel seulement si k == valeur.\n"
+            "Apres boucle   : appel unique apres la boucle."
+        )
+
+        spin = QSpinBox()
+        spin.setRange(1, 9_999_999)
+        spin.setFixedWidth(72)
+        spin.setToolTip("N (frequence) ou k (pas unique)")
+
+        # Restaurer depuis entry
+        mode = entry.get("step_mode", "all")
+        # Compatibilite ascendante : in_loop=False => "after"
+        if not entry.get("in_loop", True) and "step_mode" not in entry:
+            mode = "after"
+        elif "step_mode" not in entry and entry.get("freq", 1) > 1:
+            mode = "every_n"
+        val = entry.get("step_val", entry.get("freq", 1))
+
+        idx = {d: i for i, d in enumerate(["all","every_n","at_k","after"])}.get(mode, 0)
+        combo.setCurrentIndex(idx)
+        spin.setValue(int(val))
+
+        def _on_mode(i, s=spin):
+            s.setEnabled(i in (1, 2))  # every_n ou at_k
+        combo.currentIndexChanged.connect(_on_mode)
+        _on_mode(combo.currentIndex())
+
+        lay.addWidget(combo)
+        lay.addWidget(spin)
+        return container, combo, spin
+
+    def _add_gbv_row(self, dim: str, entry: dict = None):
+        """\n        Ajoute une ligne de configuration GetBodyVector.        dim    : "2D" ou "3D"        entry  : dict optionnel pour pre-remplir la ligne                 {"vec": str, "ids": str, "group": str,                  "in_loop": bool, "freq": int}        """
+        from PyQt6.QtWidgets import QListWidget, QListWidgetItem
+
+        entry = entry or {}
+        rows_list   = self._gbv2_rows   if dim == "2D" else self._gbv3_rows
+        rows_layout = self._gbv2_rows_layout if dim == "2D" else self._gbv3_rows_layout
+
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(4)
+
+        # ── Vecteur ──────────────────────────────────────────────────────────
+        combo_vec = QComboBox()
+        combo_vec.addItems(self._GBV_VECS)
+        combo_vec.setFixedWidth(110)
+        if entry.get("vec") in self._GBV_VECS:
+            combo_vec.setCurrentText(entry["vec"])
+        combo_vec.setToolTip(
+            "Vecteur d'etat a extraire.\n"
+            "Coor0=pos init, Coor_=pos courante, X____=coord gen, "
+            "V____=vitesses gen, Vfree=vitesses libres, "
+            "Fext=forces ext, Fint_=forces int, "
+            "Reac=reaction contact, Ireac=impulsion contact."
+        )
+        row_layout.addWidget(combo_vec)
+
+        # ── IDs avatars ───────────────────────────────────────────────────────
+        edit_ids = QLineEdit()
+        edit_ids.setFixedWidth(120)
+        edit_ids.setPlaceholderText("Ex : 1, 3, 5")
+        edit_ids.setText(entry.get("ids", ""))
+        edit_ids.setToolTip(
+            "IDs des avatars (numerotation 1-based, ordre de creation). "
+            "Prioritaire sur le groupe si les deux sont remplis."
+        )
+        btn_pick = QPushButton("...")
+        btn_pick.setFixedWidth(28)
+        btn_pick.setToolTip("Choisir les avatars depuis la liste du projet.")
+        def _make_pick(e=edit_ids, d=dim):
+            return lambda: self._pick_avatar_ids(e, d)
+        btn_pick.clicked.connect(_make_pick())
+        row_layout.addWidget(edit_ids)
+        row_layout.addWidget(btn_pick)
+
+        # ── Groupe ────────────────────────────────────────────────────────────
+        combo_grp = QComboBox()
+        combo_grp.setFixedWidth(110)
+        combo_grp.setEditable(True)
+        combo_grp.addItem("")          # vide = pas de groupe
+        groups = list(
+            (getattr(getattr(self, "controller", None),
+                     "state", None) and
+             getattr(self.controller.state, "avatar_groups", {}) or {}).keys()
+        )
+        combo_grp.addItems(groups)
+        if entry.get("group"):
+            idx = combo_grp.findText(entry["group"])
+            if idx >= 0:
+                combo_grp.setCurrentIndex(idx)
+            else:
+                combo_grp.setCurrentText(entry["group"])
+        combo_grp.setToolTip(
+            "Groupe d'avatars a extraire. "
+            "Si vide, les IDs ci-contre sont utilises. "
+            "Si les deux sont remplis, les IDs ont la priorite."
+        )
+        row_layout.addWidget(combo_grp)
+
+        # ── Mode d'execution (timing) ──────────────────────────────────────
+        _tc, _combo_mode, _spin_val = self._make_timing_widget(entry)
+        row_layout.addWidget(_tc)
+
+        # ── Bouton supprimer ──────────────────────────────────────────────────
+        btn_del = QPushButton("x")
+        btn_del.setFixedWidth(24)
+        btn_del.setToolTip("Supprimer cette ligne.")
+        row_data = {
+            "widget":     row_widget,
+            "combo_vec":  combo_vec,
+            "edit_ids":   edit_ids,
+            "combo_grp":  combo_grp,
+            "combo_mode": _combo_mode,
+            "spin_val":   _spin_val,
+            "dim":        dim,
+        }
+        def _make_del(rd=row_data, rl=rows_list, rlay=rows_layout):
+            def _do_del():
+                rl.remove(rd)
+                rlay.removeWidget(rd["widget"])
+                rd["widget"].deleteLater()
+            return _do_del
+        btn_del.clicked.connect(_make_del())
+        row_layout.addWidget(btn_del)
+        row_layout.addStretch()
+
+        rows_layout.addWidget(row_widget)
+        rows_list.append(row_data)
+
+    def _read_gbv_row(self, row: dict) -> dict:
+        """Lit les valeurs d'une ligne GBV et retourne un dict serialisable."""
+        _mode = row["combo_mode"].currentData()
+        return {
+            "vec":       row["combo_vec"].currentText(),
+            "ids":       row["edit_ids"].text().strip(),
+            "group":     row["combo_grp"].currentText().strip(),
+            "step_mode": _mode,
+            "step_val":  row["spin_val"].value(),
+            # compat ascendante
+            "in_loop":   _mode != "after",
+            "freq":      row["spin_val"].value() if _mode == "every_n" else 1,
+        }
+
     def _pick_avatar_ids(self, target_edit: "QLineEdit", dim: str):
-        """
-        Ouvre un dialogue de selection d'avatars du projet.
-        Insere les IDs selectionnes (1-bases) dans target_edit.
-        dim : "2D" ou "3D" pour filtrer les avatars affichables.
-        """
+        """\n        Ouvre un dialogue de selection d'avatars du projet.        Insere les IDs selectionnes (1-bases) dans target_edit.        dim : "2D" ou "3D" pour filtrer les avatars affichables.        """
         if self.controller is None:
             QMessageBox.information(
                 self,
@@ -1137,10 +1842,7 @@ class ChipyRoutinesDialog(QDialog):
     # =========================================================================
 
     def get_params(self) -> Dict[str, Any]:
-        """
-        Retourne le dict complet des parametres configures.
-        Fusionnable avec ComputeTab.get_parameters().
-        """
+        """\n        Retourne le dict complet des parametres configures.        Fusionnable avec ComputeTab.get_parameters().        """
         p: Dict[str, Any] = {}
 
         # Modele
@@ -1186,19 +1888,17 @@ class ChipyRoutinesDialog(QDialog):
         }.items():
             p[key] = getattr(self, attr).isChecked()
 
-        # Visibilite — lire les QLineEdit
-        p["vis_RBDY2_visible"]   = self._edit_vis2_vis.text().strip()
-        p["vis_RBDY2_invisible"] = self._edit_vis2_invis.text().strip()
-        p["vis_RBDY3_visible"]   = self._edit_vis3_vis.text().strip()
-        p["vis_RBDY3_invisible"] = self._edit_vis3_invis.text().strip()
+        # Visibilite — lignes dynamiques
+        p["vis_entries"] = [self._read_vis_row(r) for r in self._vis_rows]
 
-        # GetBodyVector RBDY2/3
-        for vec, _ in _GBV_VECTORS_2D:
-            p["gbv2_{}".format(vec)]      = self._gbv2_checks[vec].isChecked()
-            p["gbv2_{}_freq".format(vec)] = self._gbv2_spins[vec].value()
-        for vec, _ in _GBV_VECTORS_3D:
-            p["gbv3_{}".format(vec)]      = self._gbv3_checks[vec].isChecked()
-            p["gbv3_{}_freq".format(vec)] = self._gbv3_spins[vec].value()
+        # Inspection
+        p["insp2d_entries"] = [self._read_insp_row(r) for r in self._insp2d_rows]
+        p["insp3d_entries"] = [self._read_insp_row(r) for r in self._insp3d_rows]
+        p["inspi_entries"]  = [self._read_insp_row(r) for r in self._inspi_rows]
+
+        # GetBodyVector RBDY2/3 — collecter toutes les entrees
+        p["gbv2_entries"] = [self._read_gbv_row(row) for row in self._gbv2_rows]
+        p["gbv3_entries"] = [self._read_gbv_row(row) for row in self._gbv3_rows]
 
         # Pilotage
         p["use_restart"]      = self._cb_restart.isChecked()

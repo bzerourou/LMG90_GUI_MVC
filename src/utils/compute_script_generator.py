@@ -3,35 +3,13 @@
 # ============================================================================
 """
 Genere le script de calcul chipy (command.py) a partir des parametres
-collectes par ComputeTab.get_parameters() fusionnes avec
-ChipyRoutinesDialog.get_params().
+collectes par ComputeTab.get_parameters()
 
-Structure du script genere :
-  1.  Imports  +  initialisation
-  2.  Parametres (dt, theta, solveur, …)
-  3.  chipy.SetDimension(dim, mhyp)
-  4.  ReadDatbox(deformable=…)
-  5.  Ouverture fichiers de sortie
-  6.  ComputeMass  (+  mecaFEMx_ComputeMass)
-  7.  Restart eventuel  (ReadIni + SetStep)
-  8.  Boucle de calcul  (simple ou multi-pas) :
-        a. IncrementStep
-        b. FreeVelocity  —  RBDY2 / RBDY3 / mecaFEMx / therFEMx / hydrFEMx
-        c. SelectProxTactors  —  tous les detecteurs actifs
-        d. RecupRloc / ExSolver / UpdateTactBehav / StockRloc
-        e. UpdateBulkBehav  (si coche)
-        f. ComputeDof  +  UpdateStep  (+  variantes FEM)
-        g. Extraction  (energie, forces, champs)
-        h. Critere d'arret  (si active)
-        i. WriteOut  +  WriteDisplayFiles  +  WritePostproFiles
-  9.  Visualisation hors-boucle  (si display_in_loop = False)
-  10. CloseDisplayFiles / ClosePostproFiles / Finalize
 """
 
 from io import StringIO
 from pathlib import Path
 from typing import Dict, Any
-
 
 class ComputeScriptGenerator:
     """Genere le script command.py pour chipy."""
@@ -55,23 +33,19 @@ class ComputeScriptGenerator:
         'extract_Rnod': False, 'extract_Vloc': False, 'extract_Rloc': False,
         'extract_energy': False, 'extract_KE': False,
         'extract_fields': False, 'extract_internal': False,
-        # Visibilite avatars
-        'vis_RBDY2_visible': '', 'vis_RBDY2_invisible': '',
-        'vis_RBDY3_visible': '', 'vis_RBDY3_invisible': '',
-        # GetBodyVector RBDY2
-        'gbv2_Coor': False,          'gbv2_Coor_freq': 1,
-        'gbv2_Velo': False,          'gbv2_Velo_freq': 1,
-        'gbv2_Fext': False,          'gbv2_Fext_freq': 1,
-        'gbv2_Reac': False,          'gbv2_Reac_freq': 1,
-        'gbv2_Acce': False,          'gbv2_Acce_freq': 1,
-        'gbv2_RigidBodyMass': False, 'gbv2_RigidBodyMass_freq': 1,
-        # GetBodyVector RBDY3
-        'gbv3_Coor': False,          'gbv3_Coor_freq': 1,
-        'gbv3_Velo': False,          'gbv3_Velo_freq': 1,
-        'gbv3_Fext': False,          'gbv3_Fext_freq': 1,
-        'gbv3_Reac': False,          'gbv3_Reac_freq': 1,
-        'gbv3_Acce': False,          'gbv3_Acce_freq': 1,
-        'gbv3_RigidBodyMass': False, 'gbv3_RigidBodyMass_freq': 1,
+        # Visibilite avatars — chaine d'IDs (ex: '1, 3, 5') ou '' = desactive
+        'vis_entries': [],
+        # GetBodyVector RBDY2/3 — liste d'entrees
+        # Chaque entree : {'vec': str, 'ids': str, 'group': str,
+        #                  'in_loop': bool, 'freq': int}
+        'gbv2_entries': [],
+        'gbv3_entries': [],
+        # Inspection contacteurs 2D/3D + interactions
+        # Chaque entree : {'func': str, 'ids': str, 'group': str,
+        #                  'in_loop': bool, 'freq': int, 'store': str}
+        'insp2d_entries': [],
+        'insp3d_entries': [],
+        'inspi_entries':  [],
         'use_restart': False, 'restart_step': 0,
         'use_stop_crit': False, 'stop_crit_type': 'energy',
         'stop_crit_val': 1e-6, 'stop_crit_freq': 10,
@@ -221,27 +195,42 @@ class ComputeScriptGenerator:
             w('chipy.hydrFEMx_ComputeMass()\n')
         w('\n')
 
+        def _resolve_group_ids(grp_name):
+            if not grp_name or self.controller is None:
+                return []
+            groups = getattr(
+                getattr(self.controller, 'state', None), 'avatar_groups', {}
+            ) or {}
+            return [str(i + 1) for i in groups.get(grp_name, [])]
+        
+
         # ── 6b. Visibilite des avatars ────────────────────────────────────────
-        def _write_vis_calls(key, func, guard):
-            """Ecrit un appel chipy.func(id) pour chaque ID dans la chaine."""
-            if not guard:
-                return
-            ids_str = p.get(key, '')
-            ids = [tok.strip() for tok in ids_str.split(',') if tok.strip().isdigit()]
-            for av_id in ids:
+        # Tri des entrees par position temporelle
+        _vis_before  = [e for e in p.get('vis_entries', []) if not e.get('step_mode')]
+        _vis_in_loop = [e for e in p.get('vis_entries', [])
+                        if e.get('step_mode') and e.get('step_mode') != 'after']
+        _vis_after   = [e for e in p.get('vis_entries', [])
+                        if e.get('step_mode') == 'after']
+
+        # _emit_vis_entry et _timing_guard seront definis dans le corps de la
+        # boucle — les appels avant/apres sont emis via des closures tardives,
+        # mais ici on ecrit directement dans le script genere sans appeler
+        # ces fonctions locales. On utilise un helper independant.
+        def _write_vis_before(entry):
+            action   = entry.get('action', 'visible')
+            dim      = entry.get('dim', '2D')
+            ids_str  = entry.get('ids', '').strip()
+            grp_name = entry.get('group', '').strip()
+            id_list  = ([t.strip() for t in ids_str.split(',') if t.strip().isdigit()]
+                        if ids_str else _resolve_group_ids(grp_name))
+            func = ('RBDY2' if dim == '2D' else 'RBDY3') + (
+                '_SetVisible' if action == 'visible' else '_SetInvisible')
+            for av_id in id_list:
                 w('chipy.{}({})\n'.format(func, av_id))
 
-        _write_vis_calls('vis_RBDY2_visible',   'RBDY2_SetVisible',   use_RBDY2)
-        _write_vis_calls('vis_RBDY2_invisible', 'RBDY2_SetInvisible', use_RBDY2)
-        _write_vis_calls('vis_RBDY3_visible',   'RBDY3_SetVisible',   use_RBDY3)
-        _write_vis_calls('vis_RBDY3_invisible', 'RBDY3_SetInvisible', use_RBDY3)
-
-        _any_vis = any(
-            bool([t for t in p.get(k, '').split(',') if t.strip().isdigit()])
-            for k in ('vis_RBDY2_visible','vis_RBDY2_invisible',
-                      'vis_RBDY3_visible','vis_RBDY3_invisible')
-        )
-        if _any_vis:
+        for _ve in _vis_before:
+            _write_vis_before(_ve)
+        if _vis_before:
             w('\n')
 
         # ── 7. Restart ────────────────────────────────────────────────────────
@@ -377,29 +366,179 @@ class ComputeScriptGenerator:
         )):
             w('\n')
 
-        # GetBodyVector RBDY2
-        _gbv2_active = [v for v in (
-            'Coor0','Coor_','Coorb','Coorm','X____','V____','Vbeg_', 'Vfree', 'Fext', 'Fint_', 'Reac', 'Ireac',
-        ) if p.get('gbv2_{}'.format(v))]
-        if _gbv2_active and use_RBDY2:
-            L("chipy.utilities_logMes('RBDY2 GetBodyVector')")
-            for _v in _gbv2_active:
-                _freq = p.get('gbv2_{}_freq'.format(_v), 1)
-                L('if k % {} == 0:'.format(_freq))
-                w(ind + '    chipy.RBDY2_GetBodyVector(\'{}\')\n'.format(_v))
+        # ── GetBodyVector RBDY2 / RBDY3 dans la boucle ─────────────────────
+        def _timing_guard(entry):
+            """
+            Retourne (guard_line, inner_indent) selon step_mode.
+            all      -> pas de garde, indent = ind
+            every_n  -> 'if k % N == 0:', indent = ind + 4sp
+            at_k     -> 'if k == K:',     indent = ind + 4sp
+            """
+            mode = entry.get('step_mode', '')
+            if not mode:
+                freq = int(entry.get('freq', 1))
+                mode = 'every_n' if freq > 1 else 'all'
+                entry = dict(entry, step_mode=mode, step_val=freq)
+            val = int(entry.get('step_val', entry.get('freq', 1)))
+            if mode == 'every_n' and val > 1:
+                return ind + 'if k % {} == 0:\n'.format(val), ind + '    '
+            elif mode == 'at_k':
+                return ind + 'if k == {}:\n'.format(val), ind + '    '
+            else:
+                return '', ind
+
+        def _emit_vis_entry(entry, in_loop_context=False):
+            """Emet les appels chipy.RBDYx_SetVisible/Invisible pour une entree."""
+            action   = entry.get('action', 'visible')
+            dim      = entry.get('dim', '2D')
+            ids_str  = entry.get('ids', '').strip()
+            grp_name = entry.get('group', '').strip()
+            if ids_str:
+                id_list = [t.strip() for t in ids_str.split(',') if t.strip().isdigit()]
+            elif grp_name:
+                id_list = _resolve_group_ids(grp_name)
+            else:
+                return
+            func = ('RBDY2' if dim == '2D' else 'RBDY3') + (
+                '_SetVisible' if action == 'visible' else '_SetInvisible'
+            )
+            if in_loop_context:
+                guard, xi = _timing_guard(entry)
+                if guard:
+                    w(guard)
+                    for av_id in id_list:
+                        w(xi + 'chipy.{}({})\n'.format(func, av_id))
+                else:
+                    for av_id in id_list:
+                        w(ind + 'chipy.{}({})\n'.format(func, av_id))
+            else:
+                for av_id in id_list:
+                    w('chipy.{}({})\n'.format(func, av_id))
+
+        def _emit_gbv(entry, func_name):
+            """Emet le code chipy.XXX_GetBodyVector avec step_mode."""
+            vec     = entry.get('vec', 'Coor_')
+            ids_str = entry.get('ids', '').strip()
+            grp     = entry.get('group', '').strip()
+            id_list = ([t.strip() for t in ids_str.split(',') if t.strip().isdigit()]
+                       if ids_str else _resolve_group_ids(grp))
+            if not id_list:
+                return
+            ids_repr = '[{}]'.format(', '.join(id_list))
+            guard, xi = _timing_guard(entry)
+            if guard:
+                w(guard)
+                w(xi + 'for _id in {}:\n'.format(ids_repr))
+                w(xi + '    chipy.{}(\'{}\', _id)\n'.format(func_name, vec))
+            else:
+                w(xi + 'for _id in {}:\n'.format(ids_repr))
+                w(xi + '    chipy.{}(\'{}\', _id)\n'.format(func_name, vec))
             w('\n')
 
-        # GetBodyVector RBDY3
-        _gbv3_active = [v for v in (
-            'Coor0','Coor_','Coorb','Coorm','X____','V____','Vbeg_', 'Vfree', 'Fext', 'Fint_', 'Reac', 'Ireac',
-        ) if p.get('gbv3_{}'.format(v))]
-        if _gbv3_active and use_RBDY3:
-            L("chipy.utilities_logMes('RBDY3 GetBodyVector')")
-            for _v in _gbv3_active:
-                _freq = p.get('gbv3_{}_freq'.format(_v), 1)
-                L('if k % {} == 0:'.format(_freq))
-                w(ind + '    chipy.RBDY3_GetBodyVector(\'{}\')\n'.format(_v))
+        for _gbv_key, _gbv_func, _gbv_flag in [
+            ('gbv2_entries', 'RBDY2_GetBodyVector', use_RBDY2),
+            ('gbv3_entries', 'RBDY3_GetBodyVector', use_RBDY3),
+        ]:
+            if not _gbv_flag:
+                continue
+            _in_e = [e for e in p.get(_gbv_key, [])
+                     if e.get('step_mode','') != 'after'
+                     and (e.get('step_mode') or e.get('in_loop', True))]
+            if _in_e:
+                L("chipy.utilities_logMes('{} extraction')".format(_gbv_func))
+                for _e in _in_e:
+                    _emit_gbv(_e, _gbv_func)
+
+        # ── Visibilite dans la boucle ────────────────────────────────────────
+        for _ve_loop in _vis_in_loop:
+            _emit_vis_entry(_ve_loop, in_loop_context=True)
+
+        # ── Inspection contacteurs / interactions (dans la boucle) ────────────
+        def _emit_insp(entry):
+            """Emet le code d'inspection pour une entree."""
+            func    = entry.get('func', '')
+            ids_str = entry.get('ids', '').strip()
+            grp     = entry.get('group', '').strip()
+            store   = entry.get('store', '').strip()
+
+            if not func:
+                return
+
+            # Fonctions sans ID : GetNb*, KineticEnergy, etc.
+            # Convention : si 'ids' ET 'group' sont vides => appel direct sans arg
+            no_id = (not ids_str and not grp)
+            # Aussi : les noms GetNb... ne prennent jamais d'ID
+            no_id = no_id or func.endswith('GetNb' + func.split('GetNb')[-1])                           and 'GetNb' in func                           or func in (
+                              'RBDY2_GetNbRBDY2', 'RBDY3_GetNbRBDY3',
+                              'RBDY2_KineticEnergy',
+                              'DISKx_GetNbDISKx', 'JONCx_GetNbJONCx',
+                              'POLYR_GetNbPOLYR', 'xKSID_GetNbxKSID',
+                              'SPHER_GetNbSPHER', 'POLYH_GetNbPOLYH',
+                              'CYLND_GetNbCYLND', 'PLANE_GetNbPLANE',
+                              'PT2Dx_GetNbPT2Dx', 'PT3Dx_GetNbPT3Dx',
+                              'DKDKx_GetNbDKDKx', 'DKJCx_GetNbDKJCx',
+                              'DKKDx_GetNbDKKDx', 'PLPLx_GetNbPLPLx',
+                              'CLALp_GetNbCLALp', 'ALpALp_GetNbALpALp',
+                              'SPSPx_GetNbSPSPx', 'SPCDx_GetNbSPCDx',
+                              'SPPLx_GetNbSPPLx', 'CDCDx_GetNbCDCDx',
+                              'CDPLx_GetNbCDPLx', 'PRPRx_GetNbPRPRx',
+                              'DKMECAx_GetNbDKMECAx', 'ALpMECAx_GetNbALpMECAx',
+                              'SPMECAx_GetNbSPMECAx',
+                          )
+
+            call = 'chipy.{}({})'.format(func, '{}')  # placeholder
+
+            guard, extra_ind = _timing_guard(entry)
+
+            if no_id or (not ids_str and not grp):
+                # Appel direct sans boucle
+                call_str = 'chipy.{}()'.format(func)
+                if store:
+                    line = '{} = {}'.format(store, call_str)
+                else:
+                    line = call_str
+                if guard:
+                    w(guard)
+                    w(extra_ind + line + '\n')
+                else:
+                    w(ind + line + '\n')
+            else:
+                # Construire liste IDs
+                if ids_str:
+                    id_list = [t.strip() for t in ids_str.split(',')
+                               if t.strip().isdigit()]
+                else:
+                    id_list = _resolve_group_ids(grp)
+                if not id_list:
+                    return
+                ids_repr = '[{}]'.format(', '.join(id_list))
+                if store:
+                    inner = '    {}_{{_id}} = chipy.{}(_id)\n'.format(store, func)
+                else:
+                    inner = '    chipy.{}(_id)\n'.format(func)
+                if guard:
+                    w(guard)
+                    w(extra_ind + 'for _id in {}:\n'.format(ids_repr))
+                    w(extra_ind + '    ' + inner.lstrip())
+                else:
+                    w(ind + 'for _id in {}:\n'.format(ids_repr))
+                    w(ind + inner)
             w('\n')
+
+        # Regrouper toutes les entrees d'inspection dans la boucle
+        def _is_in_loop(e):
+            m = e.get('step_mode', '')
+            return (m != 'after') if m else e.get('in_loop', True)
+
+        _all_insp_in = (
+            [('2D', e) for e in p.get('insp2d_entries', []) if _is_in_loop(e)]
+            + [('3D', e) for e in p.get('insp3d_entries', []) if _is_in_loop(e)]
+            + [('INT', e) for e in p.get('inspi_entries', [])  if _is_in_loop(e)]
+        )
+        if _all_insp_in:
+            L("chipy.utilities_logMes('INSPECTION')")
+            for _dim_i, _ei in _all_insp_in:
+                _emit_insp(_ei)
 
         # h. Critere d'arret
         if use_stop:
@@ -449,6 +588,71 @@ class ComputeScriptGenerator:
                 # Fallback generique si aucune visu specifique
                 L('chipy.WriteDisplayFiles(freq_display)')
             L('chipy.WritePostproFiles()')
+            w('\n')
+
+        # ── GetBodyVector hors boucle (step_mode='after') ─────────────────
+        for _gbv_key2, _gbv_func2, _gbv_flag2 in [
+            ('gbv2_entries', 'RBDY2_GetBodyVector', use_RBDY2),
+            ('gbv3_entries', 'RBDY3_GetBodyVector', use_RBDY3),
+        ]:
+            if not _gbv_flag2:
+                continue
+            _out2 = [e for e in p.get(_gbv_key2, [])
+                     if e.get('step_mode', '') == 'after'
+                     or (not e.get('step_mode') and not e.get('in_loop', True))]
+            if _out2:
+                w('# ── {} hors boucle ──────\n'.format(_gbv_func2))
+                for _e2 in _out2:
+                    _v2  = _e2.get('vec', 'Coor_')
+                    _s2  = _e2.get('ids', '').strip()
+                    _g2  = _e2.get('group', '').strip()
+                    _il2 = ([t.strip() for t in _s2.split(',') if t.strip().isdigit()]
+                            if _s2 else _resolve_group_ids(_g2))
+                    if _il2:
+                        w('for _id in {}:\n'.format('[{}]'.format(', '.join(_il2))))
+                        w('    chipy.{}(\'{}\', _id)\n'.format(_gbv_func2, _v2))
+                        w('\n')
+
+        # ── Inspection hors boucle ────────────────────────────────────────
+        _all_insp_out = (
+            [e for e in p.get('insp2d_entries', []) if not _is_in_loop(e)]
+            + [e for e in p.get('insp3d_entries', []) if not _is_in_loop(e)]
+            + [e for e in p.get('inspi_entries',  []) if not _is_in_loop(e)]
+        )
+        if _all_insp_out:
+            w('# ── Inspection hors boucle ──────\n')
+            for _eo in _all_insp_out:
+                _func_o  = _eo.get('func', '')
+                _ids_o   = _eo.get('ids', '').strip()
+                _grp_o   = _eo.get('group', '').strip()
+                _store_o = _eo.get('store', '').strip()
+                if not _func_o:
+                    continue
+                _no_id_o = (not _ids_o and not _grp_o)
+                if _no_id_o:
+                    if _store_o:
+                        w('{} = chipy.{}()\n'.format(_store_o, _func_o))
+                    else:
+                        w('chipy.{}()\n'.format(_func_o))
+                else:
+                    if _ids_o:
+                        _il_o = [t.strip() for t in _ids_o.split(',') if t.strip().isdigit()]
+                    else:
+                        _il_o = _resolve_group_ids(_grp_o)
+                    if _il_o:
+                        _repr_o = '[{}]'.format(', '.join(_il_o))
+                        w('for _id in {}:\n'.format(_repr_o))
+                        if _store_o:
+                            w('    {}_{{_id}} = chipy.{}(_id)\n'.format(_store_o, _func_o))
+                        else:
+                            w('    chipy.{}(_id)\n'.format(_func_o))
+                w('\n')
+
+        # ── Visibilite apres boucle (step_mode='after') ─────────────────────
+        if _vis_after:
+            w('# ── Visibilite apres boucle ──────\n')
+            for _ve_after in _vis_after:
+                _emit_vis_entry(_ve_after, in_loop_context=False)
             w('\n')
 
         # ── 9. Visualisation hors-boucle ──────────────────────────────────────
