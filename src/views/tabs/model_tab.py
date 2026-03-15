@@ -44,7 +44,93 @@ class ModelTab(QWidget):
                     "DKTxx", 
                     "BARxx", 
                     "SPRG3" ]
-    
+    ELEMENTS_2D_THER = [
+        "Rxx2D",
+        "T3xxx", "T6xxx", "DKTxx",
+        "Q4xxx", "Q4P0x", "Q8xxx", "Q8Rxx",
+        "SPRG2", "S2xth",
+    ]
+    ELEMENTS_3D_THER = [
+        "Rxx3D",
+        "TE4xx", "TE10x",
+        "H8xxx", "H20xx", "H20Rx",
+        "PRI6x", "PRI15",
+        "SPRG3",
+    ]
+    ELEMENTS_2D_PORO = [
+        "T33xx", "T63xx", "Q44xx", "Q84xx",
+    ]
+    ELEMENTS_3D_PORO = [
+        "TE44x", "TE104", "H88xx", "H208x",
+    ]
+    ELEMENTS_2D_MULTI = [
+        "T33xx", "T63xx", "Q44xx", "Q84xx",
+    ]
+    ELEMENTS_3D_MULTI = [
+        "TE44x", "TE104", "H8xxx", "H88xx", "H208x",
+    ]
+ 
+    # ── Correspondance géométrie → éléments (utilisé pour info/documentation) ─
+    GEO2ELEMENT = {
+        'Point' : ('Rxx2D', 'Rxx3D'),
+        'S2xxx' : ('SPRG2', 'SPRG3', 'BARxx', 'S2xth'),
+        'S3xxx' : (),
+        'Q4xxx' : ('Q4xxx', 'Q4P0x', 'Q44xx'),
+        'T3xxx' : ('T3xxx', 'T3Lxx', 'DKTxx', 'T33xx'),
+        'Q8xxx' : ('Q8xxx', 'Q8Rxx', 'Q84xx'),
+        'Q9xxx' : ('Q9xxx',),
+        'T6xxx' : ('T6xxx', 'T63xx'),
+        'TE4xx' : ('TE4xx', 'TE4Lx', 'TE44x'),
+        'TE10x' : ('TE10x', 'TE104'),
+        'H8xxx' : ('H8xxx', 'H88xx'),
+        'H20xx' : ('H20xx', 'H20Rx', 'H208x'),
+        'PRI6x' : ('PRI6x', 'SHB6x'),
+        'PRI15' : ('PRI15',),
+    }
+ 
+    # ── Correspondance physique → listes d'éléments ──────────────────────────
+    ELEMENTS_BY_PHYSICS = {
+        "MECAx": {2: ELEMENTS_2D,      3: ELEMENTS_3D     },
+        "THERx": {2: ELEMENTS_2D_THER, 3: ELEMENTS_3D_THER},
+        "POROx": {2: ELEMENTS_2D_PORO, 3: ELEMENTS_3D_PORO},
+        "MULTI": {2: ELEMENTS_2D_MULTI,3: ELEMENTS_3D_MULTI},
+    }
+ 
+    # ── Options par élément thermique ────────────────────────────────────────
+    # Rigides (Rxx) = aucune option ; S2xth = thermique 1D (masse seulement)
+    ELEMENT_OPTIONS_THER = {
+        "Rxx2D":  [],
+        "Rxx3D":  [],
+        "T3xxx":  ["capacity_storage", "formulation", "convection_type"],
+        "T6xxx":  ["capacity_storage", "formulation", "convection_type"],
+        "DKTxx":  ["capacity_storage", "formulation", "convection_type"],
+        "Q4xxx":  ["capacity_storage", "formulation", "convection_type"],
+        "Q4P0x":  ["capacity_storage", "formulation", "convection_type"],
+        "Q8xxx":  ["capacity_storage", "formulation", "convection_type"],
+        "Q8Rxx":  ["capacity_storage", "formulation", "convection_type"],
+        "SPRG2":  ["capacity_storage"],
+        "S2xth":  ["capacity_storage", "formulation", "convection_type"],
+        "TE4xx":  ["capacity_storage", "formulation", "convection_type"],
+        "TE10x":  ["capacity_storage", "formulation", "convection_type"],
+        "H8xxx":  ["capacity_storage", "formulation", "convection_type"],
+        "H20xx":  ["capacity_storage", "formulation", "convection_type"],
+        "H20Rx":  ["capacity_storage", "formulation", "convection_type"],
+        "PRI6x":  ["capacity_storage", "formulation", "convection_type"],
+        "PRI15":  ["capacity_storage", "formulation", "convection_type"],
+        "SPRG3":  ["capacity_storage"],
+    }
+    # ── Valeurs des options thermiques ────────────────────────────────────────
+    OPTION_VALUES_THER = {
+        "capacity_storage":   ["coher"],
+        "formulation":     ["class"],
+        "external_model": [ "no___", "yes__"],
+        "convection_type": ["supg_",  "char_", "center"]
+    }
+ 
+    # ── Options disponibles par élément ──────────────────────────────────────
+    # Les éléments rigides (Rxx2D / Rxx3D) n'ont aucune option.
+    # Les éléments sans entrée ici affichent uniquement les options communes
+    # (material, anisotropy, external_model).
     ELEMENT_OPTIONS = {
         # ── 2D ───────────────────────────────────────────────────────────────
         "T3xxx": ["kinematic", "formulation", "mass_storage"],
@@ -89,6 +175,57 @@ class ModelTab(QWidget):
         "external_model": ["MatL_", "Demfi", "Umat_", "no___", "yes__"],
         
     }
+
+    # ── Options par élément poro ────────────────────────────────────────
+    # Rigides (Rxx) = aucune option ; S2xth = thermique 1D (masse seulement)
+    ELEMENT_OPTIONS_PORO = {
+        "T33xx":  ["kinematic", "mass_storage", "capacity_storage"],
+        "T63xx":  ["kinematic", "mass_storage", "capacity_storage"],
+        "Q44xx":  ["kinematic", "mass_storage", "capacity_storage"],
+        "Q84xx":  ["kinematic", "mass_storage", "capacity_storage"],
+        "H88xx":  ["kinematic", "mass_storage", "capacity_storage"],
+        "H208x":  ["kinematic", "mass_storage", "capacity_storage"],
+        "TE44x":  ["kinematic", "mass_storage", "capacity_storage"],
+        "TE104":  ["kinematic", "mass_storage", "capacity_storage"],
+
+    }
+    # ── Valeurs des options thermiques ────────────────────────────────────────
+    OPTION_VALUES_PORO = {
+        "kinematic": ["small", "large"],
+        "mass_storage": ["lump_", "coher"],
+        "capacity_storage":   ["lump_","coher"],
+        "material": ["elas_", "elasd", "J2iso", "J2mix", "kvisc"],
+        "anisotropy": ["iso__", "ortho"],
+        "external_model": ["MatL_", "Demfi", "Umat_", "no___", "yes__"],
+        "physical_type" : ["fluid", "solid"],
+        "convection_type": ["supg_",  "char_", "center"]
+        
+    }
+
+    ELEMENT_OPTIONS_MULTI = {
+        "T33xx":  ["kinematic", "mass_storage", "formulation"],
+        "T63xx":  ["kinematic", "mass_storage", "formulation"],
+        "Q44xx":  ["kinematic", "mass_storage", "formulation"],
+        "Q84xx":  ["kinematic", "mass_storage", "formulation"],
+        "H8xxx":  ["kinematic", "mass_storage", "formulation"],
+        "H88xx":  ["kinematic", "mass_storage", "formulation"],
+        "H208x":  ["kinematic", "mass_storage", "formulation"],
+        "TE44x":  ["kinematic", "mass_storage", "formulation"],
+        "TE104":  ["kinematic", "mass_storage", "formulation"],
+    }
+
+    OPTION_VALUES_MULTI = {
+        "kinematic": ["small", "large"],
+        "mass_storage": ["lump_", "coher"],
+        "material": ["elas_", "elasd", "J2iso", "J2mix", "kvisc"],
+        "anisotropy": ["iso__", "ortho"],
+        "external_model": ["no___", "yes__"],
+        "fluid_comp_storage": ["lump_", "coher"],
+        "formulation": ["UpdtL", "TotaL"],
+        "convection_type": ["supg_",  "char_", "center"]
+    }
+
+
     
     def __init__(self, controller: ProjectController):
         super().__init__()
@@ -151,7 +288,7 @@ class ModelTab(QWidget):
         form.addRow("Nom (max 5 car.) :", self.name_input)
         
         self.physics_combo = QComboBox()
-        self.physics_combo.addItems(["MECAx"])
+        self.physics_combo.addItems(["MECAx", "THERx", "POROx", "MULTI"])
         form.addRow("Physique :", self.physics_combo)
         
         self.dimension_combo = QComboBox()
@@ -207,10 +344,11 @@ class ModelTab(QWidget):
     def _connect_signals(self):
         """Connecte les signaux"""
         self.tree.itemDoubleClicked.connect(self._on_edit_from_tree)
+        self.physics_combo.currentTextChanged.connect(self._on_physics_changed)
         self.dimension_combo.currentTextChanged.connect(self._on_dimension_changed)
         self.element_combo.currentTextChanged.connect(self._on_element_changed)
         #self.dimension_changed.connect(lambda dim : self.on_dimension_combo_changed(dim))
-
+ 
     
     def _on_dimension_changed(self, dim_text):
         """Quand la dimension change"""
@@ -219,51 +357,108 @@ class ModelTab(QWidget):
         self.controller.state.dimension = int(dim_text)    
         self.dimension_changed.emit(int(dim_text))
         
-
+ 
+    def _on_physics_changed(self, _):
+        """Quand la physique change — recharge la liste d'éléments."""
+        self._update_elements()
+ 
     def _update_elements(self):
-        """Met à jour la liste des éléments selon dimension"""
-        dim = int(self.dimension_combo.currentText())
-        elements = self.ELEMENTS_2D if dim == 2 else self.ELEMENTS_3D
-        
+        """Met à jour la liste des éléments selon dimension ET physique."""
+        dim     = int(self.dimension_combo.currentText())
+        physics = self.physics_combo.currentText()
+ 
+        by_dim   = self.ELEMENTS_BY_PHYSICS.get(physics, self.ELEMENTS_BY_PHYSICS["MECAx"])
+        elements = by_dim.get(dim, [])
+ 
         current = self.element_combo.currentText()
         self.element_combo.blockSignals(True)
         self.element_combo.clear()
         self.element_combo.addItems(elements)
-        
+ 
         if current in elements:
             self.element_combo.setCurrentText(current)
-        
+ 
         self.element_combo.blockSignals(False)
         self._on_element_changed(self.element_combo.currentText())
     
     def _on_element_changed(self, element):
-        """Quand l'élément change"""
+        """Quand l'élément change — met à jour les options affichées."""
         self.name_input.setText("rigid")
+ 
+        # Nettoyer les options précédentes
         for i in reversed(range(self.options_layout.count())):
             item = self.options_layout.takeAt(i)
             if item.widget():
                 item.widget().deleteLater()
-        
         self.option_combos.clear()
-        
-        if element in ["Rxx2D", "Rxx3D"]:
+ 
+        physics = self.physics_combo.currentText()
+ 
+        # ── Éléments rigides : aucune option ─────────────────────────────────
+        _NO_OPTIONS = {"Rxx2D", "Rxx3D"}
+        if element in _NO_OPTIONS or not element:
             self.options_group.setVisible(False)
             return
-        
+ 
         self.options_group.setVisible(True)
-        
-        specific_options = self.ELEMENT_OPTIONS.get(element, [])
-        for opt_name in specific_options:
-            combo = QComboBox()
-            combo.addItems(self.OPTION_VALUES.get(opt_name, []))
-            self.options_layout.addRow(f"{opt_name} :", combo)
-            self.option_combos[opt_name] = combo
-        
-        for opt_name in ["material", "anisotropy", "external_model"]:
-            combo = QComboBox()
-            combo.addItems(self.OPTION_VALUES[opt_name])
-            self.options_layout.addRow(f"{opt_name} :", combo)
-            self.option_combos[opt_name] = combo
+ 
+        if physics == "THERx":
+            # ── Options thermiques ────────────────────────────────────────────
+            specific_options = self.ELEMENT_OPTIONS_THER.get(element, ["mass_storage"])
+            for opt_name in specific_options:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES_THER.get(opt_name, []))
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+            # Options communes thermiques
+            for opt_name in ["external_model"]:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES_THER[opt_name])
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+        elif physics == "POROx":
+            # ── Options poro ────────────────────────────────────────────
+            specific_options = self.ELEMENT_OPTIONS_PORO.get(element, ["mass_storage", "capacity_storage"])
+            for opt_name in specific_options:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES_PORO.get(opt_name, []))
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+            # Options communes poro
+            for opt_name in ["material", "anisotropy", "external_model", "physical_type", "convection_type"]:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES_PORO[opt_name])
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+        elif physics == "MULTI":
+            # ── Options multi-physiques ────────────────────────────────────────────
+            specific_options = self.ELEMENT_OPTIONS_MULTI.get(element, ["mass_storage", "capacity_storage"])
+            for opt_name in specific_options:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES_MULTI.get(opt_name, []))
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+            # Options communes multi-physiques
+            for opt_name in ["material", "anisotropy", "external_model", "fluid_comp_storage", "convection_type"]:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES_MULTI[opt_name])
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+
+        else:
+            # ── Options mécaniques (MECAx) ────────────────────────────────────
+            specific_options = self.ELEMENT_OPTIONS.get(element, [])
+            for opt_name in specific_options:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES.get(opt_name, []))
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
+            # Options communes mécaniques
+            for opt_name in ["material", "anisotropy", "external_model"]:
+                combo = QComboBox()
+                combo.addItems(self.OPTION_VALUES[opt_name])
+                self.options_layout.addRow(f"{opt_name} :", combo)
+                self.option_combos[opt_name] = combo
     
     
     def _show_context_menu(self, position):
@@ -289,6 +484,7 @@ class ModelTab(QWidget):
         """Crée un modèle"""
         try:
             options = {k: v.currentText() for k, v in self.option_combos.items() if v.currentText()}
+            # Les éléments de type ressort/discret nécessitent l'option discrete=yes__
             _DISCRETE_ELEMENTS = {"SPRG2", "SPRG3"}
             if self.element_combo.currentText() in _DISCRETE_ELEMENTS:
                 options['discrete'] = "yes__"
@@ -452,7 +648,7 @@ class ModelTab(QWidget):
         elem_idx = self.element_combo.findText(model.element)
         if elem_idx >= 0:
             self.element_combo.setCurrentIndex(elem_idx)
-
+ 
         self._on_element_changed(model.element)
         
         if model.options:

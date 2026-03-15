@@ -900,7 +900,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Visualisation...", 2000)
             QApplication.processEvents()
             
-            pre.visuAvatars(self.controller._bodies_container)
+            pre.visuAvatars(self.controller._bodies_container, with_axis=True, drvdof_color=[1.,0 ,0])
             
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Visualisation échouée :\n{e}")

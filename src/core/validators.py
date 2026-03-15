@@ -79,8 +79,40 @@ class ModelValidator:
         "BARxx",
         "SPRG3",
         ]
-       # Ensemble union pour validation rapide
-    _ALL_VALID = set(VALID_ELEMENTS_2D) | set(VALID_ELEMENTS_3D)
+    
+    VALID_ELEMENTS_2D_THER = [
+        "Rxx2D",
+        "T3xxx", "T6xxx", "DKTxx",
+        "Q4xxx", "Q4P0x", "Q8xxx", "Q8Rxx",
+        "SPRG2", "S2xth",
+    ]
+    VALID_ELEMENTS_3D_THER = [
+        "Rxx3D",
+        "TE4xx", "TE10x",
+        "H8xxx", "H20xx", "H20Rx",
+        "PRI6x", "PRI15",
+        "SPRG3",
+    ]
+    VALID_ELEMENTS_2D_PORO = ["T33xx", "T63xx", "Q44xx", "Q84xx"]
+    VALID_ELEMENTS_3D_PORO = ["TE44x", "TE104", "H88xx", "H208x"]
+    VALID_ELEMENTS_2D_MULTI = ["T33xx", "T63xx", "Q44xx", "Q84xx"]
+    VALID_ELEMENTS_3D_MULTI = ["TE44x", "TE104", "H8xxx", "H88xx", "H208x"]
+ 
+    # Ensemble union pour validation rapide
+    _ALL_VALID = (
+        set(VALID_ELEMENTS_2D)    | set(VALID_ELEMENTS_3D)    |
+        set(VALID_ELEMENTS_2D_THER) | set(VALID_ELEMENTS_3D_THER) |
+        set(VALID_ELEMENTS_2D_PORO) | set(VALID_ELEMENTS_3D_PORO) |
+        set(VALID_ELEMENTS_2D_MULTI)| set(VALID_ELEMENTS_3D_MULTI)
+    )
+ 
+    # Table physique → listes valides par dimension
+    _ELEMENTS_BY_PHYSICS = {
+        "MECAx": {2: VALID_ELEMENTS_2D,       3: VALID_ELEMENTS_3D      },
+        "THERx": {2: VALID_ELEMENTS_2D_THER,  3: VALID_ELEMENTS_3D_THER },
+        "POROx": {2: VALID_ELEMENTS_2D_PORO,  3: VALID_ELEMENTS_3D_PORO },
+        "MULTI": {2: VALID_ELEMENTS_2D_MULTI, 3: VALID_ELEMENTS_3D_MULTI},
+    }
    
     @staticmethod
     def validate(model: Model) -> Tuple[bool, str]:
@@ -99,12 +131,25 @@ class ModelValidator:
         if model.dimension not in [2, 3]:
             return False, "La dimension doit être 2 ou 3"
         
-        valid_elements = (ModelValidator.VALID_ELEMENTS_2D if model.dimension == 2 
-                         else ModelValidator.VALID_ELEMENTS_3D)
-        
+        physics = getattr(model, "physics", "MECAx") or "MECAx"
+ 
+        # Vérifier que la physique est connue
+        known = {"MECAx", "THERx", "POROx", "MULTI"}
+        if physics not in known:
+            # Physiques futures (HYDRx, THMx…) : on accepte sans valider l'élément
+            return True, ""
+ 
+        by_dim = ModelValidator._ELEMENTS_BY_PHYSICS.get(physics, {})
+        valid_elements = by_dim.get(model.dimension)
+        if valid_elements is None:
+            return False, f"Dimension {model.dimension} invalide (doit être 2 ou 3)"
+ 
         if model.element not in valid_elements:
-            return False, f"Élément '{model.element}' invalide pour dimension {model.dimension}"
-        
+            return False, (
+                f"Élément '{model.element}' invalide pour {physics} "
+                f"en dimension {model.dimension}"
+            )
+ 
         return True, ""
     
     @staticmethod
@@ -172,6 +217,18 @@ class AvatarValidator:
         "SPRG3",
         ]
     
+
+    # Tous les éléments déformables toutes physiques confondues (pour MESH)
+    _ALL_DEFORMABLE_2D = {
+        "T3xxx", "T3Lxx", "T33xx", "T6xxx", "T63xx", "DKTxx",
+        "Q4xxx", "Q4P0x", "Q44xx", "Q8xxx", "Q8Rxx", "Q84xx",
+        "Q9xxx", "BARxx", "SPRG2", "S2xth",
+    }
+    _ALL_DEFORMABLE_3D = {
+        "TE4xx", "TE4Lx", "TE44x", "TE10x", "TE104",
+        "H8xxx", "H88xx", "H20xx", "H20Rx", "H208x",
+        "PRI6x", "SHB6x", "PRI15", "BARxx", "SPRG3",
+    }
 
     @staticmethod
     def validate(avatar: Avatar, model: Model) -> Tuple[bool, str]:
