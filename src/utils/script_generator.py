@@ -441,25 +441,40 @@ class ScriptGenerator:
             f.write(body_block("        ", ce, "_br"))
             f.write(f"        _x_cur += _blx + {joint}\n")
 
-        # ---- Paneresse simple (pylmgc90) ------------------------------------
-        elif pattern == 'Paneresse simple (pylmgc90)':
-            disposition = mp.get('disposition', 'paneresse')
-            first_type  = mp.get('first_type',  '1')
-            if dim == 2:
-                f.write(f"_bref_{safe} = pre.brick3D('{bname}', {lx}, 1.0, {ly})\n")
-            else:
+        # ---- Paneresse simple / double (pylmgc90) ------------------------------------
+        elif pattern in ('Paneresse simple (pylmgc90)', 'Paneresse double (pylmgc90)'):
+            disposition  = mp.get('disposition',    'paneresse')
+            first_type   = mp.get('first_type',     '1')
+            use_length   = mp.get('pan_use_length', False)
+            pan_length   = mp.get('pan_length',     1.0)
+            no_half      = mp.get('pan_no_half',    False)
+            wall_fn      = ('paneresse_double' if 'double' in pattern
+                            else 'paneresse_simple')
+            # brick3D requis même en 2D (ly=1.0 pour mur plan)
+        
+            if dim == 3:
                 f.write(f"_bref_{safe} = pre.brick3D('{bname}', {lx}, {ly}, {_lz})\n")
-            origin = f"[{offset_x}, {offset_y}, {offset_z}]" if dim == 3                      else f"[{offset_x}, {offset_y}, 0.0]"
-            f.write(f"_wall_{safe} = pre.paneresse_simple(brick_ref=_bref_{safe}, disposition='{disposition}')\n")
+            origin = (f"[{offset_x}, {offset_y}, {offset_z}]")
+            f.write(f"_wall_{safe} = pre.{wall_fn}("
+                    f"brick_ref=_bref_{safe}, disposition='{disposition}')\n")
             f.write(f"_wall_{safe}.setNumberOfRows({nb_rows})\n")
             f.write(f"_wall_{safe}.setJointThicknessBetweenRows({joint})\n")
             f.write(f"_wall_{safe}.computeHeight()\n")
-            f.write(f"_wall_{safe}.setFirstRowByNumberOfBricks(\n")
-            f.write(f"    first_brick_type='{first_type}',\n")
-            f.write(f"    nb_bricks={nb_cols},\n")
-            f.write(f"    joint_thickness={joint}\n")
-            f.write(f")\n")
-            f.write(f"_bodies_{safe} = _wall_{safe}.buildRigidWall(\n")
+            if use_length:
+                f.write(f"_wall_{safe}.setFirstRowByLength(\n")
+                f.write(f"    first_brick_type='{first_type}',\n")
+                f.write(f"    length={pan_length},\n")
+                f.write(f"    joint_thickness={joint}\n")
+                f.write(f")\n")
+            else:
+                f.write(f"_wall_{safe}.setFirstRowByNumberOfBricks(\n")
+                f.write(f"    first_brick_type='{first_type}',\n")
+                f.write(f"    nb_bricks={nb_cols},\n")
+                f.write(f"    joint_thickness={joint}\n")
+                f.write(f")\n")
+            build_fn = ('buildRigidWallWithoutHalfBricks' if no_half
+                        else 'buildRigidWall')
+            f.write(f"_bodies_{safe} = _wall_{safe}.{build_fn}(\n")
             f.write(f"    origin={origin},\n")
             f.write(f"    model=mods['{mod}'],\n")
             f.write(f"    material=mats['{mat}'],\n")
@@ -468,12 +483,54 @@ class ScriptGenerator:
             f.write(f"for _body in _bodies_{safe}:\n")
             f.write(f"    bodies.addAvatar(_body)\n")
             f.write(f"    bodies_list.append(_body)\n")
-
+ 
+            # ── Transformations (translate / rotate / deepcopy) ────────────
+            tf_translate = mp.get("tf_translate", False)
+            tf_rotate    = mp.get("tf_rotate",    False)
+            tf_copy      = mp.get("tf_copy",      False)
+ 
+            if tf_translate:
+                tx = mp.get("tf_tx", 0.0)
+                ty = mp.get("tf_ty", 0.0)
+                tz = mp.get("tf_tz", 0.0)
+                if dim == 3:
+                    f.write(f"_bodies_{safe}.translate(dx={tx}, dy={ty}, dz={tz})\n")
+                else:
+                    f.write(f"_bodies_{safe}.translate(dx={tx}, dy={ty})\n")
+ 
+            if tf_rotate:
+                cx      = mp.get("tf_cx",        0.0)
+                cy      = mp.get("tf_cy",        0.0)
+                cz      = mp.get("tf_cz",        0.0)
+                axis    = mp.get("tf_axis",      "Z")
+                alpha_d = mp.get("tf_alpha_deg", 0.0)
+                ax_map  = {"X": "[1.,0.,0.]", "Y": "[0.,1.,0.]", "Z": "[0.,0.,1.]"}
+                ax_str  = ax_map.get(axis, "[0.,0.,1.]")
+                f.write(f"_bodies_{safe}.rotate(\n")
+                f.write(f"    description='axis',\n")
+                f.write(f"    center=np.array([{cx}, {cy}, {cz}]),\n")
+                f.write(f"    axis={ax_str},\n")
+                f.write(f"    alpha=math.radians({alpha_d})\n")
+                f.write(f")\n")
+ 
+            if tf_copy:
+                cdx = mp.get("tf_copy_dx", 0.0)
+                cdy = mp.get("tf_copy_dy", 0.0)
+                cdz = mp.get("tf_copy_dz", 0.0)
+                f.write(f"_bodies_{safe}_copy = copy.deepcopy(_bodies_{safe})\n")
+                if dim == 3:
+                    f.write(f"_bodies_{safe}_copy.translate(dx={cdx}, dy={cdy}, dz={cdz})\n")
+                else:
+                    f.write(f"_bodies_{safe}_copy.translate(dx={cdx}, dy={cdy})\n")
+                f.write(f"for _body in _bodies_{safe}_copy:\n")
+                f.write(f"    bodies.addAvatar(_body)\n")
+                f.write(f"    bodies_list.append(_body)\n")
+ 
         else:
             f.write(f"# Pattern inconnu '{pattern}' -> fallback liste de centers\n")
             for _, av in getattr(self, '_last_group_avs', []):
                 f.write(f"# center={list(av.center)}\n")
-
+ 
         f.write('\n')
 
     def _write_masonry_centers_loop(

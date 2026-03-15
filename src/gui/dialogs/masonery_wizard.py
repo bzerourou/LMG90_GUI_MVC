@@ -67,7 +67,8 @@ class MasonryWizard(QWizard):
     PAGE_MODEL      = 3
     PAGE_BRICK_DIM  = 4
     PAGE_LAYOUT     = 5
-    PAGE_SUMMARY    = 6
+    PAGE_TRANSFORM  = 6
+    PAGE_SUMMARY    = 7
 
     def __init__(self, controller: ProjectController, parent=None):
         super().__init__(parent)
@@ -84,6 +85,7 @@ class MasonryWizard(QWizard):
         self.addPage(MasonryModelPage())
         self.addPage(BrickDimensionsPage())
         self.addPage(LayoutPage())
+        self.addPage(TransformPage())
         self.addPage(MasonrySummaryPage())
 
         self.setButtonText(QWizard.WizardButton.NextButton,   "Suivant ➡️")
@@ -178,6 +180,37 @@ class MasonryWizard(QWizard):
         color        = layout_page.color_input.text().strip() or "BLUEx"
         group_name   = (layout_page.group_name_input.text().strip()
                         if layout_page.store_check.isChecked() else None)
+        # Paramètres paneresse — lecture défensive (widgets optionnels)
+        _psm = getattr(layout_page, "pan_size_mode_combo", None)
+        pan_use_length = (_psm.currentIndex() == 1) if _psm else False
+        _pls = getattr(layout_page, "pan_length_spin", None)
+        pan_length     = _pls.value() if _pls else 1.0
+        _pnh = getattr(layout_page, "no_half_bricks_check", None)
+        pan_no_half    = _pnh.isChecked() if _pnh else False
+
+        # ── Transformations post-génération — lecture défensive ───────────────
+        _tf_pg       = self.page(getattr(self, "PAGE_TRANSFORM", -1))
+        def _gv(page, attr, default):
+            w = getattr(page, attr, None) if page else None
+            if w is None: return default
+            if hasattr(w, "isChecked"): return w.isChecked()
+            if hasattr(w, "value"):     return w.value()
+            if hasattr(w, "currentText"): return w.currentText()
+            return default
+        tf_translate = _gv(_tf_pg, "translate_check", False)
+        tf_tx        = _gv(_tf_pg, "tx_spin",         0.0)
+        tf_ty        = _gv(_tf_pg, "ty_spin",         0.0)
+        tf_tz        = _gv(_tf_pg, "tz_spin",         0.0)
+        tf_rotate    = _gv(_tf_pg, "rotate_check",    False)
+        tf_cx        = _gv(_tf_pg, "cx_spin",         0.0)
+        tf_cy        = _gv(_tf_pg, "cy_spin",         0.0)
+        tf_cz        = _gv(_tf_pg, "cz_spin",         0.0)
+        tf_axis      = _gv(_tf_pg, "axis_combo",      "Z")
+        tf_alpha_deg = _gv(_tf_pg, "alpha_spin",      0.0)
+        tf_copy      = _gv(_tf_pg, "copy_check",      False)
+        tf_copy_dx   = _gv(_tf_pg, "copy_dx_spin",    0.0)
+        tf_copy_dy   = _gv(_tf_pg, "copy_dy_spin",    0.0)
+        tf_copy_dz   = _gv(_tf_pg, "copy_dz_spin",    0.0)
 
         # ── Création de la brique de référence pylmgc90 ───────────────────────
         # brick2D(name, lx, ly)          — lx=longueur, ly=hauteur
@@ -264,43 +297,124 @@ class MasonryWizard(QWizard):
                     _place(cx, cy, brick_lx, ly)
                     x_cursor += brick_lx + joint
 
-        # ── Paneresse simple (API pylmgc90 brick_wall) ────────────────────────
-        # Utilise paneresse_simple pour une gestion automatique des demi-briques
-        # et du nombre de briques par rangée selon la longueur souhaitée.
-        elif pattern == "Paneresse simple (pylmgc90)":
+        # ── Paneresse simple / double (API pylmgc90 brick_wall) ───────────────
+        elif pattern in ("Paneresse simple (pylmgc90)", "Paneresse double (pylmgc90)"):
             disposition = layout_page.disposition_combo.currentText()
             first_type  = layout_page.first_brick_combo.currentText()
 
-            if dimension ==2 : 
-                brick_ref_wall = pre.brick3D(brick_name, lx, 1.0, ly) #épaisseur 1.0 pour un mur 2D
-            else : 
+            # brick3D requis même en 2D : ly=1.0 pour un mur plan
+            if dimension == 2:
+                brick_ref_wall = pre.brick3D(brick_name, lx, 1.0, ly)
+            else:
                 brick_ref_wall = pre.brick3D(brick_name, lx, ly, lz)
 
+            # Choisir simple ou double
+            if "double" in pattern:
+                wall = pre.paneresse_double(brick_ref=brick_ref_wall, disposition=disposition)
+            else:
+                wall = pre.paneresse_simple(brick_ref=brick_ref_wall, disposition=disposition)
 
-            wall = pre.paneresse_simple(brick_ref=brick_ref_wall, disposition=disposition)
             wall.setNumberOfRows(nb_rows)
             wall.setJointThicknessBetweenRows(joint)
             wall.computeHeight()
-            wall.setFirstRowByNumberOfBricks(
-                first_brick_type=first_type,
-                nb_bricks=nb_cols,
-                joint_thickness=joint
-            )
+
+            # Dimensionnement : nombre de briques OU longueur totale
+            if pan_use_length:
+                wall.setFirstRowByLength(
+                    first_brick_type=first_type,
+                    length=pan_length,
+                    joint_thickness=joint
+                )
+            else:
+                wall.setFirstRowByNumberOfBricks(
+                    first_brick_type=first_type,
+                    nb_bricks=nb_cols,
+                    joint_thickness=joint
+                )
 
             origin = [offset_x, offset_y, offset_z] if dimension == 3 \
                      else [offset_x, offset_y, 0.0]
-            bodies_container = wall.buildRigidWall(
-                origin=origin,
-                model=mod_obj,
-                material=mat_obj,
-                colors=[color, color]
-            )
+
+            # Générer avec ou sans demi-briques aux extrémités
+            if pan_no_half:
+                bodies_container = wall.buildRigidWallWithoutHalfBricks(
+                    origin=origin,
+                    model=mod_obj,
+                    material=mat_obj,
+                    colors=[color, color]
+                )
+            else:
+                bodies_container = wall.buildRigidWall(
+                    origin=origin,
+                    model=mod_obj,
+                    material=mat_obj,
+                    colors=[color, color]
+                )
+
             for body in bodies_container:
                 center = list(body.nodes[1].coor)
                 _place_body(body, center, lx, ly, lz)
 
         else:
             raise ValueError(f"Appareil inconnu : '{pattern}'")
+
+        # ── Transformations post-génération ──────────────────────────────────
+        if tf_translate or tf_rotate or tf_copy:
+            import math as _math, copy as _copy, numpy as _np
+            # Bodies de cette session = les derniers enregistrés
+            session_bodies = self.controller._pylmgc_bodies[-len(generated_indices):]
+
+            def _apply_tf(body_list):
+                if tf_translate:
+                    for b in body_list:
+                        if dimension == 3:
+                            b.translate(dx=tf_tx, dy=tf_ty, dz=tf_tz)
+                        else:
+                            b.translate(dx=tf_tx, dy=tf_ty)
+                if tf_rotate:
+                    _alpha = _math.radians(tf_alpha_deg)
+                    _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
+                    _ctr = _np.array([tf_cx, tf_cy, tf_cz])
+                    for b in body_list:
+                        b.rotate(description='axis', center=_ctr,
+                                 axis=_ax, alpha=_alpha)
+
+            _apply_tf(session_bodies)
+
+            # Mettre à jour les centres dans l'état après transformation
+            for idx_av, body in zip(generated_indices, session_bodies):
+                try:
+                    self.controller.state.avatars[idx_av].center = list(body.nodes[1].coor)
+                except Exception:
+                    pass
+
+            # Copie décalée : deepcopy + translate + enregistrement
+            if tf_copy:
+                copy_bodies = _copy.deepcopy(session_bodies)
+                for b in copy_bodies:
+                    if dimension == 3:
+                        b.translate(dx=tf_copy_dx, dy=tf_copy_dy, dz=tf_copy_dz)
+                    else:
+                        b.translate(dx=tf_copy_dx, dy=tf_copy_dy)
+                for b in copy_bodies:
+                    self.controller._bodies_container.addAvatar(b)
+                    self.controller._pylmgc_bodies.append(b)
+                    try:
+                        center_copy = list(b.nodes[1].coor)
+                    except Exception:
+                        center_copy = [0., 0., 0.]
+                    self.controller.state.avatars.append(Avatar(
+                        avatar_type=AvatarType.EMPTY_AVATAR,
+                        center=center_copy,
+                        material_name=mat_name,
+                        model_name=mod_name,
+                        color=color,
+                        origin=AvatarOrigin.MANUAL,
+                        wall_params={'l': lx, 'h': ly,
+                                     'brick_name': brick_name, 'copy': True},
+                        contactors=[]
+                    ))
+                    generated_indices.append(len(self.controller.state.avatars) - 1)
 
         # ── Groupe ────────────────────────────────────────────────────────────
         if group_name and generated_indices:
@@ -309,6 +423,49 @@ class MasonryWizard(QWizard):
             if group_name not in self.controller.state.avatar_groups:
                 self.controller.state.avatar_groups[group_name] = []
             self.controller.state.avatar_groups[group_name].extend(generated_indices)
+
+            # ── Paramètres du pattern — pour reconstituer la boucle dans le script
+            if not hasattr(self.controller.state, 'masonry_patterns'):
+                self.controller.state.masonry_patterns = {}
+            mp = {
+                'pattern':   pattern,
+                'lx':        lx,
+                'ly':        ly,
+                'lz':        lz,
+                'nb_rows':   nb_rows,
+                'nb_cols':   nb_cols,
+                'offset_x':  offset_x,
+                'offset_y':  offset_y,
+                'offset_z':  offset_z,
+                'joint':     joint,
+                'brick_name': brick_name,
+                'mat':       mat_name,
+                'mod':       mod_name,
+                'color':     color,
+                'dim':       dimension,
+            }
+            if pattern in ('Paneresse simple (pylmgc90)', 'Paneresse double (pylmgc90)'):
+                mp['disposition']    = layout_page.disposition_combo.currentText()
+                mp['first_type']     = layout_page.first_brick_combo.currentText()
+                mp['pan_use_length'] = pan_use_length
+                mp['pan_length']     = pan_length
+                mp['pan_no_half']    = pan_no_half
+            # Transformations post-génération
+            mp['tf_translate']  = tf_translate
+            mp['tf_tx']         = tf_tx
+            mp['tf_ty']         = tf_ty
+            mp['tf_tz']         = tf_tz
+            mp['tf_rotate']     = tf_rotate
+            mp['tf_cx']         = tf_cx
+            mp['tf_cy']         = tf_cy
+            mp['tf_cz']         = tf_cz
+            mp['tf_axis']       = tf_axis
+            mp['tf_alpha_deg']  = tf_alpha_deg
+            mp['tf_copy']       = tf_copy
+            mp['tf_copy_dx']    = tf_copy_dx
+            mp['tf_copy_dy']    = tf_copy_dy
+            mp['tf_copy_dz']    = tf_copy_dz
+            self.controller.state.masonry_patterns[group_name] = mp
 
         self.controller.state_changed.emit()
         return len(generated_indices)
@@ -340,8 +497,8 @@ class MasonryIntroPage(QWizardPage):
             "• Running Bond (décalage ⅓ progressif)<br>"
             "• Stack Bond (joints alignés)<br>"
             "• Flemish Bond (panneresse/boutisse alternées)<br>"
-            "• Paneresse simple — utilise directement "
-            "<code>pre.paneresse_simple</code> de pylmgc90</p>"
+            "• Paneresse simple — <code>pre.paneresse_simple</code> (mur simple épaisseur)<br>"
+            "• Paneresse double — <code>pre.paneresse_double</code> (mur double épaisseur)</p>"
             "<p><b>💡 info : API utilisée :</b> <code>pre.brick2D(name, lx, ly)</code>, "
             "<code>pre.brick3D(name, lx, ly, lz)</code>, "
             "<code>brick.rigidBrick(center, model, material, color)</code></p>"
@@ -599,9 +756,12 @@ class LayoutPage(QWizardPage):
         "Flemish Bond":
             "Alternance panneresse (lx) / boutisse (lx/2) dans chaque rang.",
         "Paneresse simple (pylmgc90)":
-            "Utilise directement pre.paneresse_simple — gestion automatique "
-            "des demi-briques et du nombre de briques par rangée. "
-            "Disposition et type de première brique configurables ci-dessous.",
+            "pre.paneresse_simple — mur simple épaisseur. "
+            "Gestion automatique des demi-briques. "
+            "Disposition, type de première brique et mode de dimensionnement configurables.",
+        "Paneresse double (pylmgc90)":
+            "pre.paneresse_double — mur double épaisseur (deux rangées de briques). "
+            "Mêmes options que la paneresse simple.",
     }
 
     def __init__(self):
@@ -628,15 +788,54 @@ class LayoutPage(QWizardPage):
         )
         layout.addWidget(self.pattern_info)
 
-        # Options paneresse_simple (cachées par défaut)
-        self.paneresse_group = QGroupBox("Options paneresse_simple")
+        # Options paneresse_simple / paneresse_double (cachées par défaut)
+        self.paneresse_group = QGroupBox("Options paneresse (pylmgc90)")
         pan_form = QFormLayout()
+
         self.disposition_combo = QComboBox()
         self.disposition_combo.addItems(["paneresse", "boutisse", "chant"])
+        self.disposition_combo.setToolTip(
+            "paneresse : briques posées dans le sens de la longueur\n"
+            "boutisse  : briques posées en travers (face visible = petit côté)\n"
+            "chant     : briques posées sur chant (hauteur = largeur brique)"
+        )
         pan_form.addRow("Disposition :", self.disposition_combo)
+
         self.first_brick_combo = QComboBox()
-        self.first_brick_combo.addItems(["1", "1/2"])
+        self.first_brick_combo.addItems(["1", "1/2", "1/4", "3/4"])
+        self.first_brick_combo.setToolTip(
+            "Type de la première brique du premier rang.\n"
+            "1=brique entière, 1/2=demi-brique, 1/4 ou 3/4=quart/trois-quarts."
+        )
         pan_form.addRow("Première brique :", self.first_brick_combo)
+
+        # Mode dimensionnement : nb colonnes OU longueur totale
+        self.pan_size_mode_combo = QComboBox()
+        self.pan_size_mode_combo.addItems(["Nombre de briques", "Longueur totale (m)"])
+        self.pan_size_mode_combo.currentIndexChanged.connect(self._on_pan_size_mode_changed)
+        self.pan_size_mode_combo.setToolTip(
+            "Nombre de briques : setFirstRowByNumberOfBricks(type, nb, joint)\n"
+            "Longueur totale   : setFirstRowByLength(type, longueur, joint)"
+        )
+        pan_form.addRow("Dimensionnement :", self.pan_size_mode_combo)
+
+        self.pan_length_label = QLabel("Longueur totale :")
+        self.pan_length_spin  = QDoubleSpinBox()
+        self.pan_length_spin.setRange(0.01, 100.0)
+        self.pan_length_spin.setValue(3.0)
+        self.pan_length_spin.setSuffix(" m")
+        self.pan_length_spin.setDecimals(3)
+        self.pan_length_spin.setVisible(False)
+        self.pan_length_label.setVisible(False)
+        pan_form.addRow(self.pan_length_label, self.pan_length_spin)
+
+        self.no_half_bricks_check = QCheckBox("Sans demi-briques (buildRigidWallWithoutHalfBricks)")
+        self.no_half_bricks_check.setToolTip(
+            "Utilise buildRigidWallWithoutHalfBricks au lieu de buildRigidWall.\n"
+            "Le mur est généré sans découpe de briques aux extrémités."
+        )
+        pan_form.addRow(self.no_half_bricks_check)
+
         self.paneresse_group.setLayout(pan_form)
         self.paneresse_group.setVisible(False)
         layout.addWidget(self.paneresse_group)
@@ -719,20 +918,27 @@ class LayoutPage(QWizardPage):
         is3d      = dim_page.dim_3d_radio.isChecked()
         self.offset_z_label.setVisible(is3d)
         self.offset_z_spin.setVisible(is3d)
-        paneresse_item = "Paneresse simple (pylmgc90)"
-        idx = self.pattern_combo.findText(paneresse_item)
-        if is3d:
-            if idx == -1:
-                self.pattern_combo.addItem(paneresse_item)
-        else:
-            if idx != -1:
-                if self.pattern_combo.currentText() == paneresse_item:
-                    self.pattern_combo.setCurrentIndex(0)
-                self.pattern_combo.removeItem(idx)
+        # Paneresse simple et double seulement pour la 3d
+
+        for item in ("Paneresse simple (pylmgc90)", "Paneresse double (pylmgc90)"):
+            idx = self.pattern_combo.findText(item)
+            if idx >= 0:
+                self.pattern_combo.model().item(idx).setEnabled(is3d)
+
+    def _on_pan_size_mode_changed(self, idx: int):
+        use_length = (idx == 1)
+        self.pan_length_label.setVisible(use_length)
+        self.pan_length_spin.setVisible(use_length)
 
     def _on_pattern_changed(self, pattern: str):
         self.pattern_info.setText(self._PATTERN_INFO.get(pattern, ""))
-        self.paneresse_group.setVisible(pattern == "Paneresse simple (pylmgc90)") 
+        is_pan = pattern in ("Paneresse simple (pylmgc90)", "Paneresse double (pylmgc90)")
+        self.paneresse_group.setVisible(is_pan)
+        if is_pan:
+            self.paneresse_group.setTitle(
+                "Options paneresse simple" if "simple" in pattern
+                else "Options paneresse double"
+            )
 
     def validatePage(self) -> bool:
         total = self.rows_spin.value() * self.cols_spin.value()
@@ -745,6 +951,204 @@ class LayoutPage(QWizardPage):
             )
             return reply == QMessageBox.StandardButton.Yes
         return True
+
+
+class TransformPage(QWizardPage):
+    """Page de configuration des transformations post-génération."""
+
+    def __init__(self):
+        super().__init__()
+        self.setTitle("🔄 Transformations")
+        self.setSubTitle(
+            "Appliquez des transformations au mur après génération : "
+            "translation, rotation, copie décalée."
+        )
+
+        layout = QVBoxLayout(self)
+
+        # ── Note explicative ─────────────────────────────────────────────────
+        note = QLabel(
+            "💡 Ces transformations s'appliquent sur le <code>bodies_container</code> "
+            "pylmgc90 après <code>buildRigidWall()</code>.<br>"
+            "Elles correspondent à : <code>bodies.translate()</code>, "
+            "<code>bodies.rotate()</code> et <code>copy.deepcopy(bodies)</code>."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet(
+            "background:#e8f4fd; padding:8px; border-radius:4px; font-size:9pt;"
+        )
+        layout.addWidget(note)
+
+        # ── Translation ───────────────────────────────────────────────────────
+        grp_tr = QGroupBox("Translation  —  bodies.translate(dx, dy, dz)")
+        tr_form = QFormLayout()
+
+        self.translate_check = QCheckBox("Activer la translation")
+        self.translate_check.setChecked(False)
+        self.translate_check.toggled.connect(self._on_translate_toggled)
+        tr_form.addRow(self.translate_check)
+
+        self.tx_spin = QDoubleSpinBox()
+        self.tx_spin.setRange(-1000., 1000.)
+        self.tx_spin.setValue(0.)
+        self.tx_spin.setSuffix(" m")
+        self.tx_spin.setDecimals(4)
+        self.tx_spin.setEnabled(False)
+        tr_form.addRow("dx :", self.tx_spin)
+
+        self.ty_spin = QDoubleSpinBox()
+        self.ty_spin.setRange(-1000., 1000.)
+        self.ty_spin.setValue(0.)
+        self.ty_spin.setSuffix(" m")
+        self.ty_spin.setDecimals(4)
+        self.ty_spin.setEnabled(False)
+        tr_form.addRow("dy :", self.ty_spin)
+
+        self.tz_label = QLabel("dz :")
+        self.tz_spin  = QDoubleSpinBox()
+        self.tz_spin.setRange(-1000., 1000.)
+        self.tz_spin.setValue(0.)
+        self.tz_spin.setSuffix(" m")
+        self.tz_spin.setDecimals(4)
+        self.tz_spin.setEnabled(False)
+        tr_form.addRow(self.tz_label, self.tz_spin)
+        grp_tr.setLayout(tr_form)
+        layout.addWidget(grp_tr)
+
+        # ── Rotation ─────────────────────────────────────────────────────────
+        grp_rot = QGroupBox(
+            "Rotation  —  bodies.rotate(description='axis', center, axis, alpha)"
+        )
+        rot_form = QFormLayout()
+
+        self.rotate_check = QCheckBox("Activer la rotation")
+        self.rotate_check.setChecked(False)
+        self.rotate_check.toggled.connect(self._on_rotate_toggled)
+        rot_form.addRow(self.rotate_check)
+
+        self.cx_spin = QDoubleSpinBox()
+        self.cx_spin.setRange(-1000., 1000.)
+        self.cx_spin.setValue(0.)
+        self.cx_spin.setSuffix(" m")
+        self.cx_spin.setDecimals(4)
+        self.cx_spin.setEnabled(False)
+        rot_form.addRow("Centre x :", self.cx_spin)
+
+        self.cy_spin = QDoubleSpinBox()
+        self.cy_spin.setRange(-1000., 1000.)
+        self.cy_spin.setValue(0.)
+        self.cy_spin.setSuffix(" m")
+        self.cy_spin.setDecimals(4)
+        self.cy_spin.setEnabled(False)
+        rot_form.addRow("Centre y :", self.cy_spin)
+
+        self.cz_spin = QDoubleSpinBox()
+        self.cz_spin.setRange(-1000., 1000.)
+        self.cz_spin.setValue(0.)
+        self.cz_spin.setSuffix(" m")
+        self.cz_spin.setDecimals(4)
+        self.cz_spin.setEnabled(False)
+        rot_form.addRow("Centre z :", self.cz_spin)
+
+        self.axis_combo = QComboBox()
+        self.axis_combo.addItems(["Z", "X", "Y"])
+        self.axis_combo.setToolTip(
+            "Axe de rotation.\n"
+            "Z = rotation dans le plan XY (90° pour angle droit)\n"
+            "X / Y = bascule hors-plan"
+        )
+        self.axis_combo.setEnabled(False)
+        rot_form.addRow("Axe :", self.axis_combo)
+
+        self.alpha_spin = QDoubleSpinBox()
+        self.alpha_spin.setRange(-360., 360.)
+        self.alpha_spin.setValue(90.)
+        self.alpha_spin.setSuffix(" °")
+        self.alpha_spin.setDecimals(2)
+        self.alpha_spin.setToolTip(
+            "Angle de rotation en degrés.\n"
+            "90° = angle droit, 180° = demi-tour.\n"
+            "Converti en radians pour l'API pylmgc90."
+        )
+        self.alpha_spin.setEnabled(False)
+        rot_form.addRow("Angle α :", self.alpha_spin)
+
+        grp_rot.setLayout(rot_form)
+        layout.addWidget(grp_rot)
+
+        # ── Copie décalée ─────────────────────────────────────────────────────
+        grp_copy = QGroupBox(
+            "Copie décalée  —  copy.deepcopy(bodies) + translate"
+        )
+        copy_form = QFormLayout()
+
+        self.copy_check = QCheckBox("Créer une copie décalée du mur")
+        self.copy_check.setChecked(False)
+        self.copy_check.toggled.connect(self._on_copy_toggled)
+        self.copy_check.setToolTip(
+            "Duplique le mur généré (deepcopy) puis lui applique\n"
+            "un décalage. Utile pour créer deux murs parallèles\n"
+            "ou fermer un angle (avec la rotation active)."
+        )
+        copy_form.addRow(self.copy_check)
+
+        self.copy_dx_spin = QDoubleSpinBox()
+        self.copy_dx_spin.setRange(-1000., 1000.)
+        self.copy_dx_spin.setValue(0.)
+        self.copy_dx_spin.setSuffix(" m")
+        self.copy_dx_spin.setDecimals(4)
+        self.copy_dx_spin.setEnabled(False)
+        copy_form.addRow("Décalage dx :", self.copy_dx_spin)
+
+        self.copy_dy_spin = QDoubleSpinBox()
+        self.copy_dy_spin.setRange(-1000., 1000.)
+        self.copy_dy_spin.setValue(0.)
+        self.copy_dy_spin.setSuffix(" m")
+        self.copy_dy_spin.setDecimals(4)
+        self.copy_dy_spin.setEnabled(False)
+        copy_form.addRow("Décalage dy :", self.copy_dy_spin)
+
+        self.copy_dz_label = QLabel("Décalage dz :")
+        self.copy_dz_spin  = QDoubleSpinBox()
+        self.copy_dz_spin.setRange(-1000., 1000.)
+        self.copy_dz_spin.setValue(0.)
+        self.copy_dz_spin.setSuffix(" m")
+        self.copy_dz_spin.setDecimals(4)
+        self.copy_dz_spin.setEnabled(False)
+        copy_form.addRow(self.copy_dz_label, self.copy_dz_spin)
+
+        grp_copy.setLayout(copy_form)
+        layout.addWidget(grp_copy)
+
+        layout.addStretch()
+
+    # ── Helpers enable/disable ────────────────────────────────────────────────
+    def _on_translate_toggled(self, v: bool):
+        for w in (self.tx_spin, self.ty_spin, self.tz_spin):
+            w.setEnabled(v)
+
+    def _on_rotate_toggled(self, v: bool):
+        for w in (self.cx_spin, self.cy_spin, self.cz_spin,
+                  self.axis_combo, self.alpha_spin):
+            w.setEnabled(v)
+
+    def _on_copy_toggled(self, v: bool):
+        for w in (self.copy_dx_spin, self.copy_dy_spin, self.copy_dz_spin):
+            w.setEnabled(v)
+
+    def initializePage(self):
+        """Afficher/masquer dz selon la dimension."""
+        dim_page = self.wizard().page(MasonryWizard.PAGE_DIMENSION)
+        is3d     = dim_page.dim_3d_radio.isChecked()
+        self.tz_label.setVisible(is3d)
+        self.tz_spin.setVisible(is3d)
+        self.cz_spin.setVisible(is3d)
+        self.copy_dz_label.setVisible(is3d)
+        self.copy_dz_spin.setVisible(is3d)
+        # En 2D, l'axe Z est le seul pertinent pour les rotations
+        if not is3d:
+            self.axis_combo.setCurrentText("Z")
+            self.axis_combo.setEnabled(False)
 
 
 class MasonrySummaryPage(QWizardPage):
@@ -766,6 +1170,7 @@ class MasonrySummaryPage(QWizardPage):
         mod_page    = wizard.page(MasonryWizard.PAGE_MODEL)
         dim_brick   = wizard.page(MasonryWizard.PAGE_BRICK_DIM)
         layout_page = wizard.page(MasonryWizard.PAGE_LAYOUT)
+        # tf_page utilisé plus bas dans la génération du résumé
 
         is3d      = dim_page.dim_3d_radio.isChecked()
         dimension = "3D" if is3d else "2D"
@@ -835,12 +1240,51 @@ class MasonrySummaryPage(QWizardPage):
                 f"<tr><td style='padding:4px'><b>Groupe</b></td>"
                 f"<td>{layout_page.group_name_input.text()}</td></tr>"
             )
-        if pattern == "Paneresse simple (pylmgc90)":
+
+        # ── Transformations ───────────────────────────────────────────────────
+        tf_page = wizard.page(MasonryWizard.PAGE_TRANSFORM)
+        if tf_page.translate_check.isChecked():
+            summary += (
+                f"<tr><td style='padding:4px'><b>Translation</b></td>"
+                f"<td>dx={tf_page.tx_spin.value():.4f} m, "
+                f"dy={tf_page.ty_spin.value():.4f} m"
+                + (f", dz={tf_page.tz_spin.value():.4f} m" if is3d else "")
+                + "</td></tr>"
+            )
+        if tf_page.rotate_check.isChecked():
+            summary += (
+                f"<tr><td style='padding:4px'><b>Rotation</b></td>"
+                f"<td>axe {tf_page.axis_combo.currentText()}, "
+                f"α={tf_page.alpha_spin.value():.2f}°, "
+                f"centre=({tf_page.cx_spin.value():.4f}, "
+                f"{tf_page.cy_spin.value():.4f}"
+                + (f", {tf_page.cz_spin.value():.4f}" if is3d else "")
+                + ")</td></tr>"
+            )
+        if tf_page.copy_check.isChecked():
+            summary += (
+                f"<tr><td style='padding:4px'><b>Copie décalée</b></td>"
+                f"<td>dx={tf_page.copy_dx_spin.value():.4f} m, "
+                f"dy={tf_page.copy_dy_spin.value():.4f} m"
+                + (f", dz={tf_page.copy_dz_spin.value():.4f} m" if is3d else "")
+                + "</td></tr>"
+            )
+        if pattern in ("Paneresse simple (pylmgc90)", "Paneresse double (pylmgc90)"):
+            pan_mode = ("Longueur fixe" if layout_page.pan_size_mode_combo.currentIndex() == 1
+                        else "Nombre de briques")
+            no_half  = layout_page.no_half_bricks_check.isChecked()
             summary += (
                 f"<tr><td style='padding:4px'><b>Disposition</b></td>"
                 f"<td>{layout_page.disposition_combo.currentText()}</td></tr>"
                 f"<tr><td style='padding:4px'><b>1ère brique</b></td>"
                 f"<td>{layout_page.first_brick_combo.currentText()}</td></tr>"
+                f"<tr><td style='padding:4px'><b>Dimensionnement</b></td>"
+                f"<td>{pan_mode}"
+                + (f" — {layout_page.pan_length_spin.value():.3f} m"
+                   if layout_page.pan_size_mode_combo.currentIndex() == 1 else "")
+                + "</td></tr>"
+                f"<tr><td style='padding:4px'><b>Sans demi-briques</b></td>"
+                f"<td>{'Oui' if no_half else 'Non'}</td></tr>"
             )
         summary += "</table>"
 
