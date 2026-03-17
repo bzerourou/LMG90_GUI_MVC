@@ -17,6 +17,7 @@ from .tabs import (
     MaterialTab, ModelTab, AvatarTab, EmptyAvatarTab, AvatarLibraryTab, LoopTab,
     GranuloTab, DOFTab, ContactTab, VisibilityTab, PostProTab, ComputeTab, ViewerTab
 )
+
 from .tree_view import ModelTreeView
 from ..core.models import UnitSystem
 from ..core.app_logger import get_logger, get_log_path, get_log_dir, get_recent_logs
@@ -467,7 +468,7 @@ class MainWindow(QMainWindow):
         self.dof_tab.operation_applied.connect(self._refresh_all)   
         self.dof_tab.operation_deleted.connect(self._refresh_all)
         # rafraîchir viewer
-        self.dof_tab.operation_applied.connect(self.viewer_tab.refresh)
+        #self.dof_tab.operation_applied.connect(self.viewer_tab.refresh)
         #contact
         self.contact_tab.law_created.connect(self._refresh_all)
         self.contact_tab.law_updated.connect(self._refresh_all)
@@ -481,11 +482,11 @@ class MainWindow(QMainWindow):
         self.postpro_tab.command_deleted.connect(self._refresh_all)
         #viewer
         # Rafraîchir le viewer quand avatars changent
-        self.avatar_tab.avatar_created.connect(self.viewer_tab.refresh)
-        self.avatar_tab.avatar_updated.connect(self.viewer_tab.refresh)
-        self.avatar_tab.avatar_deleted.connect(self.viewer_tab.refresh)
-        self.loop_tab.loop_generated.connect(self.viewer_tab.refresh)
-        self.granulo_tab.granulo_generated.connect(self.viewer_tab.refresh)
+        #self.avatar_tab.avatar_created.connect(self.viewer_tab.refresh)
+        #self.avatar_tab.avatar_updated.connect(self.viewer_tab.refresh)
+        #self.avatar_tab.avatar_deleted.connect(self.viewer_tab.refresh)
+        #self.loop_tab.loop_generated.connect(self.viewer_tab.refresh)
+        #self.granulo_tab.granulo_generated.connect(self.viewer_tab.refresh)
         # librairie d'avatars 
         self.controller.state_changed.connect(self.avatar_tab.refresh)
         self.controller.state_changed.connect(self.material_tab.refresh)
@@ -1005,12 +1006,12 @@ class MainWindow(QMainWindow):
     def _refresh_all(self):
         """Rafraîchit toute l'interface"""
         self.tree_view.refresh()
-        
+ 
         for tab in [self.material_tab, self.model_tab, self.avatar_tab,
-                   self.empty_avatar_tab, self.loop_tab, self.granulo_tab,
-                   self.dof_tab, self.contact_tab, self.visibility_tab,
-                   self.postpro_tab]:
+                    self.empty_avatar_tab, self.loop_tab, self.granulo_tab,
+                    self.dof_tab, self.contact_tab, self.visibility_tab,
+                    self.postpro_tab]:
             if hasattr(tab, 'refresh'):
-                if tab is self.granulo_tab :
+                if tab is self.granulo_tab:
                     tab.refresh(full_refresh=True)
                 tab.refresh()
