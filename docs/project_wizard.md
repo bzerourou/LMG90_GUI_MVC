@@ -1,5 +1,5 @@
 # Assistant de projet 
-L'Assistant de Configuration de Projet est un outil qui vous guidera pas à pas afin de créer rapidement un projet LMGC90 complet avec  les éléments essentiaux de vos modèles numériques.
+L'Assistant de configuration de Projet est un outil qui vous guidera pas à pas afin de créer rapidement un projet LMGC90 complet avec  les éléments essentiaux de vos modèles numériques.
 
 ## 🎯 Objectif
 

@@ -18,7 +18,7 @@ Cette section sert à la génération de dépôts granulaires, toute fois il vou
 
 
 ## Exemple
-Cet exemple n'est pas concret mais montre seulement les proprétés de vos granulométries
+Cet exemple n'est pas concret mais montre seulement les propriétés de vos granulométries
 | Champ | Description | Exemple |
 |-------|-------------|---------|
 | **Nombre de particules** | Nombre total de particules à générer | `400` |
@@ -60,11 +60,11 @@ Choisissez la dimension de votre modèle numérique, dans mon cas je vais dire e
 
 ![](captures/assistant_granulo_page2.JPG)
 
-L'assistant vous propesera de créer un matériau simple de type rigide, j'opte pour les valeurs par défauts, ensuite sur "suivant"
+L'assistant vous proposera de créer un matériau simple de type rigide, j'opte pour les valeurs par défauts, ensuite sur "suivant"
 
 ![](captures/assistant_granulo_page3.JPG)
 
-L'assistant vous propesera de créer un modèle rigide de type "Rxx2D"/"Rxx3D" pour la 2D/3D, je laisse tout par défaut, et cliquez sur "suivant", 
+L'assistant vous proposera de créer un modèle rigide de type "Rxx2D"/"Rxx3D" pour la 2D/3D, je laisse tout par défaut, et cliquez sur "suivant", 
 ![](captures/assistant_granulo_page4.JPG)
 
 On arrive maintenant au dialogue de génération, pour mon cas je vais générer 500 avatars, le rayon minimal et maximal respectivement à 0.05 et 0.06, puis cliquez sur "suivant", 

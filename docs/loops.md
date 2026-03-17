@@ -1,6 +1,6 @@
 # Boucles Paramétriques
 
-En sorte, c'est comme une répétion d’avatars identiques sous différentes formes.
+En sorte, c'est comme une répétition d’avatars identiques sous différentes formes.
 
 ## Types de boucles
 Vous avez plusieurs formes : 
@@ -17,7 +17,7 @@ Il vous suffit seulement de remplir les champs pour chaque forme :
 - Rayon pour la forme circle / pas gille et ligne  / offsets (X et Y)
 - Option : stocker dans une liste nommée 
 ## exemple 
-Dans mon exemple je vais créer une répétirion linàire de RigidDisk, suivant l'axe "y", 
+Dans mon exemple je vais créer une répétition linéaire de RigidDisk, suivant l'axe "y", 
 - Après avoir créer une fondation RigidJonc, 
 - Type de bpoucle : linéaire, 
 - Nombre : 10,

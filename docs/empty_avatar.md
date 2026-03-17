@@ -1,6 +1,6 @@
 # Avatar Vide (Personnalisation avancée)
 
-Cet onglet vous permi de créer des corps rigides avec plusieurs contacteurs.
+Cet onglet vous permet de créer des corps rigides avec plusieurs contacteurs.
 
 ## Fonctionnalités
 - Ajout illimité de contacteurs

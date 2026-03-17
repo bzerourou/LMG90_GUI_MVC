@@ -14,7 +14,7 @@ Cette section explique comment créer et configurer un matériau dans LMGC90_GUI
   - **Propriétés** : Champ texte pour paramètres avancés pour chaque type de matériau
 
 ## Types de matériaux disponibles
-Vous pourriez créer différents types de matériaux, ce tabelau comprenne tous les paramères pour chaque matériau:  
+Vous pourriez créer différents types de matériaux, ce tableau comprend tous les paramères pour chaque matériau:  
 
 | Code matériau | Nom complet | Nombre de paramètres | Paramètres principaux | Modèles compatibles |
 |---------------|-------------|----------------------|-----------------------|---------------------|
