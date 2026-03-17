@@ -1,6 +1,8 @@
 # ============================================================================
+# mesh_wizard_deformable.py
 # Assistant PyQt6 pour la création de corps déformables (mesh2D / mesh3D)
 # S'appuie directement sur pre.buildMesh2D() et pre.buildMeshH8() de pylmgc90,
+# en suivant le même patron que setup_wizard.py et granulo_wizard.py.
 # ============================================================================
 
 from PyQt6.QtWidgets import (
@@ -73,10 +75,7 @@ _ELASTIC_TYPES = list(_MAT_DEFAULTS.keys())
 # ─────────────────────────── helpers gmsh ─────────────────────────────────────
 
 def _gmsh_disk(cx, cy, r, nr, ntheta, filepath):
-    """
-    Génère un maillage 2D de disque via gmsh et l'écrit dans filepath (.msh v2).
-    lc est déduit du rayon et du nombre d'éléments angulaires.
-    """
+    """\nGénère un maillage 2D de disque via gmsh et l'écrit dans filepath (.msh v2).\nlc est déduit du rayon et du nombre d'éléments angulaires.\n"""
     import gmsh
     lc = (2 * 3.14159 * r / ntheta)   # taille de maille ≈ arc / ntheta
 
@@ -97,10 +96,7 @@ def _gmsh_disk(cx, cy, r, nr, ntheta, filepath):
 
 
 def _gmsh_sphere(cx, cy, cz, r, nr, ntheta, nphi, filepath):
-    """
-    Génère un maillage 3D de sphère pleine via gmsh.
-    lc déduit du rayon et de ntheta.
-    """
+    """\nGénère un maillage 3D de sphère pleine via gmsh.\nlc déduit du rayon et de ntheta.\n"""
     import gmsh
     lc = (2 * 3.14159 * r / ntheta)
 
@@ -121,11 +117,7 @@ def _gmsh_sphere(cx, cy, cz, r, nr, ntheta, nphi, filepath):
 
 
 def _gmsh_cylinder(cx, cy, cz, r, h, nr, ntheta, nz, filepath):
-    """
-    Génère un maillage 3D de cylindre plein via gmsh.
-    Le cylindre est centré en (cx, cy, cz), axe Z, de rayon r et hauteur h.
-    lc déduit de r et ntheta.
-    """
+    """\nGénère un maillage 3D de cylindre plein via gmsh.\nLe cylindre est centré en (cx, cy, cz), axe Z, de rayon r et hauteur h.\nlc déduit de r et ntheta.\n"""
     import gmsh
     lc = (2 * 3.14159 * r / ntheta)
 
@@ -145,17 +137,12 @@ def _gmsh_cylinder(cx, cy, cz, r, h, nr, ntheta, nz, filepath):
     gmsh.write(filepath)
     gmsh.finalize()
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 # Wizard principal
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class MeshWizard(QWizard):
-    """
-    Assistant de création de corps déformables.
-    Génère un maillage structuré 2D ou 3D via pre.buildMesh2D / pre.buildMeshH8,
-    crée le matériau élastique et le modèle EF, puis insère l'avatar MAILx
-    directement dans les conteneurs pylmgc90 du controller.
-    """
+    """\nAssistant de création de corps déformables.\nGénère un maillage structuré 2D ou 3D via pre.buildMesh2D / pre.buildMeshH8,\ncrée le matériau élastique et le modèle EF, puis insère l'avatar MAILx\ndirectement dans les conteneurs pylmgc90 du controller.\n"""
 
     PAGE_INTRO   = 0
     PAGE_DIM     = 1
@@ -220,10 +207,7 @@ class MeshWizard(QWizard):
     # ── génération principale ──────────────────────────────────────────────────
 
     def _generate_mesh(self):
-        """
-        Construit le maillage EF et l'insère dans le projet.
-        Retourne (nb_noeuds, nb_elements).
-        """
+        """\nConstruit le maillage EF et l'insère dans le projet.\nRetourne (nb_noeuds, nb_elements).\n"""
         from pylmgc90.pre import buildMesh2D, buildMeshH8
 
         ctrl = self.controller
@@ -354,11 +338,13 @@ class MeshWizard(QWizard):
         )
         ctrl.state.avatars.append(avatar)
 
-        # ──Appliquer les conditions aux limites ────────────────────────────
+        # ── Appliquer les conditions aux limites (DOF) ────────────────────
         boundary_page = self.page(self.PAGE_BOUNDARY)
-        if boundary_page.fix_bottom_check.isChecked():
-            # Appliquer fixation du bord inférieur
+        dof_conditions = boundary_page.get_dof_conditions()
+        if dof_conditions:
             self._apply_boundary_conditions(mesh_obj, boundary_page)
+            # Sauvegarder les conditions dans mesh_params pour reconstruction
+            mp["dof_conditions"] = dof_conditions
 
         # Un seul signal pour rafraîchir l'UI
         ctrl.state_changed.emit()
@@ -371,10 +357,7 @@ class MeshWizard(QWizard):
     # ── construction 2D ───────────────────────────────────────────────────────
 
     def _build_mesh_2d(self, geom_page, ref_page, mat_obj, mod_obj, buildMesh2D):
-        """
-        Appelle pre.buildMesh2D(mesh_type, x0, y0, lx, ly, nb_elem_x, nb_elem_y).
-        Retourne l'avatar MAILx pylmgc90.
-        """
+        """\nAppelle pre.buildMesh2D(mesh_type, x0, y0, lx, ly, nb_elem_x, nb_elem_y).\nRetourne l'avatar MAILx pylmgc90.\n"""
         geom_type = geom_page.geom_type_combo.currentText()
         mesh_type = ref_page.mesh_type_combo.currentText()   # Q4, 2T3, 4T3, Q8
 
@@ -445,10 +428,7 @@ class MeshWizard(QWizard):
     # ── construction 3D ───────────────────────────────────────────────────────
 
     def _build_mesh_3d(self, geom_page, ref_page, mat_obj, mod_obj, buildMeshH8):
-        """
-        Appelle pre.buildMeshH8(x0, y0, z0, lx, ly, lz, nx, ny, nz).
-        Retourne l'avatar MAILx pylmgc90.
-        """
+        """\nAppelle pre.buildMeshH8(x0, y0, z0, lx, ly, lz, nx, ny, nz).\nRetourne l'avatar MAILx pylmgc90.\n"""
         from pylmgc90 import pre as pre_mod
 
         geom_type = geom_page.geom_type_combo.currentText()
@@ -547,10 +527,7 @@ class MeshWizard(QWizard):
 
     @staticmethod
     def _collect_mat_properties(mat_page, mat_type_str):
-        """
-        Collecte les propriétés mécaniques saisies dans la page matériau.
-        Construit un dictionnaire compatible avec pre.material(**props).
-        """
+        """\nCollecte les propriétés mécaniques saisies dans la page matériau.\nConstruit un dictionnaire compatible avec pre.material(**props).\n"""
         # Base commune à tous les types élastiques
         props = {
             "elas":       "standard",
@@ -579,21 +556,45 @@ class MeshWizard(QWizard):
         return props
     
     def _apply_boundary_conditions(self, mesh_obj, boundary_page):
-        """Applique les conditions aux limites au maillage"""
-        # Fixation du bord inférieur
-        if boundary_page.fix_bottom_check.isChecked():
-            # TODO: Implémenter la fixation des nœuds du bord inférieur
-            # mesh_obj.imposeInitValue(...)
-            pass
-        
-        # Charge appliquée
-        if boundary_page.apply_load_check.isChecked():
-            load_value = boundary_page.load_value_spin.value()
-            load_direction = boundary_page.load_direction_combo.currentText()
-            
-            # TODO: Implémenter l'application de la charge
-            # mesh_obj.imposeDrivenDof(...)
-            pass
+        """\nConstruit les DOFOperation depuis les lignes de MeshBoundaryPage\net les transmet à controller.add_dof_operation() qui :\n- applique l'opération sur l'objet pylmgc90 via LMGC90Bridge\n- sauvegarde dans state.operations (visible dans l'onglet DOF)\n\nLes paramètres kwargs sont parsés depuis le texte libre de chaque\nQLineEdit (ex : 'component=[1,2], dofty="vlocy"').\n"""
+        from ...core.models import DOFOperation
+        from ...utils.safe_eval import SafeEvaluator
+
+        _evaluator = SafeEvaluator()
+        avatar_index = len(self.controller.state.avatars) - 1
+
+        for condition in boundary_page.get_dof_conditions():
+            dof_type   = condition["dof_type"]
+            group      = condition["group"]
+            params_str = condition["params_str"].strip()
+
+            if not params_str:
+                continue
+
+            # Parser les kwargs depuis le texte libre
+            # Exemple : 'component=[1,2], dofty="vlocy"'
+            try:
+                params = _evaluator.eval_dict(params_str)
+            except Exception as exc:
+                import warnings
+                warnings.warn(
+                    "DOF : impossible de parser les paramètres "
+                    "\"{}\" — condition ignorée. ({})".format(params_str, exc)
+                )
+                continue
+
+            # Ajouter le groupe comme paramètre pylmgc90
+            params["group"] = group
+
+            operation = DOFOperation(
+                operation_type=dof_type,
+                target_type="avatar",
+                target_value=avatar_index,
+                parameters=params,
+            )
+
+            # Applique ET sauvegarde dans state.operations
+            self.controller.add_dof_operation(operation)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -621,9 +622,8 @@ class MeshIntroPage(QWizardPage):
             "<li>✅ Générer le maillage</li>"
             "</ol>"
             "<p><b>💡 Astuce :</b> Les maillages permettent de simuler la déformation de solides.</p>"
-            "<p>     Le maillage est construit via <code>buildMesh2D</code> "
+            "<p><b>💡 Astuce :</b> Le maillage est construit via <code>buildMesh2D</code> "
             "ou <code>buildMeshH8</code> de pylmgc90 puis converti en avatar MAILx.</p>"
-            "<p><i>⏱️ Temps estimé : 2-3 minutes</i></p>"
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -1208,81 +1208,184 @@ class MeshRefinementPage(QWizardPage):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class MeshBoundaryPage(QWizardPage):
-    """
-    Page des conditions aux limites — UI uniquement, sans application effective.
-    Les sélections sont mémorisées pour le récapitulatif ; l'application
-    se fait ensuite via l'onglet DOF.
-    """
+    """\nPage des conditions aux limites (DOF).\n\nUI : pour chaque condition, l'utilisateur choisit\n- un groupe de surface via QComboBox (down/up/left/right/front/rear)\n- les paramètres DOF via QLineEdit texte libre, exactement comme\ndans le dof_tab : ex.  component=[1,2], dofty="vlocy"\n\nÀ la génération, chaque ligne est convertie en DOFOperation et transmise\nà controller.add_dof_operation() qui applique ET sauvegarde dans\nstate.operations (visible dans l'onglet DOF).\n"""
+
+    # Groupes créés automatiquement par buildMesh2D et buildMeshH8
+    _GROUPS_2D = ["down", "up", "left", "right"]
+    _GROUPS_3D = ["down", "up", "left", "right", "front", "rear"]
+
+    # Exemples de paramètres pour l'aide contextuelle
+    _PARAM_EXAMPLES = (
+        "Exemples de paramètres :\n"
+        "  translation :  dx=0.0, dy= 1.0\"\n"
+        "  rotation :   psi = -2*math.pi/3, center=[0.0, 0.0]\n"
+        "  imposeDrivenDof  :   component=[1,2], dofty='vlocy'\n"
+        "  imposeInitValue  :   component=[1,2,3], value=3.0\n"
+    )
 
     def __init__(self):
         super().__init__()
-        self.setTitle("🔒 Conditions aux Limites")
+        self.setTitle("🔒 Conditions aux Limites (DOF)")
         self.setSubTitle(
-            "Notez les conditions souhaitées — à appliquer via l'onglet DOF."
+            "Définissez les conditions DOF sur les groupes de surface du maillage."
         )
+        self._dof_rows = []
+        main_layout = QVBoxLayout(self)
 
-        self.form = QFormLayout()
-
-        info = QLabel(
-            "ℹ️ Ces sélections sont enregistrées en mémo uniquement.<br>"
-            "Utilisez l'<b>onglet DOF</b> pour les appliquer sur les groupes "
-            "<code>down</code>, <code>up</code>, <code>left</code>, <code>right</code>"
-            " (+ <code>front</code>, <code>rear</code> en 3D)."
+        # ── Note explicative ─────────────────────────────────────────────────
+        note = QLabel(
+            "💡 <b>Groupes :</b> "
+            "<code>down</code> · <code>up</code> · "
+            "<code>left</code> · <code>right</code>"
+            " · <code>front</code> / <code>rear</code> (3D).<br>"
+            "<b>Type :</b> "
+            "<code>translation</code> ou <code>rotation</code> pour les conditions classiques, "
+            "<code>imposeDrivenDof</code> ou <code>imposeInitValue</code>.<br>"
+            "<b>Paramètres :</b> écrire directement les kwargs pylmgc90, "
+            "ex : <code>component=[1,2], dofty=&quot;vlocy&quot;</code>"
         )
-        info.setWordWrap(True)
-        info.setStyleSheet("color: #1a5276; font-size: 9pt;")
-        self.form.addRow(info)
+        note.setWordWrap(True)
+        note.setStyleSheet(
+            "background:#eaf4fb; padding:8px; border-radius:4px; font-size:9pt;"
+        )
+        main_layout.addWidget(note)
 
-        # Fixations
-        self.fix_bottom_check = QCheckBox("Bord inférieur  (down)")
-        self.form.addRow("Fixer :", self.fix_bottom_check)
+        # ── En-tête colonnes ─────────────────────────────────────────────────
+        hdr = QHBoxLayout()
+        for txt, w in [
+            ("Type DOF",   150),
+            ("Groupe",      90),
+            ("Paramètres (kwargs pylmgc90)", 300),
+        ]:
+            lbl = QLabel("<b>{}</b>".format(txt))
+            lbl.setFixedWidth(w)
+            hdr.addWidget(lbl)
+        hdr.addStretch()
+        main_layout.addLayout(hdr)
 
-        self.fix_top_check = QCheckBox("Bord supérieur  (up)")
-        self.form.addRow("", self.fix_top_check)
+        # ── Zone de lignes ───────────────────────────────────────────────────
+        self._rows_widget = QWidget()
+        self._rows_layout = QVBoxLayout(self._rows_widget)
+        self._rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._rows_layout.setSpacing(3)
+        main_layout.addWidget(self._rows_widget)
 
-        self.fix_left_check = QCheckBox("Bord gauche  (left)")
-        self.form.addRow("", self.fix_left_check)
+        btn_add = QPushButton("+ Ajouter une condition DOF")
+        btn_add.clicked.connect(self._add_dof_row)
+        main_layout.addWidget(btn_add)
 
-        self.fix_right_check = QCheckBox("Bord droit  (right)")
-        self.form.addRow("", self.fix_right_check)
+        # Attributs fantômes pour compatibilité avec l'ancien code
+        for attr in ("fix_bottom_check", "fix_top_check", "fix_left_check",
+                     "fix_right_check", "fix_front_check", "fix_rear_check",
+                     "apply_load_check"):
+            setattr(self, attr, QCheckBox())
 
-        self.fix_front_check = QCheckBox("Face avant  (front)  — 3D")
-        self.form.addRow("", self.fix_front_check)
+        main_layout.addStretch()
 
-        self.fix_rear_check = QCheckBox("Face arrière  (rear)  — 3D")
-        self.form.addRow("", self.fix_rear_check)
+    # ── Helpers ──────────────────────────────────────────────────────────────
 
-        # Chargement
-        self.apply_load_check = QCheckBox("Activer")
-        self.form.addRow("Chargement :", self.apply_load_check)
+    def _is_3d(self) -> bool:
+        wiz = self.wizard()
+        if wiz is None:
+            return False
+        return not wiz.page(MeshWizard.PAGE_DIM).dim_2d_radio.isChecked()
 
-        self.load_face_combo = QComboBox()
-        self.load_face_combo.addItems(["down", "up", "left", "right", "front", "rear"])
-        self.form.addRow("Groupe cible :", self.load_face_combo)
+    def _add_dof_row(self, entry: dict = None):
+        """\nAjoute une ligne de condition DOF.\nentry = dict optionnel : {"dof_type", "group", "params_str"}\n"""
+        entry   = entry or {}
+        is_3d   = self._is_3d()
+        groups  = self._GROUPS_3D if is_3d else self._GROUPS_2D
 
-        self.load_value_spin = QDoubleSpinBox()
-        self.load_value_spin.setRange(-1e9, 1e9)
-        self.load_value_spin.setSuffix(" N/m²")
-        self.form.addRow("Valeur :", self.load_value_spin)
+        row_w   = QWidget()
+        row_lay = QHBoxLayout(row_w)
+        row_lay.setContentsMargins(0, 0, 0, 0)
+        row_lay.setSpacing(4)
 
-        self.load_direction_combo = QComboBox()
-        self.load_direction_combo.addItems(["X", "Y", "Z"])
-        self.form.addRow("Direction :", self.load_direction_combo)
+        # ── Type DOF ─────────────────────────────────────────────────────────
+        combo_type = QComboBox()
+        combo_type.setFixedWidth(150)
+        combo_type.addItem("translation")
+        combo_type.addItem("rotation")  
+        combo_type.addItem("imposeDrivenDof")
+        combo_type.addItem("imposeInitValue")
+       
+        if entry.get("dof_type") in ("translation", "rotation", "imposeDrivenDof", "imposeInitValue"):
+            combo_type.setCurrentText(entry["dof_type"])
+        combo_type.setToolTip(
+            "translation : translation \n"
+            "rotation : rotation \n"
+            "imposeDrivenDof : DDL piloté (déplacement ou force ou flux imposée)\n"
+            "imposeInitValue : condition initiale (position ou vitesse)"
+        )
+        row_lay.addWidget(combo_type)
 
-        layout = QVBoxLayout()
-        layout.addLayout(self.form)
-        layout.addStretch()
-        self.setLayout(layout)
+        # ── Groupe ───────────────────────────────────────────────────────────
+        combo_grp = QComboBox()
+        combo_grp.setFixedWidth(90)
+        combo_grp.addItems(groups)
+        if entry.get("group") in groups:
+            combo_grp.setCurrentText(entry["group"])
+        combo_grp.setToolTip(
+            "Groupe de surface du maillage.\n"
+            "Créé automatiquement par buildMesh2D / buildMeshH8."
+        )
+        row_lay.addWidget(combo_grp)
+
+        # ── Paramètres kwargs ────────────────────────────────────────────────
+        edit_params = QLineEdit()
+        edit_params.setMinimumWidth(300)
+        edit_params.setPlaceholderText(
+            'ex : component=[1,2], dofty="vlocy"'
+        )
+        edit_params.setText(entry.get("params_str", ""))
+        edit_params.setToolTip(self._PARAM_EXAMPLES)
+        row_lay.addWidget(edit_params, stretch=1)
+
+        # ── Bouton supprimer ─────────────────────────────────────────────────
+        btn_del = QPushButton("x")
+        btn_del.setFixedWidth(24)
+        row_data = {
+            "widget":      row_w,
+            "combo_type":  combo_type,
+            "combo_grp":   combo_grp,
+            "edit_params": edit_params,
+        }
+        def _make_del(rd=row_data):
+            def _do():
+                self._dof_rows.remove(rd)
+                self._rows_layout.removeWidget(rd["widget"])
+                rd["widget"].deleteLater()
+            return _do
+        btn_del.clicked.connect(_make_del())
+        row_lay.addWidget(btn_del)
+
+        self._rows_layout.addWidget(row_w)
+        self._dof_rows.append(row_data)
+
+    def _read_dof_row(self, row: dict) -> dict:
+        """Lit une ligne et retourne un dict sérialisable."""
+        return {
+            "dof_type":  row["combo_type"].currentText(),
+            "group":     row["combo_grp"].currentText(),
+            "params_str": row["edit_params"].text().strip(),
+        }
+
+    def get_dof_conditions(self) -> list:
+        """Retourne la liste des conditions DOF configurées."""
+        return [self._read_dof_row(r) for r in self._dof_rows]
 
     def initializePage(self):
-        wizard    = self.wizard()
-        dim_page  = wizard.page(MeshWizard.PAGE_DIM)
-        is_3d     = not dim_page.dim_2d_radio.isChecked()
-        self.fix_front_check.setVisible(is_3d)
-        self.fix_rear_check.setVisible(is_3d)
-        self.load_face_combo.model().item(4).setEnabled(is_3d)
-        self.load_face_combo.model().item(5).setEnabled(is_3d)
-
+        """Met à jour les combos groupe selon la dimension."""
+        is_3d  = self._is_3d()
+        groups = self._GROUPS_3D if is_3d else self._GROUPS_2D
+        for row in self._dof_rows:
+            cur = row["combo_grp"].currentText()
+            row["combo_grp"].blockSignals(True)
+            row["combo_grp"].clear()
+            row["combo_grp"].addItems(groups)
+            if cur in groups:
+                row["combo_grp"].setCurrentText(cur)
+            row["combo_grp"].blockSignals(False)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Page 7 — Récapitulatif
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1409,67 +1512,18 @@ class MeshSummaryPage(QWizardPage):
         else:
             mod_html = f"<li><b>Existant :</b> {mod_page.existing_mod_combo.currentText()}</li>"
 
-        # ── Conditions aux Limites (mémo) ─────────────────────────────────────
-        cl_items = []
-        if bound_page.fix_bottom_check.isChecked():
-            cl_items.append("Bord inférieur (down) fixé")
-        if bound_page.fix_top_check.isChecked():
-            cl_items.append("Bord supérieur (up) fixé")
-        if bound_page.fix_left_check.isChecked():
-            cl_items.append("Bord gauche (left) fixé")
-        if bound_page.fix_right_check.isChecked():
-            cl_items.append("Bord droit (right) fixé")
-        if bound_page.fix_front_check.isChecked():
-            cl_items.append("Face avant (front) fixée")
-        if bound_page.fix_rear_check.isChecked():
-            cl_items.append("Face arrière (rear) fixée")
-        if bound_page.apply_load_check.isChecked():
-            cl_items.append(
-                f"Chargement {bound_page.load_value_spin.value():.2e} N/m² "
-                f"en {bound_page.load_direction_combo.currentText()} "
-                f"sur groupe '{bound_page.load_face_combo.currentText()}'"
+        # ── Conditions aux Limites (DOF) ──────────────────────────────────────
+        dof_conds = bound_page.get_dof_conditions()
+        if dof_conds:
+            cl_html = "".join(
+                "<li><b>{}</b> — groupe <code>{}</code>"
+                " &nbsp; <code>{}</code></li>".format(
+                    c["dof_type"], c["group"], c["params_str"] or "(vide)"
+                )
+                for c in dof_conds
             )
-        if cl_items:
-            cl_html = "".join(f"<li>{item}</li>" for item in cl_items)
         else:
-            cl_html = "<li><i>Aucune condition notée — à définir dans l'onglet DOF</i></li>"
+            cl_html = "<li><i>Aucune condition DOF définie.</i></li>"
 
-        html = f"""
-<h2>🔷 Corps Déformable {dimension}</h2>
-
-<h3>📐 Géométrie</h3>
-<ul>
-  <li><b>Forme :</b> {geom_type}</li>
-  <li><b>Type de maillage :</b> {mesh_type}</li>
-  {dims_html}
-  <li><b>Centre :</b> {center_str}</li>
-</ul>
-
-<h3>🔢 Raffinement</h3>
-<ul>
-  {ref_html}
-</ul>
-
-<h3>🧱 Matériau</h3>
-<ul>
-  {mat_html}
-</ul>
-
-<h3>⚙️ Modèle EF</h3>
-<ul>
-  {mod_html}
-</ul>
-
-<h3>🔒 Conditions aux Limites (mémo)</h3>
-<ul>
-  {cl_html}
-</ul>
-
-<hr>
-<h3 style="color: green;">✅ Prêt à générer !</h3>
-<p><b>Cliquez sur « Générer le maillage » pour créer le corps déformable.</b></p>
-<p style="color: #888;">
-  ⚠️ La génération peut prendre quelques secondes selon la finesse du maillage.
-</p>
-"""
+        html = f"""\n<h2>🔷 Corps Déformable {dimension}</h2>\n\n<h3>📐 Géométrie</h3>\n<ul>\n<li><b>Forme :</b> {geom_type}</li>\n<li><b>Type de maillage :</b> {mesh_type}</li>\n{dims_html}\n<li><b>Centre :</b> {center_str}</li>\n</ul>\n\n<h3>🔢 Raffinement</h3>\n<ul>\n{ref_html}\n</ul>\n\n<h3>🧱 Matériau</h3>\n<ul>\n{mat_html}\n</ul>\n\n<h3>⚙️ Modèle EF</h3>\n<ul>\n{mod_html}\n</ul>\n\n<h3>🔒 Conditions aux Limites (mémo)</h3>\n<ul>\n{cl_html}\n</ul>\n\n<hr>\n<h3 style="color: green;">✅ Prêt à générer !</h3>\n<p><b>Cliquez sur « Générer le maillage » pour créer le corps déformable.</b></p>\n<p style="color: #888;">\n⚠️ La génération peut prendre quelques secondes selon la finesse du maillage.\n</p>\n"""
         self.summary_text.setHtml(html)
