@@ -41,6 +41,8 @@ Il est possible de paramétrer vos scripts calculs via au bouton "Configurer les
 #### 1.Onglet Modèle 
 Le premier onglet fait l'objet d'une détéection automatique sur l'hypothèse de votre modèle, et charge tous les paramètres se lon vos avatars, 
 
+
+
 |Contraintes planes (mhyp = 1)	|Calcul 2D en état plan de contraintes. Pertinent pour les structures minces.
 | --- | ------- |
 |Déformations planes (mhyp = 2)	|Calcul 2D en état plan de déformations. Pertinent pour les structures infiniment longues en z.|
@@ -55,6 +57,8 @@ Le premier onglet fait l'objet d'une détéection automatique sur l'hypothèse d
 
 #### 2.Routines
 Cet onglet sélectionne les routines chipy à inclure dans la boucle de calcul. Chaque case à cocher correspond à un appel de la famille NewStep / ComputeStep / WriteOut dans le script généré.
+
+![](captures/config_calculs_routines.JPG)
 
 **Corps rigides 2D — RBDY2**
 
@@ -115,6 +119,8 @@ de structures maçonnées avec blocs déformables.
 
 #### 3.Extraction
 Cet onglet configure toutes les sorties du calcul : fichiers de visualisation, visibilité des avatars, extraction de vecteurs d'état, forces de contact, énergie et champs FEM.
+
+![](captures/config_calculs_extraction.JPG)
 
 **Messages chipy (logs)**
 
@@ -194,5 +200,173 @@ Vecteurs disponibles :
 
 –	Champs par élément (mecaFEMx_WriteBodies) — Écrit les champs par élément : contraintes et déformations (MECAx), température (THERx), pression (HYDRx).
 –	Variables internes (mecaFEMx_WriteInternalVariables) — Écrit les variables internes aux points de Gauss : plasticité, endommagement, variables d'histoire.
+
+### 4.Pilotage
+
+Cet onglet contrôle des fonctions avancées du déroulement du calcul : reprise depuis un état sauvegardé, arrêt anticipé sur critère de convergence et séquençage multi-pas.
+
+![](captures/config_pilotage.JPG)
+
+**Restart — Reprise de calcul**
+Permet de reprendre un calcul à partir d'un état précédemment sauvegardé dans les fichiers .dat.last.
+
+|Activer le restart	|Génère chipy.ReadIni() puis chipy.SetStep(restart_step) avant la boucle de calcul.|
+|---|--------|
+|Pas de reprise	|Numéro du pas de temps à partir duquel reprendre (entier, de 0 à 9 999 999).|
+
+**Critère d'arrêt automatique**
+
+Interrompt la boucle de calcul avant la fin du nombre de pas prévu si un critère de convergence est satisfait.
+
+
+|Activer un critère d'arrêt	|Active le mécanisme d'arrêt anticipé. Génère une condition break dans la boucle for k.|
+|----|---------|
+|Type de critère	|Trois types disponibles : résidu d'énergie (‖E_res‖ < seuil), déplacement maximum (max|u| < seuil), résidu de force (‖F_res‖ < seuil).|
+|Seuil	|Valeur numérique du critère d'arrêt (de 10⁻¹⁶ à 1,0). Valeur par défaut : 10⁻⁶.|
+|Fréquence d'évaluation	|Évaluer le critère tous les N pas. Évite un calcul du critère à chaque itération, ce qui peut être coûteux.|
+
+**Séquence multi-pas — dt variable**
+
+Permet de définir plusieurs phases de calcul avec des pas de temps différents. Utile pour les calculs avec chargements progressifs ou pour affiner le pas de temps à l'approche d'un événement critique.
+
+|Activer une séquence multi-pas	|Génère une boucle externe sur les phases : for _dt in dt_sequence: chipy.TimeEvolution_SetTimeStep(_dt) + boucle interne.|
+|----|-------|
+|Nombre de phases	|Entre 2 et 20 phases. Le nombre total de pas (nb_steps) est réparti équitablement entre les phases.|
+|dt par phase	|Liste de valeurs de dt séparées par des virgules, une par phase (ex. : 1e-3, 1e-4, 1e-5).|
+
+### 5. Inspection 2D
+
+Cet onglet permet d'ajouter des appels d'inspection sur les contacteurs 2D du modèle. Chaque ligne correspond à un appel chipy.XXXX_GetYYYY() inséré dans la boucle de calcul ou après celle-ci.
+
+![](captures/config_inspect2D.JPG)
+
+Cliquer sur « + Ajouter une inspection 2D » pour créer une ligne. Chaque ligne contient cinq colonnes :
+
+|Fonction chipy	|Sélection dans la liste déroulante des fonctions disponibles pour les contacteurs 2D. La description s'affiche dans l'infobulle.|
+|---|------|
+|IDs (contacteurs)	|Liste d'identifiants chipy séparés par des virgules. Laissé vide pour les fonctions de type GetNb... qui ne prennent pas d'argument.|
+|Groupe	|Nom d'un groupe d'avatars. Résolu en IDs à la génération si les IDs sont vides.|
+|Mode / Timing	|Un des quatre modes de temporisation (Tous les pas, Tous les N pas, Au pas k =, Après boucle).|
+|Var. Python	|Nom de la variable Python dans laquelle stocker le résultat (ex. : vel_disk). Laissé vide si le résultat n'est pas réutilisé.|
+
+**Fonctions disponibles — Contacteurs 2D**
+
+Les fonctions sont regroupées par type de contacteur :
+
+`DISKx — Disques rigides 2D`
+–	DISKx_GetNbDISKx — Nombre total de contacteurs DISKx (pas d'ID requis).
+–	DISKx_GetBodyId(i) — ID du corps RBDY2 auquel appartient le contacteur i.
+–	DISKx_GetPtrDISKx2BDYTY(i) — Index local du contacteur dans son corps RBDY2.
+–	DISKx_GetPtrTactBehav(i) — Loi de comportement de contact associée au contacteur i.
+–	DISKx_GetRadius(i) — Rayon du disque i.
+–	DISKx_GetCoor(i) — Coordonnées du centre du disque i.
+–	DISKx_GetVelocity(i) — Vitesse du centre du disque i.
+
+`JONCx — Joncs / Ellipses 2D`
+–	JONCx_GetNbJONCx — Nombre total de contacteurs JONCx.
+–	JONCx_GetBodyId(i), JONCx_GetPtrJONCx2BDYTY(i), JONCx_GetPtrTactBehav(i) — Identification.
+–	JONCx_GetAxes(i) — Demi-axes (a, b) du jonc i.
+–	JONCx_GetCoor(i) — Coordonnées du centre du jonc i.
+
+`POLYR — Polygones rigides 2D`
+–	POLYR_GetNbPOLYR — Nombre total de contacteurs POLYR.
+–	POLYR_GetBodyId(i), POLYR_GetPtrPOLYR2BDYTY(i), POLYR_GetPtrTactBehav(i) — Identification.
+–	POLYR_GetNbVerti(i) — Nombre de sommets du polygone i.
+–	POLYR_GetVerti(i) — Coordonnées de tous les sommets du polygone i.
+–	POLYR_GetCoor(i) — Coordonnées du centre de référence du polygone i.
+
+`xKSID — Clusters de disques discrets 2D`
+–	xKSID_GetNbxKSID, xKSID_GetBodyId(i), xKSID_GetPtrxKSID2BDYTY(i), xKSID_GetRadius(i).
+
+`RBDY2 — Corps rigides 2D (synthèse)`
+–	RBDY2_GetNbRBDY2 — Nombre total de corps rigides 2D.
+–	RBDY2_KineticEnergy — Énergie cinétique totale de tous les corps RBDY2.
+
+`PT2Dx — Nœuds contacteurs FEM 2D`
+–	PT2Dx_GetNbPT2Dx — Nombre de nœuds contacteurs FEM 2D.
+–	PT2Dx_GetBodyId(i) — ID du corps FEM parent.
+–	PT2Dx_GetCoor(i) — Coordonnées du nœud contacteur i.
+
+### 6. Inspection 3D
+
+![](captures/config_inspect3D.JPG)
+
+Fonctionnement identique à l'onglet Inspection 2D, mais pour les contacteurs 3D. Les familles disponibles sont :
+
+`SPHER — Sphères rigides 3D`
+–	SPHER_GetNbSPHER, SPHER_GetBodyId(i), SPHER_GetPtrSPHER2BDYTY(i), SPHER_GetPtrTactBehav(i).
+–	SPHER_GetRadius(i) — Rayon de la sphère i.
+–	SPHER_GetCoor(i), SPHER_GetVelocity(i) — Position et vitesse.
+
+`POLYH — Polyèdres rigides 3D`
+–	POLYH_GetNbPOLYH, POLYH_GetBodyId(i), POLYH_GetPtrPOLYH2BDYTY(i), POLYH_GetPtrTactBehav(i).
+–	POLYH_GetNbFaces(i), POLYH_GetNbVerti(i), POLYH_GetVerti(i) — Géométrie.
+–	POLYH_GetCoor(i) — Coordonnées du centre de référence.
+
+`CYLND — Cylindres rigides 3D`
+–	CYLND_GetNbCYLND, CYLND_GetBodyId(i), CYLND_GetPtrCYLND2BDYTY(i), CYLND_GetPtrTactBehav(i).
+–	CYLND_GetRadius(i), CYLND_GetLength(i), CYLND_GetCoor(i).
+
+`PLANE — Plans rigides 3D`
+–	PLANE_GetNbPLANE, PLANE_GetBodyId(i), PLANE_GetNormal(i), PLANE_GetCoor(i).
+
+`RBDY3 et PT3Dx`
+–	RBDY3_GetNbRBDY3 — Nombre total de corps rigides 3D.
+–	PT3Dx_GetNbPT3Dx, PT3Dx_GetBodyId(i), PT3Dx_GetCoor(i) — Nœuds contacteurs FEM 3D.
+
+### 7. Inespection des interactions 
+
+Cet onglet inspecte les paires de contacteurs actives (interactions en cours de simulation). L'ID utilisé est l'index de la paire dans la liste chipy (numérotation 1-based).
+
+![](captures/config_interac.JPG)
+
+Les fonctions sont regroupées par type d'interaction :
+
+``DKDKx — Disque / Disque``
+–	DKDKx_GetNbDKDKx — Nombre de paires actives.
+–	DKDKx_GetBodyIds(i) — IDs RBDY2 des deux corps de la paire i.
+–	DKDKx_GetTactors(i) — IDs des deux contacteurs DISKx de la paire i.
+–	DKDKx_GetGapTT(i) — Jeu (gap) de la paire i.
+–	DKDKx_GetStatusTT(i) — Statut de contact : 0 = pas de contact, 1 = contact actif.
+–	DKDKx_GetRlocTT(i) — Réaction locale (Rn, Rt) dans le repère local de contact.
+–	DKDKx_GetVlocTT(i) — Vitesse locale relative (Vn, Vt).
+
+``DKJCx — Disque / Jonc``
+–	DKJCx_GetNbDKJCx, DKJCx_GetBodyIds(i), DKJCx_GetTactors(i), DKJCx_GetGapTT(i), DKJCx_GetStatusTT(i), DKJCx_GetRlocTT(i).
+
+``DKKDx — Disque / Corde (Polygone)``
+–	DKKDx_GetNbDKKDx, DKKDx_GetBodyIds(i), DKKDx_GetGapTT(i), DKKDx_GetRlocTT(i).
+
+``PLPLx — Polygone / Polygone``
+–	PLPLx_GetNbPLPLx, PLPLx_GetBodyIds(i), PLPLx_GetTactors(i), PLPLx_GetGapTT(i), PLPLx_GetStatusTT(i), PLPLx_GetRlocTT(i), PLPLx_GetVlocTT(i).
+
+``CLALp — Brique / Brique (maçonnerie)``
+–	CLALp_GetNbCLALp, CLALp_GetBodyIds(i), CLALp_GetGapTT(i), CLALp_GetStatusTT(i), CLALp_GetRlocTT(i).
+●  Utiliser CLALp avec le mode « Tous les pas » pour suivre l'évolution des forces de contact dans les joints de maçonnerie au cours de la simulation.
+
+``ALpALp — ALp / ALp``
+–	ALpALp_GetNbALpALp, ALpALp_GetBodyIds(i), ALpALp_GetGapTT(i), ALpALp_GetRlocTT(i).
+
+``SPSPx — Sphère / Sphère (3D)``
+–	SPSPx_GetNbSPSPx, SPSPx_GetBodyIds(i), SPSPx_GetTactors(i), SPSPx_GetGapTT(i), SPSPx_GetStatusTT(i), SPSPx_GetRlocTT(i) (Rn, Rt, Rs), SPSPx_GetVlocTT(i) (Vn, Vt, Vs).
+
+``SPCDx — Sphère / Cylindre (3D)``
+–	SPCDx_GetNbSPCDx, SPCDx_GetBodyIds(i), SPCDx_GetTactors(i), SPCDx_GetGapTT(i), SPCDx_GetRlocTT(i).
+
+``SPPLx — Sphère / Plan (3D)``
+–	SPPLx_GetNbSPPLx, SPPLx_GetBodyIds(i), SPPLx_GetGapTT(i), SPPLx_GetRlocTT(i).
+
+``CDCDx — Cylindre / Cylindre (3D)``
+–	CDCDx_GetNbCDCDx, CDCDx_GetBodyIds(i), CDCDx_GetGapTT(i), CDCDx_GetRlocTT(i).
+CDPLx — Cylindre / Plan (3D)
+–	CDPLx_GetNbCDPLx, CDPLx_GetBodyIds(i), CDPLx_GetGapTT(i), CDPLx_GetRlocTT(i).
+
+``PRPRx — Polyèdre / Polyèdre (3D)``
+–	PRPRx_GetNbPRPRx, PRPRx_GetBodyIds(i), PRPRx_GetTactors(i), PRPRx_GetGapTT(i), PRPRx_GetStatusTT(i), PRPRx_GetRlocTT(i) (Rn, Rt, Rs).
+
+``Contacteurs mixtes Rigide / Déformable``
+–	DKMECAx_GetNbDKMECAx, DKMECAx_GetBodyIds(i), DKMECAx_GetGapTT(i), DKMECAx_GetRlocTT(i) — Disque / MECAx FEM 2D.
+–	ALpMECAx_GetNbALpMECAx, ALpMECAx_GetBodyIds(i), ALpMECAx_GetRlocTT(i) — ALp / MECAx FEM 2D.
+–	SPMECAx_GetNbSPMECAx, SPMECAx_GetBodyIds(i), SPMECAx_GetRlocTT(i) — Sphère / MECAx FEM 3D.
 
 
