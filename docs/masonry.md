@@ -84,8 +84,7 @@ Ici vous introduisez la géométrie de votre mur,
 La page DOF vous permet de fixer des conditions aux limites pour vos éléments de maçonnerie, 
 - translation
 - rotation
-- imposeDrivenDof
-- imposeInitValue
+- duplication par copie
 
 ![](captures/assistant_maçon_page7.JPG)
 
