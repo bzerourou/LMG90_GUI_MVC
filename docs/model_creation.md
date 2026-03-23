@@ -1,220 +1,311 @@
 # Création d'un Modèle
 
-Le modèle définit le type de physique de vos futurs modèles qui seront supportés par **LMGC90** 
+Le modèle définit le **solveur éléments finis** qui sera utilisé pour les corps déformables du projet. Il associe une physique, un type d'élément fini, une dimension spatiale et des options numériques.
 
 ## Interface
-L'onglet **Modèle** vous permmetra de définir vos types de problème et modèles, cette interface comprend ces champs : 
-  - Nom : qui est une suite maximum de cinq caractères
-  - Physique : (seulement 'MECAx' qui est implémenté)
-  - Élément : (type de formulation)
-  - Dimension : (seulement en 2D)
-  - Options : (kinematic, formulation, etc.) qui dépend de l'élément choisit
+L'onglet **Modèle** (`Ctrl+2`) est divisé en deux parties :
+ 
+- **Liste des modèles** (en haut) : tableau affichant tous les modèles définis dans le projet avec leur nom, physique, élément et dimension. Les modèles utilisés par au moins un avatar sont affichés en vert.
+- **Formulaire de création / modification** (en bas) : champs de saisie dont la section Options s'adapte automatiquement à l'élément sélectionné.
 
-
-Les physiques en LMGC90 sont quatre : 
-
-| Code | Nom complet | Physique |
-|------|------------|----------|
-| **MECAx** | Mécanique | Déformation, contrainte, dynamique |
-| **THERx** | Thermique | Transfert de chaleur |
-| **POROx** | Poromécanique | Milieux poreux saturés (Biot) |
-| **MULTI** | Multiphasique | Écoulements multiphasiques |
-
-_Remarque_ : "MECAx" mécanique est le seul implémenté dans LMGC90_GUI. Il traite les problèmes de déformation, contrainte et dynamique.
-
-## Éléments disponibles
-**LMGC90_GUI** supporte quelques éléments de base depuis la version v0.2.0
-Le tableau suivant résume partiellement les éléments supportés dans LMGC90 :
-### Classification par usage
-| Usage | Dimension | Éléments recommandés | Ordre | Remarques |
-|-------|-----------|---------------------|-------|-----------|
-| **DEM 2D** | 0D | Rxx2D | - | Corps rigides plans |
-| **DEM 3D** | 0D | Rxx3D | - | Corps rigides 3D |
-| **Ressorts 2D** | 1D | SPRG2 | 1 | Éléments discrets |
-| **Ressorts 3D** | 1D | SPRG3 | 1 | Éléments discrets |
-| **Barres treillis** | 1D | BARxx | 1 | Traction/compression |
-| **Conduction 1D** | 1D | S2xth | 1 | Thermique |
-| **Structures 2D standard** | 2D | Q4xxx, Q8xxx | 1-2 | Quadrangles |
-| **Structures 2D complexes** | 2D | T6xxx | 2 | Triangles auto |
-| **Plaques minces** | 2D | DKTxx | 1 | Kirchhoff |
-| **Pièces 3D simples** | 3D | H8xxx, H20xx | 1-2 | Maillage structuré |
-| **Pièces 3D complexes** | 3D | TE10x | 2 | Maillage auto |
-| **Géomécanique** | 3D | TE10x, H8xxx | 1-2 | Sol, roches |
-| **Poromécanique 2D** | 2D | T33xx, Q44xx | 1 | Biot 2D |
-| **Poromécanique 3D** | 3D | TE44x, H88xx, TE104 | 1-2 | Biot 3D |
-| **Multiphasique** | 2D/3D | T33xx, T63xx, Q44xx, H8xxx, TE44x | 1-2 | Écoulements |
-
-### Classification par dimension
-| Dimension | Type géométrique | Code élément | Nœuds | Ordre | Nom complet | DDL MECAx | DDL THERx | DDL POROx | DDL MULTI |
-|-----------|------------------|--------------|-------|-------|-------------|-----------|-----------|-----------|-----------|
-| **0D** | **Point** | | | | | | | | |
-| 0D | Point | **Rxx2D** | 1 | - | Corps rigide 2D | 3 | 1 | - | - |
-| 0D | Point | **Rxx3D** | 1 | - | Corps rigide 3D | 6 | 1 | - | - |
-| **1D** | **Segment** | | | | | | | | |
-| 1D | S2xxx | **SPRG2** | 2 | 1 | Ressort 2D | 2 | 1 | - | - |
-| 1D | S2xxx | **SPRG3** | 2 | 1 | Ressort 3D | 3 | 1 | - | - |
-| 1D | S2xxx | **S2xth** | 2 | 1 | Segment thermique | - | 1 | - | - |
-| 1D | S2xxx | **BARxx** | 2 | 1 | Barre 3D | 3 | - | - | - |
-| 1D | S2xxx | **Beam** | 2-3 | 1-2 | Poutre (futur) | - | - | - | - |
-| 1D | S2xxx | **Cable** | 2-3 | 1-2 | Câble (futur) | - | - | - | - |
-| 1D | S3xxx | *(vide)* | 3 | 2 | Réservé | - | - | - | - |
-| **2D** | **Triangle** | | | | | | | | |
-| 2D | T3xxx | **T3xxx** | 3 | 1 | Triangle linéaire | 2 | 1 | - | - |
-| 2D | T3xxx | **T3Lxx** | 3 | 1 | Triangle linéaire spécial | 2 | - | - | - |
-| 2D | T3xxx | **DKTxx** | 3 | 1 | Triangle plaque DKT | 4 | 1 | - | - |
-| 2D | T3xxx | **T33xx** | 3 | 1 | Triangle poromécanique | - | - | 3 | 4 |
-| 2D | T6xxx | **T6xxx** | 6 | 2 | Triangle quadratique | 2 | 1 | - | - |
-| 2D | T6xxx | **T63xx** | 6 | 2 | Triangle quadratique poro | - | - | 3 | 4 |
-| **2D** | **Quadrangle** | | | | | | | | |
-| 2D | Q4xxx | **Q4xxx** | 4 | 1 | Quadrangle bilinéaire | 2 | 1 | - | - |
-| 2D | Q4xxx | **Q4P0x** | 4 | 1 | Quadrangle + pression | 2 | 1 | - | - |
-| 2D | Q4xxx | **Q44xx** | 4 | 1 | Quadrangle poromécanique | - | - | 3 | 4 |
-| 2D | Q8xxx | **Q8xxx** | 8 | 2 | Quadrangle sérendipité | 2 | 1 | - | - |
-| 2D | Q8xxx | **Q8Rxx** | 8 | 2 | Quadrangle intégr. réduite | 2 | 1 | - | - |
-| 2D | Q8xxx | **Q84xx** | 8 | 2 | Quadrangle sérendipité poro | - | - | 3 | 4 |
-| 2D | Q9xxx | **Q9xxx** | 9 | 2 | Quadrangle Lagrange | 2 | - | - | - |
-| **3D** | **Tétraèdre** | | | | | | | | |
-| 3D | TE4xx | **TE4xx** | 4 | 1 | Tétraèdre linéaire | 3 | 1 | - | - |
-| 3D | TE4xx | **TE4Lx** | 4 | 1 | Tétraèdre linéaire spécial | 3 | - | - | - |
-| 3D | TE4xx | **TE44x** | 4 | 1 | Tétraèdre poromécanique | - | - | 4 | 5 |
-| 3D | TE10x | **TE10x** | 10 | 2 | Tétraèdre quadratique | 3 | 1 | - | - |
-| 3D | TE10x | **TE104** | 10 | 2 | Tétraèdre quadratique poro | - | - | 4 | 5 |
-| **3D** | **Hexaèdre** | | | | | | | | |
-| 3D | H8xxx | **H8xxx** | 8 | 1 | Hexaèdre trilinéaire | 3 | 1 | - | 5 |
-| 3D | H8xxx | **H88xx** | 8 | 1 | Hexaèdre poromécanique | - | - | 4 | 4 |
-| 3D | H8xxx | **SHB8x** | 8 | 1 | Hexaèdre SHB (futur) | 3 | - | - | - |
-| 3D | H20xx | **H20xx** | 20 | 2 | Hexaèdre sérendipité | 3 | 1 | - | - |
-| 3D | H20xx | **H20Rx** | 20 | 2 | Hexaèdre intégr. réduite | 3 | 1 | - | - |
-| 3D | H20xx | **H208x** | 20 | 2 | Hexaèdre sérendipité poro | - | - | 4 | 5 |
-| 3D | H20xx | **SHB20** | 20 | 2 | Hexaèdre SHB 20 (futur) | 3 | - | - | - |
-| **3D** | **Prisme** | | | | | | | | |
-| 3D | PRI6x | **PRI6x** | 6 | 1 | Prisme linéaire | 3 | 1 | - | - |
-| 3D | PRI6x | **SHB6x** | 6 | 1 | Prisme SHB | 3 | - | - | - |
-| 3D | PRI15 | **PRI15** | 15 | 2 | Prisme quadratique | 3 | 1 | - | - |
-| 3D | PRI15 | **SHB15** | 15 | 2 | Prisme SHB 15 (futur) | 3 | - | - | - |
-
-
-
-## Options du modèle "MECAx"
-#### **kinematic** : Type de cinématique
-Définit si les déformations sont petites ou grandes.
-**Valeurs possibles** :
-- **`small`** : Petites déformations (hypothèse HPP)
-  - Déformations < 5-10%
-  - Relation linéaire déplacement-déformation
-  - Géométrie de référence = géométrie actuelle
-- **`large`** : Grandes déformations
-  - Déformations > 10%
-  - Relation non-linéaire géométrique
-  - Mise à jour de la configuration
-
-**Choix pratique** :
-- `small` : Béton, acier en élasticité, la plupart des structures
-- `large` : Caoutchouc, matériaux mous, formage, crash
-
-#### **formulation** : Formulation lagrangienne
-
-⚠️ **Requis uniquement pour `kinematic='large'`**
-
-**Valeurs possibles** :
-- **`TotaL`** : Lagrangien Total
-  - Toutes les quantités référencées à la configuration initiale
-  - Tenseur de déformation : Green-Lagrange
-  - Tenseur de contrainte : 2ème Piola-Kirchhoff
-  
-- **`UpdtL`** : Lagrangien Actualisé (Updated Lagrangian)
-  - Quantités référencées à la configuration actuelle
-  - Mise à jour incrémentale de la géométrie
-
-#### **mass_storage** : Stockage de la matrice de masse
-
-Définit comment la matrice de masse est calculée et stockée.
-
-**Valeurs possibles** :
-- **`lump_`** : Masse concentrée (lumped mass)
-  - Matrice diagonale
-  - Inversion triviale
-  - Plus rapide, moins précis
-  
-- **`coher`** : Masse cohérente (consistent mass)
-  - Matrice pleine
-  - Plus coûteux, plus précis
-  - Meilleure pour hautes fréquences
-
-#### **material** : Type de comportement mécanique
-
-Définit la classe de comportement du matériau.
-
-**Valeurs possibles** :
-
-| Code | Comportement | Matériaux typiques |
-|------|-------------|-------------------|
-| **`elas_`** | Élastique linéaire | Acier, béton (faibles charges), verre |
-| **`elasd`** | Élastique avec dilatation | Matériaux thermo-élastiques |
-| **`neoh_`** | Néo-Hookéen | Caoutchouc, élastomères |
-| **`hyper`** | Hyperélastique général | Polymères, tissus biologiques |
-| **`hyp_d`** | Hyperélastique avec dilatation | Hyperélasticité + thermique |
-| **`J2iso`** | Plasticité J2 isotrope | Métaux (acier, alu) en plasticité |
-| **`J2mix`** | Plasticité J2 mixte | Plasticité avec écrouissage mixte |
-| **`kvisc`** | Visco-élastique | Polymères visqueux, asphalte |
-
-**Compatibilité** :
-
-kinematic='small' : elas_, elasd, kvisc, J2iso, J2mix
-kinematic='large' + formulation='TotaL' : neoh_, hyper, hyp_d, kvisc, J2iso
-
-#### **anisotropy** : Anisotropie du matériau
-
-**Valeurs possibles** :
-- **`iso__`** : Isotrope
-  - Propriétés identiques dans toutes les directions
-  - 2 paramètres : E (Young), ν (Poisson)
-  
-- **`ortho`** : Orthotrope
-  - Propriétés différentes selon 3 directions principales
-  - Nécessite : Ex, Ey, Ez, νxy, νyz, νxz, Gxy, Gyz, Gxz
-  - Matériaux : composites, bois, matériaux stratifiés
-
-#### **external_model** : Modèle utilisateur externe
-
-Permet d'utiliser une loi de comportement définie par l'utilisateur.
-
-**Valeurs possibles** :
-- **`no___`** : Pas de modèle externe (défaut)
-- **`MatL_`** : Utilise une bibliothèque MFront/MaterialLaw
-- **`Demfi`** : Interface Demfi
-- **`Umat_`** : Interface UMAT (type Abaqus)
-
-#### **discrete** : Éléments discrets
-
-Active les éléments de type ressort/amortisseur.
-
-**Valeurs possibles** :
-- **`yes__`** : Active les éléments discrets
-- **`no___`** : Désactive (défaut)
-
-## Exemple
-Dans l'onglet 'Modèle' choisissez : 
-1. Nom : `rigid`
-2. Élément : `Rxx2D`
-3. Dimension : `2`
-4. Cliquez ensuise sur le bouton *Créer Modèle*
-
-![modele](captures/modele_rigid.JPG)
-
-**Important** :
-
-Ce tableau résume la compatibilité entre matériau et modèle dans LMGC90: 
-| Matériau | MECAx (elas_) | MECAx (neoh_) | MECAx (hyper) | MECAx (kvisc) | MECAx (J2iso) | MECAx (J2mix) | MECAx (elasd) | MECAx (hyp_d) | THERx | POROx | MULTI |
-|----------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|-------|-------|-------|
-| **RIGID** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **THERMO_RIGID** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **DISCRETE** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **USER_MAT** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **EXTERNAL** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **ELAS** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **VISCO_ELAS** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **ELAS_PLAS** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **ELAS_DILA** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **THERMO_ELAS** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| **PORO_ELAS** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+### Champs du formulaire
+ 
+| Champ | Description |
+|-------|-------------|
+| **Nom** | Identifiant unique du modèle. **sur 5 caractères** (contrainte interne LMGC90). Exemples : `rigid`, `MECAx`, `elas2`, `ther3`. |
+| **Physique** | Famille de physique résolue. Détermine la liste d'éléments disponibles. Voir section [Physiques disponibles](#physiques-disponibles). |
+| **Dimension** | Dimension spatiale : `2` (2D) ou `3` (3D). La liste d'éléments se met à jour automatiquement. |
+| **Élément** | Type d'élément fini. La liste dépend de la physique ET de la dimension sélectionnées. |
+| **Options** | Paramètres numériques affichés automatiquement selon l'élément. Les éléments rigides (`Rxx2D`, `Rxx3D`) n'ont aucune option. |
+ 
+> **Mise à jour automatique :** à chaque changement de physique ou de dimension, la liste d'éléments disponibles est rechargée. Si l'élément précédemment sélectionné existe dans la nouvelle liste, il est conservé.
+ 
+---
+ 
+## Physiques disponibles
+ 
+Les quatre physiques sont toutes implémentées dans LMGC90_GUI.
+ 
+| Code | Nom complet | Description | Matériaux compatibles |
+|------|-------------|-------------|----------------------|
+| `MECAx` | Mécanique des solides | Déformation, contrainte, dynamique. | `RIGID`, `ELAS`, `ELAS_DILA`, `VISCO_ELAS`, `ELAS_PLAS` |
+| `THERx` | Thermique | Diffusion de chaleur, convection, rayonnement. | `THERMO_ELAS` |
+| `POROx` | Poromécanique | Couplage solide / fluide selon la théorie de Biot. | `PORO_ELAS` |
+| `MULTI` | Thermo-hydraulique-mécanique (THM) | Couplage complet mécanique + thermique + hydraulique. | `PORO_ELAS`, `THERMO_ELAS` |
+ 
+---
+ 
+## Éléments disponibles par physique
+ 
+### MECAx — Éléments mécaniques 2D
+ 
+| Élément | Géométrie | Nœuds | Ordre | Description |
+|---------|-----------|-------|-------|-------------|
+| `Rxx2D` | Point | 1 | — | Corps rigide 2D. Aucune option. |
+| `T3xxx` | Triangle 3 nœuds | 3 | 1 | Triangle linéaire standard. |
+| `T3Lxx` | Triangle 3 nœuds | 3 | 1 | Triangle linéaire enrichi (incompatible). |
+| `T6xxx` | Triangle 6 nœuds | 6 | 2 | Triangle quadratique. |
+| `DKTxx` | Triangle 3 nœuds | 3 | 1 | Triangle de Kirchhoff discret (plaques minces). |
+| `Q4xxx` | Quadrangle 4 nœuds | 4 | 1 | Quadrangle bilinéaire standard. |
+| `Q4P0x` | Quadrangle 4 nœuds | 4 | 1 | Quadrangle bilinéaire + pression constante (quasi-incompressible). |
+| `Q8xxx` | Quadrangle 8 nœuds | 8 | 2 | Quadrangle sérendipité. |
+| `Q8Rxx` | Quadrangle 8 nœuds | 8 | 2 | Quadrangle sérendipité à intégration réduite. |
+| `Q9xxx` | Quadrangle 9 nœuds | 9 | 2 | Quadrangle Lagrange biquadratique. |
+| `BARxx` | Segment 2 nœuds | 2 | 1 | Barre / treillis 1D. |
+| `SPRG2` | Segment 2 nœuds | 2 | 1 | Ressort 2D (`discrete=yes__` ajouté automatiquement). |
+ 
+### MECAx — Éléments mécaniques 3D
+ 
+| Élément | Géométrie | Nœuds | Ordre | Description |
+|---------|-----------|-------|-------|-------------|
+| `Rxx3D` | Point | 1 | — | Corps rigide 3D. Aucune option. |
+| `TE4xx` | Tétraèdre 4 nœuds | 4 | 1 | Tétraèdre linéaire. |
+| `TE4Lx` | Tétraèdre 4 nœuds | 4 | 1 | Tétraèdre linéaire enrichi (F-bar). |
+| `TE10x` | Tétraèdre 10 nœuds | 10 | 2 | Tétraèdre quadratique. |
+| `H8xxx` | Hexaèdre 8 nœuds | 8 | 1 | Hexaèdre trilinéaire. |
+| `H20xx` | Hexaèdre 20 nœuds | 20 | 2 | Hexaèdre sérendipité. |
+| `H20Rx` | Hexaèdre 20 nœuds | 20 | 2 | Hexaèdre sérendipité à intégration réduite. |
+| `PRI6x` | Prisme 6 nœuds | 6 | 1 | Prisme linéaire. |
+| `SHB6x` | Prisme 6 nœuds | 6 | 1 | Prisme solide-coque SHB6. |
+| `PRI15` | Prisme 15 nœuds | 15 | 2 | Prisme quadratique. |
+| `BARxx` | Segment 2 nœuds | 2 | 1 | Barre / treillis 1D. |
+| `SPRG3` | Segment 2 nœuds | 2 | 1 | Ressort 3D (`discrete=yes__` ajouté automatiquement). |
+ 
+### THERx — Éléments thermiques 2D
+ 
+| Élément | Nœuds | Ordre | Options thermiques spécifiques |
+|---------|-------|-------|-------------------------------|
+| `Rxx2D` | 1 | — | aucune |
+| `T3xxx` | 3 | 1 | `mass_storage`, `convection`, `radiation` |
+| `T6xxx` | 6 | 2 | `mass_storage`, `convection`, `radiation` |
+| `DKTxx` | 3 | 1 | `mass_storage`, `convection`, `radiation` |
+| `Q4xxx` | 4 | 1 | `mass_storage`, `convection`, `radiation` |
+| `Q4P0x` | 4 | 1 | `mass_storage`, `convection`, `radiation` |
+| `Q8xxx` | 8 | 2 | `mass_storage`, `convection`, `radiation` |
+| `Q8Rxx` | 8 | 2 | `mass_storage`, `convection`, `radiation` |
+| `SPRG2` | 2 | 1 | `mass_storage` uniquement |
+| `S2xth` | 2 | 1 | `mass_storage` uniquement — segment thermique 1D |
+ 
+### THERx — Éléments thermiques 3D
+ 
+| Élément | Nœuds | Ordre | Options thermiques spécifiques |
+|---------|-------|-------|-------------------------------|
+| `Rxx3D` | 1 | — | aucune |
+| `TE4xx` | 4 | 1 | `mass_storage`, `convection`, `radiation` |
+| `TE10x` | 10 | 2 | `mass_storage`, `convection`, `radiation` |
+| `H8xxx` | 8 | 1 | `mass_storage`, `convection`, `radiation` |
+| `H20xx` | 20 | 2 | `mass_storage`, `convection`, `radiation` |
+| `H20Rx` | 20 | 2 | `mass_storage`, `convection`, `radiation` |
+| `PRI6x` | 6 | 1 | `mass_storage`, `convection`, `radiation` |
+| `PRI15` | 15 | 2 | `mass_storage`, `convection`, `radiation` |
+| `SPRG3` | 2 | 1 | `mass_storage` uniquement |
+ 
+### POROx — Éléments poromécaniques (éléments mixtes déplacement-pression)
+ 
+| Élément | Dim. | Géométrie | Nœuds | Ordre | Description |
+|---------|------|-----------|-------|-------|-------------|
+| `T33xx` | 2D | Triangle | 3 | 1 | Triangle mixte P1/P1. |
+| `T63xx` | 2D | Triangle | 6 | 2 | Triangle mixte P2/P1 — satisfait la condition LBB. |
+| `Q44xx` | 2D | Quadrangle | 4 | 1 | Quadrangle mixte Q1/Q1. |
+| `Q84xx` | 2D | Quadrangle | 8 | 2 | Quadrangle mixte Q2/Q1 — satisfait la condition LBB. |
+| `TE44x` | 3D | Tétraèdre | 4 | 1 | Tétraèdre mixte P1/P1. |
+| `TE104` | 3D | Tétraèdre | 10 | 2 | Tétraèdre mixte P2/P1 — satisfait la condition LBB. |
+| `H88xx` | 3D | Hexaèdre | 8 | 1 | Hexaèdre mixte Q1/Q1. |
+| `H208x` | 3D | Hexaèdre | 20 | 2 | Hexaèdre mixte Q2/Q1 — satisfait la condition LBB. |
+ 
+### MULTI — Éléments THM 2D et 3D
+ 
+Mêmes éléments mixtes que POROx, avec en plus `H8xxx` en 3D pour l'interpolation uniforme des trois champs couplés.
+ 
+| Élément | Dim. | Description |
+|---------|------|-------------|
+| `T33xx` | 2D | Triangle mixte P1/P1. |
+| `T63xx` | 2D | Triangle mixte P2/P1. |
+| `Q44xx` | 2D | Quadrangle mixte Q1/Q1. |
+| `Q84xx` | 2D | Quadrangle mixte Q2/Q1. |
+| `TE44x` | 3D | Tétraèdre mixte P1/P1. |
+| `TE104` | 3D | Tétraèdre mixte P2/P1. |
+| `H8xxx` | 3D | Hexaèdre trilinéaire (interpolation uniforme THM). |
+| `H88xx` | 3D | Hexaèdre mixte Q1/Q1. |
+| `H208x` | 3D | Hexaèdre mixte Q2/Q1. |
+ 
+---
+ 
+## Tableau récapitulatif par usage
+ 
+| Usage | Dimension | Éléments recommandés | Remarque |
+|-------|-----------|---------------------|----------|
+| Corps rigides 2D (DEM) | 2D | `Rxx2D` | Aucune option |
+| Corps rigides 3D (DEM) | 3D | `Rxx3D` | Aucune option |
+| Ressorts / barres 2D | 2D | `SPRG2`, `BARxx` | `discrete=yes__` auto |
+| Ressorts / barres 3D | 3D | `SPRG3`, `BARxx` | `discrete=yes__` auto |
+| Structures 2D — précision standard | 2D | `Q4xxx`, `T3xxx` | Rapide, adapté aux maillages structurés |
+| Structures 2D — géométrie complexe | 2D | `T6xxx`, `Q8xxx` | Maillages automatiques non structurés |
+| Plaques minces 2D | 2D | `DKTxx` | Formulation Kirchhoff |
+| Quasi-incompressibilité 2D | 2D | `Q4P0x` | Pression constante par élément |
+| Structures 3D — maillage structuré | 3D | `H8xxx`, `H20xx` | Hexaèdres recommandés |
+| Structures 3D — maillage automatique | 3D | `TE10x`, `TE4xx` | Tétraèdres adaptatifs |
+| Coques épaisses 3D | 3D | `SHB6x`, `PRI6x` | Solidescoques |
+| Thermique 2D | 2D | `Q4xxx`, `T3xxx` | Physique THERx |
+| Thermique 3D | 3D | `H8xxx`, `TE4xx` | Physique THERx |
+| Segment thermique 1D | 2D / 3D | `S2xth` | Physique THERx uniquement |
+| Poro-mécanique 2D (Biot) | 2D | `T63xx`, `Q84xx` | LBB satisfaite — recommandé |
+| Poro-mécanique 3D (Biot) | 3D | `TE104`, `H208x` | LBB satisfaite — recommandé |
+| THM couplé 3D | 3D | `H8xxx`, `TE104` | Physique MULTI |
+ 
+---
+ 
+## Options du modèle
+ 
+### Options MECAx — spécifiques à l'élément
+ 
+Ces trois options s'affichent pour tous les éléments MECAx non rigides.
+ 
+#### `kinematic` — Hypothèse cinématique
+ 
+| Valeur | Description | Cas d'usage |
+|--------|-------------|-------------|
+| `small` | Petites déformations (HPP). Relation linéaire déplacement-déformation. Géométrie de référence supposée constante. | Béton, acier en élasticité, la plupart des structures du génie civil. |
+| `large` | Grandes déformations. Relation non linéaire géométrique. Mise à jour de la configuration à chaque pas. | Caoutchouc, matériaux souples, formage, impact, crash. |
+ 
+#### `formulation` — Formulation lagrangienne
+ 
+Pertinent uniquement pour `kinematic=large`.
+ 
+| Valeur | Description |
+|--------|-------------|
+| `UpdtL` | **Lagrangien actualisé.** La configuration de référence est mise à jour à chaque pas. Contraintes de Cauchy. Recommandé pour les grandes déformations continues (métaux). |
+| `TotaL` | **Lagrangien total.** La configuration de référence reste la configuration initiale. Contraintes de Piola-Kirchhoff. Recommandé pour les grandes déformations réversibles (élastomères). |
+ 
+#### `mass_storage` — Stockage de la matrice de masse
+ 
+| Valeur | Description | Cas d'usage |
+|--------|-------------|-------------|
+| `lump_` | **Masse concentrée.** Matrice diagonale. Inversion immédiate. Moins précis sur les hautes fréquences. | Dynamique explicite, schémas à pas de temps petit. |
+| `coher` | **Masse cohérente.** Matrice pleine intégrée. Plus précis. Plus coûteux à inverser. | Dynamique implicite, analyse modale, hautes fréquences. |
+ 
+---
+ 
+### Options MECAx — communes à tous les éléments (hors rigides)
+ 
+Ces trois options s'affichent en complément des options spécifiques à l'élément.
+ 
+#### `material` — Loi de comportement locale
+ 
+| Valeur | Comportement | Matériaux associés |
+|--------|-------------|-------------------|
+| `elas_` | Élasticité linéaire standard | `ELAS`, `ELAS_DILA`, `RIGID` |
+| `elasd` | Élasticité endommageable | `ELAS_PLAS` (avec variable d'endommagement) |
+| `J2iso` | Plasticité J2 isotrope | `ELAS_PLAS` (`isoh='linear'` ou `'nonlinear'`) |
+| `J2mix` | Plasticité J2 mixte (isotrope + cinématique) | `ELAS_PLAS` (`isoh` et `cinh` tous les deux actifs) |
+| `kvisc` | Visco-élasticité de Kelvin-Voigt | `VISCO_ELAS` |
+ 
+#### `anisotropy` — Anisotropie
+ 
+| Valeur | Description |
+|--------|-------------|
+| `iso__` | **Isotrope.** Propriétés identiques dans toutes les directions. 2 paramètres : E (Young), ν (Poisson). |
+| `ortho` | **Orthotrope.** Propriétés différentes selon 3 directions principales. Nécessite les 9 constantes d'élasticité (Ex, Ey, Ez, νxy, νyz, νxz, Gxy, Gyz, Gxz). Adapté aux composites, au bois, aux matériaux stratifiés. |
+ 
+#### `external_model` — Modèle externe
+ 
+| Valeur | Description |
+|--------|-------------|
+| `MatL_` | Loi interne LMGC90 (comportement standard). Valeur par défaut. |
+| `Demfi` | Interface DemFi — couplage avec un modèle DEM externe. |
+| `Umat_` | Interface UMAT — routine utilisateur de type ABAQUS (Fortran / C). |
+| `no___` | Désactivé. |
+| `yes__` | Activé (selon le contexte de l'option). |
+ 
+---
+ 
+### Options THERx
+ 
+Ces options s'affichent pour tous les éléments thermiques non rigides.
+ 
+| Option | Valeurs | Description |
+|--------|---------|-------------|
+| `mass_storage` | `lump_` · `coher` | Stockage de la matrice de capacité thermique. Même signification qu'en MECAx. |
+| `convection` | `no___` · `yes__` | Active les termes de convection thermique en surface. |
+| `radiation` | `no___` · `yes__` | Active les termes de rayonnement thermique en surface (loi de Stefan-Boltzmann). |
+| `anisotropy` | `iso__` · `ortho` | Anisotropie de la conductivité thermique. |
+| `external_model` | `MatL_` · `Demfi` · `Umat_` · `no___` · `yes__` | Interface avec un modèle thermique externe. |
+ 
+> **Note :** `SPRG2`, `SPRG3` et `S2xth` n'ont que l'option `mass_storage`. Les options `convection` et `radiation` ne s'affichent pas pour ces éléments 1D.
+ 
+---
+ 
+## Exemple de création — corps rigide 2D
+ 
+1. Ouvrir l'onglet **Modèle** (`Ctrl+2`).
+2. Saisir le nom : `rigid`.
+3. Sélectionner la physique : `MECAx`.
+4. Sélectionner la dimension : `2`.
+5. Sélectionner l'élément : `Rxx2D` — la section Options disparaît (aucune option pour les éléments rigides).
+6. Cliquer sur **✅ Créer Modèle**.
+ 
+![Création d'un modèle rigide 2D](captures/modele_rigid.JPG)
+ 
+---
+ 
+## Exemple de création — mécanique 2D élastique
+ 
+1. Nom : `elas2`.
+2. Physique : `MECAx` · Dimension : `2` · Élément : `Q4xxx`.
+3. Options affichées automatiquement :
+   - `kinematic` → `small`
+   - `formulation` → `UpdtL`
+   - `mass_storage` → `lump_`
+   - `material` → `elas_`
+   - `anisotropy` → `iso__`
+   - `external_model` → `MatL_`
+4. Cliquer sur **✅ Créer Modèle**.
+ 
+---
+ 
+## Modification et suppression
+ 
+Sélectionnez un modèle dans la liste puis cliquez sur **✏️ Modifier Sélection** pour le charger en mode **Édition**. Apportez vos modifications puis cliquez sur **💾 Enregistrer Modifications**, ou sur **❌ Annuler** pour ignorer les changements.
+ 
+> **Suppression :** un modèle utilisé par au moins un avatar ne peut pas être supprimé directement. La boîte de dialogue d'avertissement liste les avatars concernés.
+ 
+---
+ 
+## Tableau de compatibilité matériau / physique
+ 
+| Matériau | MECAx | THERx | POROx | MULTI |
+|----------|-------|-------|-------|-------|
+| `RIGID` | ✅ | ❌ | ❌ | ❌ |
+| `ELAS` | ✅ | ✅ | ❌ | ❌ |
+| `ELAS_DILA` | ✅ | ✅ | ❌ | ❌ |
+| `VISCO_ELAS` | ✅ | ❌ | ❌ | ❌ |
+| `ELAS_PLAS` | ✅ | ❌ | ❌ | ❌ |
+| `THERMO_ELAS` | ✅ | ✅ | ❌ | ✅ |
+| `PORO_ELAS` | ❌ | ❌ | ✅ | ✅ |
+| `DISCRETE` | ✅ | ❌ | ❌ | ❌ |
+| `USER_MAT` | ✅ | ❌ | ❌ | ❌ |
+| `EXTERNAL` | ✅ | ❌ | ❌ | ❌ |
+ 
+---
+ 
+## Tableau de compatibilité matériau / option `material`
+ 
+| Matériau | `elas_` | `elasd` | `J2iso` | `J2mix` | `kvisc` |
+|----------|---------|---------|---------|---------|---------|
+| `RIGID` | ✅ | — | — | — | — |
+| `ELAS` | ✅ | — | — | — | — |
+| `ELAS_DILA` | ✅ | ✅ | — | — | — |
+| `VISCO_ELAS` | — | — | — | — | ✅ |
+| `ELAS_PLAS` | — | ✅ | ✅ | ✅ | — |
+| `THERMO_ELAS` | ✅ | ✅ | — | — | — |
+ 
+---
+ 
+## Astuces
+ 
+- **Nom limité à 5 caractères** : LMGC90 ignore silencieusement les caractères supplémentaires. Préférez `rigid`, `elas2`, `ther3`, `poro2`.
+- **Élément Rxx** : les corps rigides utilisent exclusivement `Rxx2D` (2D) ou `Rxx3D` (3D). Ces éléments n'ont aucune option numérique.
+- **Ressorts** : pour `SPRG2` et `SPRG3`, l'option `discrete=yes__` est ajoutée automatiquement à la création — il n'est pas nécessaire de la saisir manuellement.
+- **LBB en poromécanique** : pour les calculs de consolidation ou de diffusion de pression, privilégiez les éléments d'ordre supérieur (`T63xx`, `Q84xx`, `TE104`, `H208x`) qui satisfont la condition de Ladyzhenskaya-Babuška-Brezzi et évitent les oscillations parasites de pression.
+- **`kinematic=large` avec `formulation`** : le champ `formulation` n'a d'effet que si `kinematic=large`. En petites déformations, la valeur de `formulation` est ignorée par le solveur.
+- **Modèles non utilisés** : les modèles non associés à un avatar apparaissent en noir dans la liste. Ils n'ont aucun effet sur le calcul.
