@@ -8,7 +8,7 @@ L'interface est organisée de manière claire et ergonomique pour accompagner l'
 
 La vidéo suivante présente une vue d'ensemble des différentes parties de l'interface.
 
-[![Introduction LMGC90_GUI](https://img.youtube.com/vi/2lVIGg3VboA/0.jpg)](https://www.youtube.com/watch?v=2lVIGg3VboA)
+[![Introduction LMGC90_GUI](https://img.youtube.com/vi/2lVIGg3VboA/0.jpg)](https://www.youtube.com/watch?v=WSS62MTns1w)
 
 
 ## Fenêtre principale

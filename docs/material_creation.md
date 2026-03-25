@@ -90,6 +90,7 @@ elas='standard', young=2.1e11, nu=0.3, anisotropy='isotropic'
 | `young` | Module de Young (Pa). | Acier : `2.1e11` · Béton : `3e10` · Roche : `5e10` |
 | `nu` | Coefficient de Poisson (sans dimension). | `0.2` à `0.35` |
 | `anisotropy` | Type d'anisotropie : `'isotropic'` ou `'orthotropic'`. | `'isotropic'` |
+| `G`|  Module de cisaillement (Pa) |  Acier : `8.1e10`|     
  
 ---
  
@@ -123,7 +124,7 @@ viscous_model='KelvinVoigt', viscous_young=1.17e9, viscous_nu=0.35
 | `young` | Module de Young de la branche élastique (Pa). | `1.17e11` |
 | `nu` | Coefficient de Poisson élastique. | `0.35` |
 | `anisotropy` | Anisotropie. | `'isotropic'` |
-| `viscous_model` | Modèle rhéologique. `KelvinVoigt` = ressort et amortisseur en parallèle (fluage réversible).  | `'KelvinVoigt'` · |
+| `viscous_model` | Modèle rhéologique. `KelvinVoigt` = ressort et amortisseur en parallèle (fluage réversible).  | `'KelvinVoigt'` · `'none'` |
 | `viscous_young` | Module de Young de la branche visqueuse (Pa). | `1.17e9` |
 | `viscous_nu` | Coefficient de Poisson de la branche visqueuse. | `0.35` |
  
@@ -142,13 +143,13 @@ cinh='none', visc='none'
 | `elas` | Formulation élastique. | `'standard'` |
 | `young` | Module de Young (Pa). | `2.1e11` |
 | `nu` | Coefficient de Poisson. | `0.3` |
-| `anisotropy` | Anisotropie. | `'isotropic'` |
-| `critere` | Critère de plasticité. | `'Von-Mises'` · `'Drucker-Prager'` |
-| `isoh` | Type d'écrouissage isotrope. | `'linear'` · `'nonlinear'` · `'none'` |
+| `anisotropy` | Anisotropie. | `'isotropic'` . `'orthotropic'`  |
+| `critere` | Critère de plasticité. | `'Von-Mises'` · `'none'` |
+| `isoh` | Type d'écrouissage isotrope. | `'none'`, `'linear'`   |
 | `iso_hard` | Limite d'élasticité initiale σ₀ (Pa). | `2.5e8` |
 | `isoh_coeff` | Module d'écrouissage isotrope H (Pa). | `1e9` |
-| `cinh` | Écrouissage cinématique. | `'linear'` · `'nonlinear'` · `'none'` |
-| `visc` | Viscoplasticité. | `'norton'` · `'none'` |
+| `cinh` | Écrouissage cinématique. | `'none'` |
+| `visc` | Viscoplasticité. | `'none'` |
  
 ---
  
@@ -167,8 +168,8 @@ dilatation=1.2e-5, T_ref_meca=20.0, conductivity=1.8, specific_capacity=880.0
 | `anisotropy` | Anisotropie. | `'isotropic'` |
 | `dilatation` | Coefficient de dilatation thermique (K⁻¹). | `1.2e-5` |
 | `T_ref_meca` | Température de référence mécanique. | `20.0` |
-| `conductivity` | Conductivité thermique (W/m/K) ou `'field'`. | `1.8` |
-| `specific_capacity` | Capacité thermique massique (J/kg/K) ou `'field'`. | `880.0` |
+| `conductivity` | Conductivité thermique (W/m/K) ou `'field'` |
+| `specific_capacity` | Capacité thermique massique (J/kg/K) ou `'field'`|
  
 ---
  
@@ -186,8 +187,8 @@ hydro_cpl=0.8, conductivity=1e-8, specific_capacity=1e-10
 | `nu` | Coefficient de Poisson du squelette. | `0.3` |
 | `anisotropy` | Anisotropie. | `'isotropic'` |
 | `hydro_cpl` | Coefficient de couplage de Biot (0 à 1). | `0.8` |
-| `conductivity` | Conductivité hydraulique (m/s) ou `'field'`. | `1e-8` |
-| `specific_capacity` | Capacité de stockage hydraulique (Pa⁻¹) ou `'field'`. | `1e-10` |
+| `conductivity` | Conductivité hydraulique (m/s) ou `'field'` |
+| `specific_capacity` | Capacité de stockage hydraulique (Pa⁻¹) ou `'field'`|
  
 ---
  

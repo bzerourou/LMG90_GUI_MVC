@@ -241,22 +241,12 @@ Pour une simulation de bielle-manivelle, configurer les commandes suivantes :
 
 ---
 
-## Signaux et intégration
-
-| Signal | Déclenchement | Effet |
-|--------|--------------|-------|
-| `command_added` | Après création | `_refresh_all()` |
-| `command_deleted` | Après suppression | `_refresh_all()` |
-
----
 
 ## Remarques importantes
 
-**Commandes globales sans cible :** `SOLVER INFORMATIONS`, `VIOLATION EVOLUTION` et `KINETIC ENERGY` ne prennent pas de `rigid_set`. Si une cible est saisie pour ces commandes, elle sera ignorée par pylmgc90.
-
 **Reconstruction lors de la modification :** comme pour les tables de visibilité, toute modification d'une commande entraîne la reconstruction complète du conteneur `_postpro_container`. Ceci est transparent pour l'utilisateur.
 
-**Les fichiers de sortie ne sont écrits que pendant le calcul.** La génération de la DATBOX et du script Python n'écrit pas de résultats — le calcul doit être lancé depuis l'onglet Calcul (`Ctrl+8`) pour que les fichiers `OUTBOX/` soient créés.
+**Les fichiers de sortie ne sont écrits que pendant le calcul.** La génération de la DATBOX et du script Python n'écrit pas de résultats — le calcul doit être lancé depuis l'onglet Calcul (`F5`) pour que les fichiers `OUTBOX/` soient créés.
 
 **Step et durée de simulation :** s'assurer que `step` est inférieur au nombre total de pas de calcul. Une commande avec `step=100` dans une simulation de 50 pas ne produira aucune sortie.
 
