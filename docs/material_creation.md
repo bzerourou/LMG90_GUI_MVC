@@ -240,7 +240,7 @@ Ouvrez la boîte de dialogue via **Outils → Variables dynamiques** ou le racco
 4. Cliquez sur **Ajouter ou modifier**.
 5. Cliquez sur **OK** pour fermer.
  
-La variable est désormais utilisable dans n'importe quel champ de l'application en tapant son nom directement.
+Les variable dynamiques sont désormais utilisable dans n'importe quel champ de l'application en tapant son nom directement. Voir [Variables dynamiques](dynam_variables.md).
  
 ### Exemples d'expressions
  
