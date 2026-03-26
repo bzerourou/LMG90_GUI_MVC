@@ -24,42 +24,460 @@
 ## 1) Vue d’ensemble — Architecture (MVC)
 
 ```mermaid
-flowchart LR
-  subgraph View["View (PyQt6)"]
-    MW["MainWindow"]
-    TV["TreeView"]
-    DLG["Dialogs"]
-    TABS["Tabs\n(MaterialTab, AvatarTab, ...)"]
-  end
+classDiagram
+    direction TB
 
-  subgraph Controller["Controller"]
-    PC["ProjectController"]
-  end
+    %% =============================================
+    %% 1. ENUMS (types de données)
+    %% =============================================
+    class MaterialType {
+        <<enumeration>>
+        RIGID
+        ELAS
+        ELAS_DILA
+        VISCO_ELAS
+        ELAS_PLAS
+        THERMO_ELAS
+        PORO_ELAS
+        DISCRETE
+        USER_MAT
+        EXTERNAL
+    }
 
-  subgraph Model["Model (core)"]
-    MOD["models.py\n(Material, MaterialType, Loop, [Project]…)"]
-    VAL["validators.py\n(MaterialValidator, LoopValidator, …)"]
-    GEN["generators.py\n(LoopGenerator, [GranuloGenerator]…)"]
-    SER["serializers.py\n(JsonSerializer [présumé])"]
-    BR["pylmgc_bridge.py\n(PylmgcBridge)"]
-  end
+    class AvatarType {
+        <<enumeration>>
+        RIGID_DISK
+        RIGID_JONC
+        RIGID_POLYGON
+        RIGID_OVOID
+        RIGID_DISCRETE
+        RIGID_CLUSTER
+        ROUGH_WALL
+        FINE_WALL
+        SMOOTH_WALL
+        GRANULO_WALL
+        EMPTY_AVATAR
+        MESH_DEFORMABLE
+        RIGID_SPHERE
+        RIGID_PLAN
+        RIGID_CYLINDER
+        RIGID_POLYHEDRON
+        ROUGH_WALL_3D
+        GRANULO_ROUGH_WALL_3D
+    }
 
-  subgraph Utils["Utils"]
-    SE["SafeEvaluator (AST)"]
-  end
+    class ContactLawType {
+        <<enumeration>>
+        IQS_CLB
+        IQS_CLB_G0
+        IQS_DS_CLB
+        IQS_MOHR_DS_CLB
+        IQS_MAC_CZM
+        RST_CLB
+        GAP_SGR_CLB
+        GAP_SGR_CLB_G0
+        GAP_MOHR_DS_CLB
+        MAC_CZM
+        MAL_CZM
+        ELASTIC_WIRE
+        BRITTLE_ELASTIC_WIRE
+        ELASTIC_ROD
+        VOIGT_ROD
+        COUPLED_DOF
+        NORMAL_COUPLED_DOF
+        ELASTIC_REPELL_CLB
+    }
 
-  MW -->|signals/slots| PC
-  TABS -->|signals/slots| PC
-  TV -->|refresh via adapter| PC
-  DLG -->|inputs| PC
+    class AvatarOrigin {
+        <<enumeration>>
+        MANUAL
+        LOOP
+        GRANULO
+    }
 
-  PC --> MOD
-  PC --> VAL
-  PC --> GEN
-  PC --> SER
-  PC --> BR
-  VAL --> SE
-  PC --> SE
+    class UnitSystem {
+        <<enumeration>>
+        SI
+        CGS
+    }
+
+    %% =============================================
+    %% 2. DATA MODELS (core/models.py)
+    %% =============================================
+    class Material {
+        +name : str
+        +material_type : MaterialType
+        +density : float
+        +properties : Dict[str, Any]
+        +to_dict() Dict
+        +from_dict(data: Dict) Material
+    }
+
+    class Model {
+        +name : str
+        +physics : str
+        +element : str
+        +dimension : int
+        +options : Dict[str, Any]
+        +to_dict() Dict
+        +from_dict(data: Dict) Model
+    }
+
+    class Avatar {
+        +avatar_type : AvatarType
+        +center : List[float]
+        +material_name : str
+        +model_name : str
+        +color : str = "BLUEx"
+        +origin : AvatarOrigin = AvatarOrigin.MANUAL
+        +controller : Any
+        +radius : Optional[float]
+        +axis : Optional[Dict[str, float]]
+        +vertices : Optional[List[List[float]]]
+        +nb_vertices : Optional[int]
+        +generation_type : Optional[str]
+        +is_hollow : bool = False
+        +wall_params : Optional[Dict[str, Any]]
+        +contactors : List[Dict[str, Any]]
+        +mesh_params : Optional[Dict[str, Any]]
+        +to_dict() Dict
+        +from_dict(data: Dict) Avatar
+    }
+
+    class ContactLaw {
+        +name : str
+        +law_type : ContactLawType
+        +friction : Optional[float]
+        +properties : Dict[str, Any]
+        +to_dict() Dict
+        +from_dict(data: Dict) ContactLaw
+    }
+
+    class VisibilityRule {
+        +candidate_body : str
+        +candidate_contactor : str
+        +candidate_color : str
+        +antagonist_body : str
+        +antagonist_contactor : str
+        +antagonist_color : str
+        +behavior_name : str
+        +alert : float = 0.1
+        +to_dict() Dict
+        +from_dict(data: Dict) VisibilityRule
+    }
+
+    class DOFOperation {
+        +operation_type : str
+        +target_type : str
+        +target_value : Any
+        +parameters : Dict[str, Any]
+        +to_dict() Dict
+        +from_dict(data: Dict) DOFOperation
+    }
+
+    class Loop {
+        +loop_type : str
+        +model_avatar_index : int
+        +count : int
+        +radius : float = 0.0
+        +step : float = 0.0
+        +offset_x : float = 0.0
+        +offset_y : float = 0.0
+        +spiral_factor : float = 0.0
+        +invert_axis : bool = False
+        +group_name : Optional[str]
+        +generated_indices : List[int]
+        +to_dict() Dict
+        +from_dict(data: Dict) Loop
+    }
+
+    class ForLoop {
+        +loop_var : str
+        +start_expr : str
+        +end_expr : str
+        +step_expr : str = "1"
+        +target_type : str = "avatar"
+        +template_config : dict
+        +group_name : Optional[str]
+        +generated_indices : List[int]
+        +to_dict() dict
+        +from_dict(data: dict) ForLoop
+    }
+
+    class GranuloGeneration {
+        +nb_particles : int
+        +radius_min : float
+        +radius_max : float
+        +container_type : str
+        +container_params : Dict[str, float]
+        +model_name : str
+        +material_name : str
+        +avatar_type : str
+        +seed : Optional[int]
+        +to_dict() Dict
+        +from_dict(data: Dict) GranuloGeneration
+    }
+
+    class ProjectState {
+        +name : str
+        +materials : List[Material]
+        +models : List[Model]
+        +avatars : List[Avatar]
+        +contact_laws : List[ContactLaw]
+        +visibility_rules : List[VisibilityRule]
+        +dof_operations : List[DOFOperation]
+        +loops : List[Loop]
+        +for_loops : List[ForLoop]
+        +granulo_generations : List[GranuloGeneration]
+        +custom_templates : Dict
+        +to_dict() Dict
+        +from_dict(data: Dict) ProjectState
+    }
+
+    %% =============================================
+    %% 3. VALIDATORS (core/validators.py)
+    %% =============================================
+    class ValidationError {
+        <<exception>>
+    }
+
+    class MaterialValidator {
+        +validate(material: Material) Tuple[bool, str]
+        +validate_or_raise(material: Material)
+    }
+
+    class ModelValidator {
+        +validate(model: Model) Tuple[bool, str]
+        +validate_or_raise(model: Model)
+    }
+
+    class AvatarValidator {
+        +validate(avatar: Avatar, model: Model) Tuple[bool, str]
+        +validate_or_raise(avatar: Avatar, model: Model)
+    }
+
+    class ContactLawValidator {
+        +validate(law: ContactLaw) Tuple[bool, str]
+        +validate_or_raise(law: ContactLaw)
+    }
+
+    %% =============================================
+    %% 4. GENERATORS (core/generators.py)
+    %% =============================================
+    class LoopGenerator {
+        +generate_circle(...) List[List[float]]
+        +generate_grid(...) List[List[float]]
+        +generate_line(...) List[List[float]]
+        +generate_spiral(...) List[List[float]]
+        +generate_positions(loop: Loop) List[List[float]]
+    }
+
+    class ForLoopGenerator {
+        +generate_items(for_loop, controller, evaluator) List[Any]
+        +_build_context(...) Dict
+        +_create_item(...) Any
+        +_eval_field(...) Any
+        +_create_avatar(...) Avatar
+        +_create_material(...) Material
+        +_create_model(...) Model
+        +_create_contact_law(...) ContactLaw
+        +_create_visibility(...) VisibilityRule
+        +_create_dof(...) DOFOperation
+    }
+
+    class GranuloGenerator {
+        +generate(config: GranuloGeneration) Tuple[int, np.ndarray, np.ndarray]
+    }
+
+    %% =============================================
+    %% 5. SERIALIZER
+    %% =============================================
+    class ProjectSerializer {
+        +save(state: ProjectState, filepath: Path)
+        +load(filepath: Path) ProjectState
+    }
+
+    %% =============================================
+    %% 6. BRIDGE (vers pylmgc90)
+    %% =============================================
+    class LMGC90Bridge {
+        +create_material(material: Material)
+        +create_model(model: Model)
+        +create_avatar(avatar: Avatar)
+        +create_contact_law(law: ContactLaw)
+        +create_visibility_rule(rule: VisibilityRule)
+        +apply_dof_operation(operation: DOFOperation)
+        +rebuild_containers()
+    }
+
+    %% =============================================
+    %% 7. CONTROLLER (controllers/project_controller.py)
+    %% =============================================
+    class ProjectController {
+        <<QObject>>
+        +state_changed pyqtSignal()
+        +state : ProjectState
+        +project_path : Optional[Path]
+        -_is_loading : bool
+        -_batch_mode : bool
+        -_materials_container
+        -_models_container
+        -_bodies_container
+        -_contact_laws_container
+        -_visibility_container
+        -_postpro_container
+        -_pylmgc_materials : Dict
+        -_pylmgc_models : Dict
+        -_pylmgc_bodies : List
+        -_pylmgc_laws : Dict
+        +new_project(name: str)
+        +save_project(filepath: Optional[Path]) Path
+        +load_project(filepath: Path)
+        +add_material(material: Material)
+        +update_material(old_name: str, material: Material)
+        +remove_material(name: str) bool
+        +add_model(model: Model)
+        +update_model(old_name: str, model: Model)
+        +remove_model(name: str) bool
+        +add_avatar(avatar: Avatar, create_pylmgc: bool = True) int
+        +update_avatar(index: int, avatar: Avatar)
+        +remove_avatar(index: int) bool
+        +duplicate_avatar(...)
+        +add_contact_law(law: ContactLaw)
+        +update_contact_law(old_name: str, law: ContactLaw)
+        +remove_contact_law(name: str) bool
+        +add_visibility_rule(rule: VisibilityRule)
+        +update_visibility_rule(index: int, rule: VisibilityRule)
+        +remove_visibility_rule(index: int) bool
+        +apply_dof_operation(operation: DOFOperation)
+        +add_dof_operation(operation: DOFOperation)
+        +generate_loop(loop: Loop) List[int]
+        +update_loop(index: int, loop: Loop)
+        +remove_loop(index: int) bool
+        +generate_granulo(config: GranuloGeneration) List[int]
+        +remove_granulo(...)
+    }
+
+    %% =============================================
+    %% 8. VIEW (PyQt6)
+    %% =============================================
+    class MainWindow {
+        <<QMainWindow>>
+    }
+
+    class TreeView {
+        <<QTreeWidget>>
+    }
+
+    class BaseTab {
+        <<QWidget>>
+    }
+
+    class MaterialTab {
+        <<BaseTab>>
+    }
+    class ModelTab {
+        <<BaseTab>>
+    }
+    class AvatarTab {
+        <<BaseTab>>
+    }
+    class AvatarLibraryTab {
+        <<BaseTab>>
+    }
+    class ContactTab {
+        <<BaseTab>>
+    }
+    class VisibilityTab {
+        <<BaseTab>>
+    }
+    class LoopTab {
+        <<BaseTab>>
+    }
+    class GranuloTab {
+        <<BaseTab>>
+    }
+    class DOFTab {
+        <<BaseTab>>
+    }
+    class ComputeTab {
+        <<BaseTab>>
+    }
+    class PostproTab {
+        <<BaseTab>>
+    }
+    class ViewerTab {
+        <<BaseTab>>
+    }
+    class EmptyAvatarTab {
+        <<BaseTab>>
+    }
+
+    class Dialogs {
+        <<QDialogs>>
+    }
+
+    %% =============================================
+    %% RELATIONS
+    %% =============================================
+    ProjectController --> ProjectState : gère
+    ProjectController --> Material : CRUD
+    ProjectController --> Model : CRUD
+    ProjectController --> Avatar : CRUD + génération
+    ProjectController --> ContactLaw : CRUD
+    ProjectController --> VisibilityRule : CRUD
+    ProjectController --> DOFOperation : CRUD
+    ProjectController --> Loop : CRUD + génération
+    ProjectController --> ForLoop : CRUD + génération
+    ProjectController --> GranuloGeneration : CRUD + génération
+
+    ProjectController --> MaterialValidator : utilise
+    ProjectController --> ModelValidator : utilise
+    ProjectController --> AvatarValidator : utilise
+    ProjectController --> ContactLawValidator : utilise
+
+    ProjectController --> LoopGenerator : utilise
+    ProjectController --> ForLoopGenerator : utilise
+    ProjectController --> GranuloGenerator : utilise
+
+    ProjectController --> LMGC90Bridge : bridge vers pylmgc90
+    ProjectController --> ProjectSerializer : save/load
+
+    ProjectState "1" --> "*" Material : contient
+    ProjectState "1" --> "*" Model : contient
+    ProjectState "1" --> "*" Avatar : contient
+    ProjectState "1" --> "*" ContactLaw : contient
+    ProjectState "1" --> "*" VisibilityRule : contient
+    ProjectState "1" --> "*" DOFOperation : contient
+    ProjectState "1" --> "*" Loop : contient
+    ProjectState "1" --> "*" ForLoop : contient
+    ProjectState "1" --> "*" GranuloGeneration : contient
+
+    MaterialValidator ..> Material : valide
+    ModelValidator ..> Model : valide
+    AvatarValidator ..> Avatar : valide
+    AvatarValidator ..> Model : valide
+    ContactLawValidator ..> ContactLaw : valide
+
+    MainWindow --> ProjectController : signaux/slots
+    TreeView --> ProjectController : refresh
+    BaseTab <|-- MaterialTab
+    BaseTab <|-- ModelTab
+    BaseTab <|-- AvatarTab
+    BaseTab <|-- AvatarLibraryTab
+    BaseTab <|-- ContactTab
+    BaseTab <|-- VisibilityTab
+    BaseTab <|-- LoopTab
+    BaseTab <|-- GranuloTab
+    BaseTab <|-- DOFTab
+    BaseTab <|-- ComputeTab
+    BaseTab <|-- PostproTab
+    BaseTab <|-- ViewerTab
+    BaseTab <|-- EmptyAvatarTab
+
+    MainWindow *-- TreeView
+    MainWindow *-- Dialogs
+    MainWindow *-- BaseTab : tabs dynamiques
 ```
 
 ---
