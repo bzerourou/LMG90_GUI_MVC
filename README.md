@@ -1,7 +1,7 @@
 
 # LMGC90_GUI — Architecture MVC 
 
-![Version](https://img.shields.io/badge/version-0.3.0)
+![Version](https://img.shields.io/badge/version-0.4.0)
 ![Python](https://img.shields.io/badge/python-3.8%2B-brightgreen)
 ![License](https://img.shields.io/badge/license-Open%20Source-green)
 
@@ -72,6 +72,7 @@ LMGC90_GUI/
 ```
 
 ## Diagramme de classes
+Voir les détails sur le diagramme de classes [Diagramme de classes](docs/LMG90_GUI_MVC_Diagrammes.md)
 ![](docs/captures/UML_classes.png)
 
 
