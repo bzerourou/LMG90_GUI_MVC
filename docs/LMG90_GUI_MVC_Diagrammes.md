@@ -1,7 +1,7 @@
 
 # LMG90_GUI_MVC — Schéma complet (Architecture, Classes, Séquences)
 
-> **Version :** 2026-01-24 19:12  > **Auteur :** M365 Copilot  > **Portée :** Schémas basés sur la structure publique du dépôt *LMG90_GUI_MVC* et le périmètre fonctionnel de *LMGC90*. Les éléments marqués **[présumé]** sont déduits du contexte et à confirmer par lecture des sources.
+> **Version :** 0.2.5  > **Auteur :** bzerourou  > **Portée :** Schémas basés sur l'architecture MVC dépôt *LMG90_GUI_MVC* et le périmètre fonctionnel de *LMGC90*.
 
 ---
 
@@ -25,29 +25,23 @@
 
 ```mermaid
 flowchart LR
-  subgraph View[View (PyQt6)]
+  subgraph View["View (PyQt6)"]
     MW[MainWindow]
     TV[TreeView]
     DLG[Dialogs]
-    TABS[Tabs
-(MaterialTab, AvatarTab, ...)]
+    TABS[Tabs\n(MaterialTab, AvatarTab, ...)]
   end
 
   subgraph Controller[Controller]
     PC[ProjectController]
   end
 
-  subgraph Model[Model (core)]
-    MOD[models.py
-(Material, MaterialType, Loop, [Project]…)]
-    VAL[validators.py
-(MaterialValidator, LoopValidator, …)]
-    GEN[generators.py
-(LoopGenerator, [GranuloGenerator]…)]
-    SER[serializers.py
-(JsonSerializer [présumé])]
-    BR[pylmgc_bridge.py
-(PylmgcBridge)]
+  subgraph Model["Model (core)"]
+    MOD[models.py\n(Material, MaterialType, Loop, [Project]…)]
+    VAL[validators.py\n(MaterialValidator, LoopValidator, …)]
+    GEN[generators.py\n(LoopGenerator, [GranuloGenerator]…)]
+    SER[serializers.py\n(JsonSerializer [présumé])]
+    BR[pylmgc_bridge.py\n(PylmgcBridge)]
   end
 
   subgraph Utils[Utils]
@@ -340,4 +334,4 @@ sequenceDiagram
 
 ---
 
-> Pour transformer ce fichier en **PNG/SVG/PDF**, utilisez par exemple *Mermaid* (support natif GitHub/GitLab/VS Code) ou `@mermaid-js/mermaid-cli` (`mmdc`).
+> Pour transformer ce fichier en **PNG/SVG/PDF**, utilisez par exemple *Mermaid* (support natif GitHub/GitLab/VS Code).
