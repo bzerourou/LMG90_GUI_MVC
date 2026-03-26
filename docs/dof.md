@@ -1,4 +1,4 @@
-# Onglet DOF — Conditions aux limites
+# Conditions aux limites (DOFs)
 
 L'onglet **DOF** (`Ctrl+5`) permet d'appliquer des conditions aux limites mécaniques, thermiques ou initiales sur les avatars du projet. Chaque opération est enregistrée dans `state.operations`, appliquée immédiatement sur les objets pylmgc90 et exportée dans le script Python généré.
 

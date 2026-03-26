@@ -1,4 +1,4 @@
-# Onglet Calcul LMGC90_GUI
+# Calcul
 
 ## Vue d'ensemble
 

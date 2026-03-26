@@ -1,4 +1,4 @@
-# Onglet Granulométrie
+# Granulométrie
 
 L'onglet **Granulométrie** (`Ctrl+7`) permet de créer, gérer et supprimer des distributions granulaires directement depuis l'interface, sans passer par l'assistant. Il est adapté pour des générations rapides à partir d'avatars et de matériaux déjà définis dans le projet.
 
