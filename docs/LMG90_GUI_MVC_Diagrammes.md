@@ -26,26 +26,26 @@
 ```mermaid
 flowchart LR
   subgraph View["View (PyQt6)"]
-    MW[MainWindow]
-    TV[TreeView]
-    DLG[Dialogs]
-    TABS[Tabs\n(MaterialTab, AvatarTab, ...)]
+    MW["MainWindow"]
+    TV["TreeView"]
+    DLG["Dialogs"]
+    TABS["Tabs\n(MaterialTab, AvatarTab, ...)"]
   end
 
-  subgraph Controller[Controller]
-    PC[ProjectController]
+  subgraph Controller["Controller"]
+    PC["ProjectController"]
   end
 
   subgraph Model["Model (core)"]
-    MOD[models.py\n(Material, MaterialType, Loop, [Project]…)]
-    VAL[validators.py\n(MaterialValidator, LoopValidator, …)]
-    GEN[generators.py\n(LoopGenerator, [GranuloGenerator]…)]
-    SER[serializers.py\n(JsonSerializer [présumé])]
-    BR[pylmgc_bridge.py\n(PylmgcBridge)]
+    MOD["models.py\n(Material, MaterialType, Loop, [Project]…)"]
+    VAL["validators.py\n(MaterialValidator, LoopValidator, …)"]
+    GEN["generators.py\n(LoopGenerator, [GranuloGenerator]…)"]
+    SER["serializers.py\n(JsonSerializer [présumé])"]
+    BR["pylmgc_bridge.py\n(PylmgcBridge)"]
   end
 
-  subgraph Utils[Utils]
-    SE[SafeEvaluator (AST)]
+  subgraph Utils["Utils"]
+    SE["SafeEvaluator (AST)"]
   end
 
   MW -->|signals/slots| PC
