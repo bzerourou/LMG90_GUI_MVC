@@ -23,6 +23,7 @@ from ..core.models import UnitSystem
 from ..core.app_logger import get_logger, get_log_path, get_log_dir, get_recent_logs
 _log = get_logger('main_window')
 from ..gui.dialogs.fast_granulo_dialg import GranuloFastDialog
+from ..gui.dialogs.convert_dialog import ConvertDialog
 
 
 class MainWindow(QMainWindow):
@@ -153,6 +154,11 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(script_action)
         
         tools_menu.addSeparator()
+
+        convert_action = QAction("🔄 Convertir script pylmgc90", self)
+        convert_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        convert_action.triggered.connect(self._on_convert_script)
+        tools_menu.addAction(convert_action)
         
         vars_action = QAction("Variables dynamiques", self)
         vars_action.setShortcut(QKeySequence("Ctrl+V"))
@@ -163,7 +169,7 @@ class MainWindow(QMainWindow):
 
         #Préférences
         prefs_action = QAction("⚙️ Préférences...", self)
-        prefs_action.setShortcut(QKeySequence("Ctrl+,"))  # Raccourci standard
+        prefs_action.setShortcut(QKeySequence("Ctrl+,"))  # Raccourci
         prefs_action.triggered.connect(self._on_preferences)
         tools_menu.addAction(prefs_action)
 
@@ -888,6 +894,11 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
+    
+    def _on_convert_script(self):
+        dialog = ConvertDialog(self)
+        dialog.exec()
+    
     
     def _on_lmgc_visualization(self):
         """Lance la visualisation LMGC90"""
