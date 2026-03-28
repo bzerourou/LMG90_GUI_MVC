@@ -18,22 +18,12 @@ Usage :
     Corps rigides 2D
     ✓ pre.rigidDisk(...)            → avatar rigidDisk
     ✓ pre.rigidJonc(...)            → avatar rigidJonc
-    ✓ pre.rigidPolygon(...)         → avatar rigidPolygon
-    ✓ pre.rigidOvoidPolygon(...)    → avatar rigidOvoidPolygon
-    ✓ pre.rigidDiscreteDisk(...)    → avatar rigidDiscreteDisk
-    ✓ pre.rigidCluster(...)         → avatar rigidCluster
-    ✓ pre.roughWall(...)            → avatar roughWall
-    ✓ pre.fineWall(...)             → avatar fineWall
-    ✓ pre.smoothWall(...)           → avatar smoothWall
-    ✓ pre.granuloRoughWall(...)     → avatar granuloRoughWall
+    etc,
 
     Corps rigides 3D
     ✓ pre.rigidSphere(...)          → avatar rigidSphere
     ✓ pre.rigidPlan(...)            → avatar rigidPlan  (normal, lx, ly)
-    ✓ pre.rigidCylinder(...)        → avatar rigidCylinder
-    ✓ pre.rigidPolyhedron(...)      → avatar rigidPolyhedron
-    ✓ pre.roughWall3D(...)          → avatar roughWall3D
-    ✓ pre.granuloRoughWall3D(...)   → avatar granuloRoughWall3D
+    etc,
 
     Corps déformables / maillés
     ✓ pre.buildMesh2D(...)          → avatar mesh  (source=built2D)
@@ -50,13 +40,7 @@ Usage :
     ✓ pre.brick3D(name, lx, ly, lz) → _BrickObj 3D
     ✓ pre.paneresse_simple(brick)   → _WallObj avec génération de briques
     ✓ pre.paneresse_double(brick)   → _WallObj avec décalage demi-brique
-    ✓ .setNumberOfRows(n)
-    ✓ .setJointThicknessBetweenRows(e)
-    ✓ .setJointThicknessInRows(e)
-    ✓ .setFirstRowByNumberOfBricks(nb)
-    ✓ .setFirstRowByLength(L)
-    ✓ .buildRigidWall(center, ...)  → liste d'avatars + masonry_patterns
-    ✓ .buildRigidWallWithoutHalfBricks(...)
+    etc,
 
     Conditions aux limites (avatars rigides et maillés)
     ✓ .translate(dx, dy, dz)
