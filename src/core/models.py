@@ -778,5 +778,6 @@ class ProjectState:
             granulo_generations=[GranuloGeneration.from_dict(g) for g in data.get('granulo_generations', [])],
             postpro_commands=[PostProCommand.from_dict(p) for p in data.get('postpro_creations', [])],
             avatar_groups=data.get('avatar_groups', {}),
+            custom_templates=data.get('custom_templates', {}),
             dynamic_vars=data.get('dynamic_vars', {})
         )

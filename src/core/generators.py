@@ -112,7 +112,7 @@ class ForLoopGenerator:
         if step == 0:
             raise ValueError("Le step ne peut pas être 0")
         
-        range_values = range(start, end, step) if step > 0 else range(start, end, step)
+        range_values = range(start, end, step) 
         for loop_value in range_values:
             context[for_loop.loop_var] = loop_value
             item = ForLoopGenerator._create_item(
@@ -149,7 +149,8 @@ class ForLoopGenerator:
                         context[var_name] = evaluator.eval_expression(var_expr, context)
                     else:
                         context[var_name] = var_expr
-                except:
+                except Exception as e:
+                    print(f"Erreur lors de l'évaluation de la variable '{var_name}': {e}")
                     context[var_name] = var_expr
         
         return context

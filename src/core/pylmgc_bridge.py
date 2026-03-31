@@ -567,5 +567,4 @@ class LMGC90Bridge:
             avatar_obj: Objet avatar pylmgc90
         """
         getattr(avatar_obj, operation.operation_type)(**operation.parameters)
-        getattr(avatar_obj, operation.operation_type)(**operation.parameters)
 

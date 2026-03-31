@@ -180,24 +180,6 @@ class BaseTab(QWidget):
             self._show_eval_error(text, e, field_name)
             raise
 
-    def _eval_expression(self, text: str, default=None, field_name: str = ""):
-        """Evalue une expression generique (float, int, liste, etc.)."""
-        text = text.strip()
-        if not text:
-            return default
-        try:
-            return self._get_evaluator().eval_expression(text)
-        except Exception as e:
-            try:
-                if '.' in text or 'e' in text.lower():
-                    return float(text)
-                return int(text)
-            except ValueError:
-                raise ValueError(
-                    f"Expression invalide pour '{field_name}' : '{text}'\n"
-                    f"Erreur : {e}"
-                )
-
 
     def _show_eval_error(self, text: str, error: Exception, field_name: str = ""):
         """Affiche une erreur d'évaluation détaillée"""
@@ -213,10 +195,10 @@ class BaseTab(QWidget):
         dyn = getattr(self.controller.state, 'dynamic_vars', {}) or {}
         if dyn:
             keys = list(dyn.keys())
-            msg += "  " + "\n  ".join(keys[:10])
+            error_msg += "  " + "\n  ".join(keys[:10])
             if len(keys) > 10:
-                msg += f"\n  ... et {len(keys) - 10} autres"
-            else:
+                error_msg += f"\n  ... et {len(keys) - 10} autres"
+        else:
                 error_msg += "  (Aucune variable définie)\n"
                 error_msg += "  Créez-les dans: Outils > Variables dynamiques"
         

@@ -52,7 +52,7 @@ class ProjectSerializer:
         
         state = ProjectState.from_dict(data)
         
-        if 'custom_templates' in data:
-            state.custom_templates = data['custom_templates']
+        #if 'custom_templates' in data:
+        #    state.custom_templates = data['custom_templates']
         
         return state
