@@ -50,9 +50,7 @@ class ProjectSerializer:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        state = ProjectState.from_dict(data)
-        
         #if 'custom_templates' in data:
         #    state.custom_templates = data['custom_templates']
         
-        return state
+        return ProjectState.from_dict(data)

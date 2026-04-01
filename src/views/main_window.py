@@ -140,7 +140,13 @@ class MainWindow(QMainWindow):
         masonry_wizard_action.triggered.connect(self._on_masonry_wizard)
         assistants_menu.addAction(masonry_wizard_action)
 
-        
+        assistants_menu.addSeparator()
+
+        factory_wizard_action = QAction("🏭 Assistant de Factory...", self)
+        factory_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+F"))
+        factory_wizard_action.triggered.connect(self._on_factory_wizard)
+        assistants_menu.addAction(factory_wizard_action)
+
 
         # Menu Outils
         tools_menu = menubar.addMenu("Outils")
@@ -854,6 +860,15 @@ class MainWindow(QMainWindow):
         if wizard.exec():
             self._refresh_all()
             self.statusBar().showMessage("✅ Maçonnerie générée", 5000)
+
+    def _on_factory_wizard(self) :
+        """Lance l'assistant de Factory"""
+        from ..gui.dialogs.factory_wizard import FactoryWizard
+        
+        wizard = FactoryWizard(self.controller, self)
+        if wizard.exec():
+            self._refresh_all()
+            self.statusBar().showMessage("✅ Factory générée", 5000)
         
     # ========== VISUALISATION ET GÉNÉRATION ==========
     

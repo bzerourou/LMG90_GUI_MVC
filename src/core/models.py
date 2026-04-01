@@ -732,6 +732,7 @@ class ProjectState:
     loops: List[Loop] = field(default_factory=list)
     granulo_generations: List[GranuloGeneration] = field(default_factory=list)
     postpro_commands: List[PostProCommand] = field(default_factory=list)
+    factories: List[dict] = field(default_factory=list)  # FactoryConfig sérialisés
     avatar_groups: Dict[str, List[int]] = field(default_factory=dict)
     dynamic_vars: Dict[str, Any] = field(default_factory=dict)
     
@@ -754,6 +755,7 @@ class ProjectState:
             'loops': [l.to_dict() for l in self.loops],
             'granulo_generations': [g.to_dict() for g in self.granulo_generations],
             'postpro_creations': [p.to_dict() for p in self.postpro_commands],
+            'factories': self.factories,
             'avatar_groups': self.avatar_groups,
             'dynamic_vars': self.dynamic_vars
         }
@@ -777,6 +779,7 @@ class ProjectState:
             loops=[Loop.from_dict(l) for l in data.get('loops', [])],
             granulo_generations=[GranuloGeneration.from_dict(g) for g in data.get('granulo_generations', [])],
             postpro_commands=[PostProCommand.from_dict(p) for p in data.get('postpro_creations', [])],
+            factories=data.get('factories', []),
             avatar_groups=data.get('avatar_groups', {}),
             custom_templates=data.get('custom_templates', {}),
             dynamic_vars=data.get('dynamic_vars', {})
