@@ -89,7 +89,7 @@ La duplication des éléments qui portent le même nom entraîne des erreurs, pe
 |--------|-----------|-------------|
 | **Générer DATBOX** | — | Génère les fichiers `.dat` utilisés par LMGC90 pour le calcul (DATBOX/). |
 | **Générer Script Python** | — | Génère le script Python de pré-traitement (`pre.py`) reproduisant l'intégralité du modèle construit dans l'interface. |
-| **Convertir script lmgc90** | `Ctrl+Shift+C` | Une boite de dialogue qui est scanne un script python pylmgc90 et le converrit vers un fichier .lmgc90 |
+| **Convertir script lmgc90** | `Ctrl+Shift+C` | Une boite de dialogue qui scanne un script python pylmgc90 et le convertie vers un fichier .lmgc90 |
 | **Variables dynamiques** | `Ctrl+V` | Ouvre une boîte de dialogue permettant de définir des variables réutilisables dans les champs numériques de l'interface (rayon, espacement, offset, etc.). C'est également une fenêtre d'inspection des propriétés des objets LMGC90 présents en mémoire. Voir la page [Variables dynamiques](dynam_variables.md). |
 | **Préférences** | `Ctrl+,` | Ouvre la boîte de dialogue de configuration de l'application. Voir section [Préférences](#5-préférences). |
 
