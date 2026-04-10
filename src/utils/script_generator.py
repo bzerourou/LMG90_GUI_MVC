@@ -67,6 +67,7 @@ class ScriptGenerator:
             self._write_visibility(f)
             self._write_dof_operations(f)
             self._write_postpro(f)
+            self._write_factories(f)
             self._write_datbox(f)
     # ── En-tête ───────────────────────────────────────────────────────────────
     def _write_header(self, f: TextIO):
@@ -80,18 +81,11 @@ class ScriptGenerator:
         f.write('from pylmgc90 import pre\n')
         f.write('import numpy as np\n')
         f.write('import math\n\n')
+        f.write('import copy\n\n')
         # ── Variables dynamiques ──────────────────────────────────────────────────
     def _write_dynamic_vars(self, f: TextIO):
         """
         Injecte les variables dynamiques du projet dans le script genere.
-
-        Chaque variable est evaluee dans l'ordre de definition pour resoudre
-        les dependances entre variables (ex: radius = thickness * 2).
-        Les expressions referençant avatar[], group[], material[] ou model[]
-        sont converties en valeur concrete au moment de la generation.
-
-        Les objets proxy non serialisables (listes d'avatars, etc.) sont
-        ecrits en commentaire avec la valeur litterale de l'expression.
         """
         dyn_vars = getattr(self.state, 'dynamic_vars', {}) or {}
         if not dyn_vars:
@@ -1253,6 +1247,33 @@ class ScriptGenerator:
                 f.write(f")\n")
                 f.write(f"posts.addCommand(post_cmd_{i})\n")
             f.write('\n')
+
+    # ── Particle Factories ──────────────────────────────────────────────────
+    def _write_factories(self, f: TextIO) -> None:
+        """Generate factory particles code before writeDatbox."""
+        factories = getattr(self.state, 'factories', None) or []
+        if not factories:
+            return
+        try:
+            from ..core.particle_factory import ParticleFactory
+        except ImportError:
+            f.write('# particle_factory.py introuvable\n')
+            return
+        
+        engine = ParticleFactory.from_list_of_dicts(factories)
+        
+        nb_existing = len(self.state.avatars)
+        engine.reset_body_counter(nb_existing+1)
+        for cfg in engine.configs :
+            engine._assign_body_indices(cfg)
+        pre_code = engine.generate_pre_code(body_counter_start=nb_existing + 1)
+        f.write('\n')
+        f.write('# ============================================================\n')
+        f.write('# Avatars (Particles Factories) crees invisibles \n')
+        f.write('# ============================================================\n')
+        f.write(pre_code)
+        f.write('\n')
+
     # ── DATBOX ────────────────────────────────────────────────────────────────
     def _write_datbox(self, f: TextIO):
         f.write('# Génération DATBOX\n')

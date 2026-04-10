@@ -26,16 +26,7 @@ def convert_to_serializable(obj):
     else:
         return obj
 
-# ============================================================================
-# EXCEPTIONS - Erreurs personnalisées
-# ============================================================================
 
-class ValidationError(Exception):
-    """
-    Exception levée lors d'une erreur de validation de données.
-    Utilisée par les validateurs pour signaler des données invalides.
-    """
-    pass
 
 
 # ============================================================================

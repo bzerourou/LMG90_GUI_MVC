@@ -12,10 +12,6 @@ vagues à des pas de temps planifiés (chipy.RBDY2/3_SetVisible).
 
 Types de Factory disponibles
 ──────────────────────────────
-  RAIN          Pluie de particules tombant d'une zone horizontale → dépôt de poudre
-  JET           Injection directionnelle avec vitesse initiale → spray, injection forcée
-  SILO_FILL     Remplissage d'un silo par le dessus → stockage, tassement
-  SURFACE       Dépôt progressif en couches sur une surface → enrobage, sédimentation
   PERIODIC      Injections périodiques à intervalle fixe → ligne de production
 
 Chaque Factory produit :

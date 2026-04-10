@@ -12,7 +12,7 @@ from PyQt6.QtGui import QAction, QKeySequence, QIcon
 from pathlib import Path
 
 from ..controllers.project_controller import ProjectController
-from ..core.models import ValidationError
+from ..core.validators import ValidationError
 from .tabs import (
     MaterialTab, ModelTab, AvatarTab, EmptyAvatarTab, AvatarLibraryTab, LoopTab,
     GranuloTab, DOFTab, ContactTab, VisibilityTab, PostProTab, ComputeTab, ViewerTab
@@ -623,7 +623,8 @@ class MainWindow(QMainWindow):
         
         # Ajouter l'onglet
         index = self.tabs.addTab(widget, f"{icon} {title}")
-        self.tabs.setCurrentIndex(0)
+        self.tabs.setCurrentIndex(index)
+
     def _on_tab_close_requested(self, index : int): 
         """Gère la fermeture d'un onglet"""
         widget = self.tabs.widget(index)
@@ -864,9 +865,19 @@ class MainWindow(QMainWindow):
     def _on_factory_wizard(self) :
         """Lance l'assistant de Factory"""
         from ..gui.dialogs.factory_wizard import FactoryWizard
+        from ..core.particle_factory import ParticleFactory
         
         wizard = FactoryWizard(self.controller, self)
-        if wizard.exec():
+        if wizard.exec() and wizard.result_config:
+            # Persister la factory dans ProjectState
+            if not hasattr(self.controller.state, 'factories'):
+                self.controller.state.factories = []
+            engine = wizard.engine
+            nb_existing = len(self.controller.state.avatars)
+            engine.reset_body_counter(nb_existing + 1)
+            for cfg in engine.configs:
+                engine._assign_body_indices(cfg)
+            self.controller.state.factories = engine.to_list_of_dicts()
             self._refresh_all()
             self.statusBar().showMessage("✅ Factory générée", 5000)
         
@@ -1034,10 +1045,11 @@ class MainWindow(QMainWindow):
         self.tree_view.refresh()
  
         for tab in [self.material_tab, self.model_tab, self.avatar_tab,
-                    self.empty_avatar_tab, self.loop_tab, self.granulo_tab,
-                    self.dof_tab, self.contact_tab, self.visibility_tab,
+                    self.empty_avatar_tab, self.loop_tab, self.dof_tab
+                    , self.contact_tab, self.visibility_tab, self.granulo_tab,
                     self.postpro_tab]:
             if hasattr(tab, 'refresh'):
                 if tab is self.granulo_tab:
                     tab.refresh(full_refresh=True)
-                tab.refresh()
+                else :     
+                    tab.refresh()

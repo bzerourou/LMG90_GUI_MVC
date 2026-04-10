@@ -1,8 +1,9 @@
 # ============================================================================
-# factory_wizard.py
+# factory_wizard.py  —  Assistant « Particle Factory » (version QWizard)
 # ============================================================================
 """
-Assistant de création de Factory Avatars
+Refactorisé pour suivre exactement la même architecture que setup_wizard.py,
+mesh_wiz_def.py et masonery_wizard.py.
 """
 
 from PyQt6.QtWidgets import (
@@ -913,8 +914,7 @@ class FactoryTab(QWidget):
             if not hasattr(self.controller.state, 'factories'):
                 self.controller.state.factories = []
             self.controller.state.factories = self._engine.to_list_of_dicts()
-            if hasattr(self.controller, 'mark_modified'):
-                self.controller.mark_modified()
+            self.controller.state_changed.emit()
             self.refresh()
             self.factory_updated.emit()
 
@@ -955,8 +955,7 @@ class FactoryTab(QWidget):
             return
         self._engine.remove(name)
         self.controller.state.factories = self._engine.to_list_of_dicts()
-        if hasattr(self.controller, 'mark_modified'):
-            self.controller.mark_modified()
+        self.controller.state_changed.emit()
         self.refresh()
         self.factory_updated.emit()
 
@@ -968,8 +967,7 @@ class FactoryTab(QWidget):
         cfg = self._engine.configs[row]
         cfg.enabled = not cfg.enabled
         self.controller.state.factories = self._engine.to_list_of_dicts()
-        if hasattr(self.controller, 'mark_modified'):
-            self.controller.mark_modified()
+        self.controller.state_changed.emit()
         self.refresh()
         self._list.setCurrentRow(row)
 

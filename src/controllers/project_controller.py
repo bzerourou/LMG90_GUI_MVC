@@ -436,9 +436,9 @@ class ProjectController(QObject):
             if body is not None:
                 try:
                     self._bodies_container.remove(body)
-                except Exception:
-                    # Ignorer si le container ne contient pas l'objet
-                    pass
+                except Exception as e:
+                    from ..core.app_logger import get_logger
+                    get_logger('controller').warning(f"Erreur suppression avatar #{index}: {e}")
             return True
         return False
     
@@ -609,6 +609,7 @@ class ProjectController(QObject):
         self._pylmgc_laws[law.name] = law_obj
         
         self.state.contact_laws.append(law)
+        self.state_changed.emit()
     
     def update_contact_law(self, old_name: str, law: ContactLaw) -> None:
         """Met à jour une loi de contact"""
