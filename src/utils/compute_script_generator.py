@@ -3,7 +3,6 @@
 # ============================================================================
 """
 Genere le script de calcul chipy (command.py) a partir des parametres
-collectes par ComputeTab.get_parameters()
 """
 
 from io import StringIO

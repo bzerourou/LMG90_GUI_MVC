@@ -127,13 +127,13 @@ def _spin(value: int, minimum: int = 0, maximum: int = 100_000) -> QSpinBox:
 class FactoryIntroPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("🏭 Nouvelle Avatar Factory")
+        self.setTitle("🏭 Nouvel Avatar Factory")
         self.setSubTitle("Inspiré de la fonction Factory d’EDEM.")
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        title = QLabel("🏭  Nouvelle Avatar Factory")
+        title = QLabel("🏭  Nouvel Avatar Factory")
         title.setStyleSheet(_STYLE_HEADER)
         layout.addWidget(title)
 

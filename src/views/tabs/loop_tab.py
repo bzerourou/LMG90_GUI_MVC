@@ -699,16 +699,15 @@ class LoopTab(BaseTab):
             item.setData(0, Qt.ItemDataRole.UserRole, idx)
             self.tree.addTopLevelItem(item)
         
-        if hasattr(self.controller.state, 'for_loops'):
-            for idx, for_loop in enumerate(self.controller.state.for_loops):
-                global_idx = len(self.controller.state.loops) + idx
-                item = QTreeWidgetItem([
-                    str(global_idx + 1),
-                    f"For ({for_loop.target_type})",
-                    str(len(for_loop.generated_indices)),
-                    f"{for_loop.loop_var}: {for_loop.start_expr}→{for_loop.end_expr}",
-                    for_loop.group_name or "—"
-                ])
-                item.setForeground(1, QBrush(QColor(0, 100, 200)))
-                item.setData(0, Qt.ItemDataRole.UserRole, global_idx)
-                self.tree.addTopLevelItem(item)
+        for idx, for_loop in enumerate(self.controller.state.for_loops):
+            global_idx = len(self.controller.state.loops) + idx
+            item = QTreeWidgetItem([
+                str(global_idx + 1),
+                f"For ({for_loop.target_type})",
+                str(len(for_loop.generated_indices)),
+                f"{for_loop.loop_var}: {for_loop.start_expr}→{for_loop.end_expr}",
+                for_loop.group_name or "—"
+            ])
+            item.setForeground(1, QBrush(QColor(0, 100, 200)))
+            item.setData(0, Qt.ItemDataRole.UserRole, global_idx)
+            self.tree.addTopLevelItem(item)

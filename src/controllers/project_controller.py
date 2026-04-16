@@ -1182,8 +1182,6 @@ class ProjectController(QObject):
         
         for_loop.generated_indices = generated_indices
         if not self._is_loading:
-            if not hasattr(self.state, 'for_loops'):
-                self.state.for_loops = []
             self.state.for_loops.append(for_loop)
         
         # Ajouter au groupe si spécifié (uniquement pour avatars)
@@ -1205,9 +1203,6 @@ class ProjectController(QObject):
         Raises:
             ValueError: Si index invalide
         """
-        if not hasattr(self.state, 'for_loops'):
-            self.state.for_loops = []
-        
         if not (0 <= index < len(self.state.for_loops)):
             raise ValueError(f"Index {index} invalide")
         
@@ -1354,10 +1349,6 @@ class ProjectController(QObject):
         Returns:
             True si supprimé
         """
-        if not hasattr(self.state, 'for_loops'):
-            self.state.for_loops = []
-            return False
-        
         if not (0 <= index < len(self.state.for_loops)):
             return False
         
@@ -1382,10 +1373,6 @@ class ProjectController(QObject):
     
     def get_for_loop(self, index: int) -> Optional[ForLoop]:
         """Retourne une boucle For par son index"""
-        if not hasattr(self.state, 'for_loops'):
-            self.state.for_loops = []
-            return None
-        
         if 0 <= index < len(self.state.for_loops):
             return self.state.for_loops[index]
         return None
@@ -1560,6 +1547,13 @@ class ProjectController(QObject):
                 self.generate_granulo(granulo)
             except Exception as e:
                 regeneration_errors.append(f"Granulo {i+1}: {str(e)}")
+
+        # Régénérer boucles For (template + éléments)
+        for i, for_loop in enumerate(self.state.for_loops):
+            try:
+                self.generate_for_loop(for_loop)
+            except Exception as e:
+                regeneration_errors.append(f"Boucle For {i+1}: {str(e)}")
 
         if regeneration_errors:
             # Stocker pour affichage ultérieur dans l'UI

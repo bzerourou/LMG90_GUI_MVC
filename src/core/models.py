@@ -721,6 +721,7 @@ class ProjectState:
     visibility_rules: List[VisibilityRule] = field(default_factory=list)
     operations: List[DOFOperation] = field(default_factory=list)
     loops: List[Loop] = field(default_factory=list)
+    for_loops: List[ForLoop] = field(default_factory=list)
     granulo_generations: List[GranuloGeneration] = field(default_factory=list)
     postpro_commands: List[PostProCommand] = field(default_factory=list)
     factories: List[dict] = field(default_factory=list)  # FactoryConfig sérialisés
@@ -744,6 +745,7 @@ class ProjectState:
             'visibility_rules': [v.to_dict() for v in self.visibility_rules],
             'operations': [o.to_dict() for o in self.operations],
             'loops': [l.to_dict() for l in self.loops],
+            'for_loops': [fl.to_dict() for fl in self.for_loops],
             'granulo_generations': [g.to_dict() for g in self.granulo_generations],
             'postpro_creations': [p.to_dict() for p in self.postpro_commands],
             'factories': self.factories,
@@ -768,6 +770,7 @@ class ProjectState:
             visibility_rules=[VisibilityRule.from_dict(v) for v in data.get('visibility_rules', [])],
             operations=[DOFOperation.from_dict(o) for o in data.get('operations', [])],
             loops=[Loop.from_dict(l) for l in data.get('loops', [])],
+            for_loops=[ForLoop.from_dict(fl) for fl in data.get('for_loops', [])],
             granulo_generations=[GranuloGeneration.from_dict(g) for g in data.get('granulo_generations', [])],
             postpro_commands=[PostProCommand.from_dict(p) for p in data.get('postpro_creations', [])],
             factories=data.get('factories', []),
