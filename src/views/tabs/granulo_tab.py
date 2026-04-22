@@ -102,11 +102,22 @@ class GranuloTab(BaseTab):
         self.seed_input = QLineEdit()
         self.seed_input.setPlaceholderText("Graine aléatoire (optionnel)")
         dist_form.addRow("Seed :", self.seed_input)
-        
+
+        self.dist_only_check = QCheckBox(
+            "Distribution uniquement — sans dépôt ni création d'avatars"
+        )
+        self.dist_only_check.setToolTip(
+            "Génère seulement la distribution de rayons (granulo_Random).\n"
+            "Aucun avatar n'est créé. La distribution est enregistrée pour référence."
+        )
+        self.dist_only_check.toggled.connect(self._on_dist_only_toggled)
+        dist_form.addRow("", self.dist_only_check)
+
         dist_group.setLayout(dist_form)
         layout.addWidget(dist_group)
         
-        container_group = QGroupBox("2. Géométrie du Dépôt")
+        self.container_group = QGroupBox("2. Géométrie du Dépôt")
+        container_group = self.container_group
         container_layout = QVBoxLayout()
         
         container_form = QFormLayout()
@@ -131,7 +142,8 @@ class GranuloTab(BaseTab):
         container_group.setLayout(container_layout)
         layout.addWidget(container_group)
         
-        phys_group = QGroupBox("3. Propriétés Physiques")
+        self.phys_group = QGroupBox("3. Propriétés Physiques")
+        phys_group = self.phys_group
         phys_form = QFormLayout()
         
         self.material_combo = QComboBox()
@@ -190,6 +202,25 @@ class GranuloTab(BaseTab):
     def _connect_signals(self):
         self.shape_combo.currentTextChanged.connect(self._update_container_params)
         self.tree.itemDoubleClicked.connect(self._show_info)
+
+    def _on_dist_only_toggled(self, checked: bool):
+        """Active/désactive géométrie et propriétés selon le mode distribution seule."""
+        self.container_group.setEnabled(not checked)
+        self.phys_group.setEnabled(not checked)
+        if checked:
+            self.gen_btn.setText("✅ Générer la Distribution")
+            self.container_group.setStyleSheet(
+                "QGroupBox { color: #aaa; border-color: #ccc; }"
+                "QGroupBox::title { color: #aaa; }"
+            )
+            self.phys_group.setStyleSheet(
+                "QGroupBox { color: #aaa; border-color: #ccc; }"
+                "QGroupBox::title { color: #aaa; }"
+            )
+        else:
+            self.gen_btn.setText("✅ Générer le Dépôt")
+            self.container_group.setStyleSheet("")
+            self.phys_group.setStyleSheet("")
     
     def _update_container_params(self, shape):
         """Met à jour les paramètres du conteneur"""
@@ -231,17 +262,26 @@ class GranuloTab(BaseTab):
     def _on_generate_optimized(self):
         """Lance la génération ultra-optimisée"""
         try:
-            # Validation
+            # Validation commune
             nb = self.eval_int(self.nb_input.text(), default=50, field_name="Nombre de particules")
-            if nb> 2000: 
-                QMessageBox.information(self, "Attention", "⚠️ Actuellement LMGC90_GUI ne peut générer plus de 1500 particules ")
-                return
             rmin = self.eval_float(self.rmin_input.text(), default=0.05, field_name="Rayon min")
             rmax = self.eval_float(self.rmax_input.text(), default=2*rmin, field_name="Rayon max")
-            
+            seed_text = self.seed_input.text().strip()
+            seed = self.eval_int(seed_text, default=None, field_name="Seed") if seed_text else None
+
+            # ── Mode distribution uniquement ──────────────────────────────────
+            if self.dist_only_check.isChecked():
+                self._generate_distribution_only(nb, rmin, rmax, seed)
+                return
+
+            # ── Mode dépôt complet ────────────────────────────────────────────
+            if nb > 2000:
+                QMessageBox.information(self, "Attention", "⚠️ Actuellement LMGC90_GUI ne peut générer plus de 1500 particules ")
+                return
+
             material = self.material_combo.currentText()
             model = self.avatar_combo.currentData()
-            
+
             if not material or not model:
                 QMessageBox.warning(self, "Erreur", "Veuillez créer un matériau et un modèle d'abord")
                 return
@@ -278,10 +318,6 @@ class GranuloTab(BaseTab):
                 }
             else:
                 container_params = {}
-            
-            # Seed
-            seed_text = self.seed_input.text().strip()
-            seed = self.eval_int(seed_text, default=None, field_name="Seed") if seed_text else None
             
             # Config
             config = GranuloGeneration(
@@ -338,6 +374,67 @@ class GranuloTab(BaseTab):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de démarrer:\n{e}")
     
+    def _generate_distribution_only(self, nb: int, rmin: float, rmax: float, seed):
+        """
+        Génère uniquement la distribution de rayons via GranuloGenerator.generate_radii.
+        Aucun avatar n'est créé. La distribution est enregistrée dans le projet.
+        """
+        from ...core.generators import GranuloGenerator
+
+        if rmin <= 0 or rmax <= 0:
+            QMessageBox.warning(self, "Validation", "Rayon min et max doivent être positifs.")
+            return
+        if rmin > rmax:
+            QMessageBox.warning(self, "Validation", "Rayon min doit être ≤ rayon max.")
+            return
+
+        group_name = (
+            self.group_name_input.text().strip()
+            if self.store_check.isChecked()
+            else None
+        )
+
+        config = GranuloGeneration(
+            nb_particles=nb,
+            radius_min=rmin,
+            radius_max=rmax,
+            container_type="Distribution",
+            container_params={'distribution_only': True},
+            model_name="",
+            material_name="",
+            avatar_type="",
+            color="",
+            seed=seed,
+            group_name=group_name,
+            generated_indices=[],
+        )
+
+        try:
+            radii = GranuloGenerator.generate_radii(config)
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Erreur",
+                f"Erreur lors de la génération des rayons :\n{e}"
+            )
+            return
+
+        r_mean = float(radii.mean())
+        r_std  = float(radii.std())
+
+        self.controller.state.granulo_generations.append(config)
+        self.granulo_generated.emit()
+        self.refresh(full_refresh=True)
+
+        QMessageBox.information(
+            self, "Distribution générée",
+            f"✅ Distribution de {len(radii)} rayons enregistrée.\n\n"
+            f"  Rayon min    : {rmin:.4g}\n"
+            f"  Rayon max    : {rmax:.4g}\n"
+            f"  Rayon moyen  : {r_mean:.4g}\n"
+            f"  Écart-type   : {r_std:.4g}\n"
+            + (f"  Groupe : {group_name}" if group_name else "  (pas de groupe)")
+        )
+
     def _on_calc_progress(self, current, total, message):
         """Progression des calculs"""
         if hasattr(self, 'progress_label') and self.progress_label.isVisible():
@@ -785,4 +882,3 @@ class GranuloTab(BaseTab):
             self.worker.stop()
             self.worker.wait()
         super().closeEvent(event)
-

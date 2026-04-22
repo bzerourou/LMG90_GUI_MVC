@@ -1069,68 +1069,133 @@ class ProjectController(QObject):
     def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
         """
         Génère des éléments selon une boucle For.
-        
-        Args:
-            for_loop: Configuration de la boucle For
-            
-        Returns:
-            Liste des indices des éléments créés
+
+        target_type supportés : avatar, material, model, contact_law,
+                                visibility, dof, granulo.
+
+        Pour 'granulo', le template_config doit contenir :
+            dist_idx    (int)  : indice dans state.granulo_generations
+            avatar_type (str)  : ex. "rigidDisk"
+            center      (str)  : expression Python avec 'i' et 'r'
+                                  ex. "[i * r * 2.5, 0.0]"
+            material_name (str)
+            model_name    (str)
+            color         (str, optionnel)
+        Les variables disponibles dans les expressions sont :
+            i  — indice courant (0-based)
+            r  — rayon issu de la distribution
+            + tout le contexte de base (math, sqrt, pi, …)
         """
         from ..utils.safe_eval import SafeEvaluator
+        from ..core.generators import GranuloGenerator
         import math
-        
+
         generated_indices = []
-        
-        # Créer l'évaluateur
         evaluator = SafeEvaluator()
-        
-        # Contexte de base
+
         base_context = {
             'math': math,
             'sqrt': math.sqrt,
-            'pi': math.pi,
-            'e': math.e,
-            'abs': abs,
-            'min': min,
-            'max': max,
-            'sum': sum,
-            'len': len,
-            'str': str,
-            'int': int,
+            'pi':   math.pi,
+            'e':    math.e,
+            'abs':  abs,
+            'min':  min,
+            'max':  max,
+            'sum':  sum,
+            'len':  len,
+            'str':  str,
+            'int':  int,
             'float': float,
         }
-        
-        # Évaluer start, end, step
+
+        # ── Cas spécial : boucle sur une distribution granulométrique ─────────
+        if for_loop.target_type == 'granulo':
+            tc = for_loop.template_config
+
+            dist_idx = tc.get('dist_idx')
+            if dist_idx is None or not (0 <= dist_idx < len(self.state.granulo_generations)):
+                raise ValueError(
+                    f"Distribution introuvable (dist_idx={dist_idx}). "
+                    "Créez d'abord une distribution dans l'onglet Granulométrie."
+                )
+            dist_config = self.state.granulo_generations[dist_idx]
+
+            # Générer les rayons via pylmgc90
+            radii = GranuloGenerator.generate_radii(dist_config)
+
+            loop_var = for_loop.loop_var
+            self._batch_mode = True
+            try:
+                for i, r in enumerate(radii):
+                    context = {**base_context, loop_var: i, 'i': i, 'r': float(r)}
+                    evaluator.allowed_names = context
+
+                    evaluated_config = {}
+                    for key, value in tc.items():
+                        if key == 'dist_idx':
+                            continue
+                        if isinstance(value, str):
+                            try:
+                                evaluated_config[key] = evaluator.eval_expression(value)
+                            except Exception:
+                                evaluated_config[key] = value
+                        else:
+                            evaluated_config[key] = value
+
+                    avatar = Avatar(
+                        avatar_type=AvatarType(
+                            evaluated_config.get('avatar_type',
+                                'rigidDisk' if self.state.dimension == 2 else 'rigidSphere')
+                        ),
+                        center=evaluated_config['center'],
+                        material_name=evaluated_config.get('material_name', ''),
+                        model_name=evaluated_config.get('model_name', ''),
+                        color=evaluated_config.get('color', 'BLUEx'),
+                        origin=AvatarOrigin.LOOP,
+                        radius=float(r),
+                    )
+                    idx = self.add_avatar(avatar)
+                    generated_indices.append(idx)
+            finally:
+                self._batch_mode = False
+
+            for_loop.generated_indices = generated_indices
+            if not self._is_loading:
+                self.state.for_loops.append(for_loop)
+
+            if for_loop.group_name:
+                self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(generated_indices)
+
+            self.state_changed.emit()
+            return generated_indices
+
+        # ── Boucle For classique (range) ──────────────────────────────────────
         evaluator.allowed_names = base_context
         start = evaluator.eval_expression(for_loop.start_expr)
-        end = evaluator.eval_expression(for_loop.end_expr)
-        step = evaluator.eval_expression(for_loop.step_expr)
-        
-        # Boucle For
+        end   = evaluator.eval_expression(for_loop.end_expr)
+        step  = evaluator.eval_expression(for_loop.step_expr)
+
         loop_var = for_loop.loop_var
-        current = start
-        
+        current  = start
+
         while (step > 0 and current < end) or (step < 0 and current > end):
-            # Contexte avec variable de boucle
             context = {**base_context, loop_var: current}
             evaluator.allowed_names = context
-            
-            # Évaluer le template
+
             evaluated_config = {}
             for key, value in for_loop.template_config.items():
                 if isinstance(value, str):
                     try:
                         evaluated_config[key] = evaluator.eval_expression(value)
                     except (ValueError, NameError, SyntaxError):
-                        # Chaîne littérale ou expression?
-                        if any(op in value for op in ['+', '-', '*', '/', '(', '[', 'str(', 'int(', 'float(', 'math.']):
-                            raise  # C'est une expression avec erreur
+                        if any(op in value for op in ['+', '-', '*', '/', '(', '[',
+                                                       'str(', 'int(', 'float(', 'math.']):
+                            raise
                         else:
-                            evaluated_config[key] = value  # Chaîne littérale
+                            evaluated_config[key] = value
                 else:
                     evaluated_config[key] = value
-            
-            # Créer l'élément selon le type
+
             if for_loop.target_type == 'avatar':
                 avatar = Avatar(
                     avatar_type=AvatarType(evaluated_config['avatar_type']),
@@ -1150,7 +1215,7 @@ class ProjectController(QObject):
                 )
                 idx = self.add_avatar(avatar)
                 generated_indices.append(idx)
-            
+
             elif for_loop.target_type == 'material':
                 from ..core.models import Material, MaterialType
                 material = Material(
@@ -1160,10 +1225,9 @@ class ProjectController(QObject):
                     properties=evaluated_config.get('properties', {})
                 )
                 self.add_material(material)
-                # Pour les matériaux, on stocke l'index dans la liste
                 idx = len(self.state.materials) - 1
                 generated_indices.append(idx)
-            
+
             elif for_loop.target_type == 'model':
                 from ..core.models import Model
                 model = Model(
@@ -1174,22 +1238,18 @@ class ProjectController(QObject):
                     options=evaluated_config.get('options', {})
                 )
                 self.add_model(model)
-                # Pour les modèles, on stocke l'index dans la liste
                 idx = len(self.state.models) - 1
                 generated_indices.append(idx)
-            
+
             current += step
-        
+
         for_loop.generated_indices = generated_indices
         if not self._is_loading:
             self.state.for_loops.append(for_loop)
-        
-        # Ajouter au groupe si spécifié (uniquement pour avatars)
-        if for_loop.group_name and for_loop.target_type == 'avatar':
-            if for_loop.group_name not in self.state.avatar_groups:
-                self.state.avatar_groups[for_loop.group_name] = []
-            self.state.avatar_groups[for_loop.group_name].extend(generated_indices)
-        
+
+        if for_loop.group_name and for_loop.target_type in ('avatar', 'granulo'):
+            self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(generated_indices)
+
         return generated_indices
     
     def update_for_loop(self, index: int, for_loop: ForLoop) -> None:

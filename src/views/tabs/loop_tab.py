@@ -80,7 +80,7 @@ class LoopTab(BaseTab):
         form = QFormLayout()
 
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["Cercle", "Grille", "Ligne", "Spirale", "For"])
+        self.type_combo.addItems(["Cercle", "Grille", "Ligne", "Spirale", "For", "Distribution"])
         self.type_combo.currentTextChanged.connect(self._on_type_changed)
         form.addRow("Type de boucle :", self.type_combo)
 
@@ -125,56 +125,113 @@ class LoopTab(BaseTab):
 
         self.for_widget = QWidget()
         for_layout = QVBoxLayout()
-        
+
         for_group = QGroupBox("⚙️ Configuration Boucle For")
         for_form = QFormLayout()
-        
+
         self.loop_var_input = QLineEdit("i")
         for_form.addRow("Variable de boucle :", self.loop_var_input)
-        
+
         self.start_input = QLineEdit("0")
         for_form.addRow("Début :", self.start_input)
-        
+
         self.end_input = QLineEdit("10")
         for_form.addRow("Fin :", self.end_input)
-        
+
         self.step_for_input = QLineEdit("1")
         for_form.addRow("Step :", self.step_for_input)
-        
+
         self.target_type_combo = QComboBox()
         self.target_type_combo.addItems([
-            "avatar", "material", "model", "contact_law", "visibility", "dof"
+            "avatar", "material", "model", "contact_law", "visibility", "dof", "granulo"
         ])
         self.target_type_combo.currentTextChanged.connect(self._on_target_type_changed)
         for_form.addRow("Type d'élément :", self.target_type_combo)
-        
+
+        # Sélecteur de distribution — visible seulement quand target_type == "granulo"
+        self.for_dist_label = QLabel("Distribution source :")
+        self.for_dist_combo = QComboBox()
+        self.for_dist_combo.setToolTip(
+            "Distribution granulométrique créée dans l'onglet Granulométrie\n"
+            "(mode « Distribution uniquement »).\n"
+            "Chaque rayon de cette distribution devient la variable 'r' dans le template."
+        )
+        self.for_dist_combo.currentIndexChanged.connect(self._on_for_dist_changed)
+        for_form.addRow(self.for_dist_label, self.for_dist_combo)
+        self.for_dist_label.setVisible(False)
+        self.for_dist_combo.setVisible(False)
+
         for_group.setLayout(for_form)
         for_layout.addWidget(for_group)
-        
+
         template_group = QGroupBox("📝 Template JSON")
         template_layout = QVBoxLayout()
-        
-        help_text = QLabel(
-            "💡 <b>Exemples de templates :</b><br>"
-            "• Avatar : {\"avatar_type\": \"rigidDisk\", \"center\": \"[i*0.5, 0]\", \"material_name\": \"TDURx\", \"model_name\": \"rigid\", \"radius\": \"0.1+i*0.01\"}<br>"
-            "• Matériau : {\"name\": \"'MAT'+str(i)\", \"material_type\": \"RIGID\", \"density\": \"2800+i*100\"}<br>"
-            "• Variables : Utilisez 'i' (variable de boucle) et vos variables dynamiques"
-        )
-        help_text.setWordWrap(True)
-        help_text.setStyleSheet("color: #666; font-size: 8pt; padding: 5px;")
-        template_layout.addWidget(help_text)
-        
+
+        self.for_help_text = QLabel()
+        self.for_help_text.setWordWrap(True)
+        self.for_help_text.setStyleSheet("color: #666; font-size: 8pt; padding: 5px;")
+        template_layout.addWidget(self.for_help_text)
+
         self.template_input = QTextEdit()
         self.template_input.setPlaceholderText('{"avatar_type": "rigidDisk", "center": "[i*0.5, 0]", ...}')
         self.template_input.setMaximumHeight(150)
         template_layout.addWidget(self.template_input)
-        
+
         template_group.setLayout(template_layout)
         for_layout.addWidget(template_group)
-        
+
         self.for_widget.setLayout(for_layout)
         self.for_widget.setVisible(False)
         layout.addWidget(self.for_widget)
+
+        # ── Widget Distribution ───────────────────────────────────────────────
+        self.dist_widget = QGroupBox("🎲 Configuration Boucle Distribution")
+        dist_form = QFormLayout()
+
+        self.dist_combo = QComboBox()
+        self.dist_combo.setToolTip(
+            "Distributions disponibles dans le projet (générées depuis l'onglet Granulométrie)."
+        )
+        dist_form.addRow("Distribution :", self.dist_combo)
+
+        self.dist_mat_combo = QComboBox()
+        dist_form.addRow("Matériau des avatars :", self.dist_mat_combo)
+
+        self.dist_mod_combo = QComboBox()
+        dist_form.addRow("Modèle des avatars :", self.dist_mod_combo)
+
+        self.dist_color_input = QLineEdit("BLUEx")
+        dist_form.addRow("Couleur :", self.dist_color_input)
+
+        self.dist_pattern_combo = QComboBox()
+        self.dist_pattern_combo.addItems(["Grille", "Ligne"])
+        self.dist_pattern_combo.setToolTip(
+            "Grille : avatars disposés en grille carrée.\n"
+            "Ligne  : avatars alignés sur l'axe X."
+        )
+        dist_form.addRow("Disposition :", self.dist_pattern_combo)
+
+        from PyQt6.QtWidgets import QDoubleSpinBox as _DSB
+        self.dist_step_spin = _DSB()
+        self.dist_step_spin.setRange(1.0, 20.0)
+        self.dist_step_spin.setDecimals(2)
+        self.dist_step_spin.setSingleStep(0.1)
+        self.dist_step_spin.setValue(2.2)
+        self.dist_step_spin.setToolTip(
+            "Multiplicateur de l'espacement entre avatars.\n"
+            "Espacement = facteur × 2 × rayon_max de la distribution."
+        )
+        dist_form.addRow("Facteur d'espacement :", self.dist_step_spin)
+
+        self.dist_ox_input = QLineEdit("0.0")
+        dist_form.addRow("Offset X :", self.dist_ox_input)
+
+        self.dist_oy_input = QLineEdit("0.0")
+        dist_form.addRow("Offset Y :", self.dist_oy_input)
+
+        self.dist_widget.setLayout(dist_form)
+        self.dist_widget.setVisible(False)
+        layout.addWidget(self.dist_widget)
 
         group_layout = QHBoxLayout()
         self.store_check = QCheckBox("Stocker dans un groupe")
@@ -266,56 +323,192 @@ class LoopTab(BaseTab):
         self.offset_y_label.setVisible(loop_type == "Grille")
         self.offset_y_input.setVisible(loop_type == "Grille")
         
-        self.classic_widget.setVisible(loop_type != "For")
+        self.classic_widget.setVisible(loop_type not in ("For", "Distribution"))
         self.for_widget.setVisible(loop_type == "For")
-        
+        self.dist_widget.setVisible(loop_type == "Distribution")
+
         suggestions = {
-            "Cercle": "Avatars disposés en cercle avec un rayon défini.",
-            "Grille": "Avatars disposés en grille régulière avec un pas.",
-            "Ligne": "Avatars disposés en ligne avec un espacement.",
-            "Spirale": "Avatars en spirale avec rayon croissant.",
-            "Manuel": "Configuration manuelle des positions.",
-            "For": "Boucle For programmable pour génération avancée."
+            "Cercle":       "Avatars disposés en cercle avec un rayon défini.",
+            "Grille":       "Avatars disposés en grille régulière avec un pas.",
+            "Ligne":        "Avatars disposés en ligne avec un espacement.",
+            "Spirale":      "Avatars en spirale avec rayon croissant.",
+            "For":          "Boucle For programmable pour génération avancée.",
+            "Distribution": (
+                "Place un avatar par rayon d'une distribution granulométrique existante. "
+                "Les rayons proviennent d'une distribution créée dans l'onglet Granulométrie."
+            ),
         }
         self.help_label.setText(suggestions.get(loop_type, ""))
 
     def _on_target_type_changed(self, target_type: str):
-        """Appelé quand le type cible change (boucle For)"""
+        """Appelé quand le type cible change (boucle For)."""
+        is_granulo = (target_type == "granulo")
+
+        # Afficher/masquer le sélecteur de distribution
+        self.for_dist_label.setVisible(is_granulo)
+        self.for_dist_combo.setVisible(is_granulo)
+
+        # Masquer start/end/step pour granulo (itération sur les rayons, pas range)
+        # On les laisse visibles mais on les grise visuellement
+        for w in (self.start_input, self.end_input, self.step_for_input):
+            w.setEnabled(not is_granulo)
+
+        # Templates d'exemple
+        # Templates d'exemple
         templates = {
-            "avatar": '{"avatar_type": "rigidDisk", "center": "[i*0.5, 0]", "material_name": "TDURx", "model_name": "rigid", "radius": "0.1+i*0.01"}',
-            "material": '{"name": "\'MAT\'+str(i)", "material_type": "RIGID", "density": "2800+i*100"}',
-            "model": '{"name": "\'MOD\'+str(i)", "physics": "MECAx", "element": "Rxx2D", "dimension": 2}',
+            "avatar": (
+                '{"avatar_type": "rigidDisk", '
+                '"center": "[i*0.5, 0.0]", '
+                '"material_name": "TDURx", '
+                '"model_name": "rigid", '
+                '"radius": "0.1+i*0.01"}'
+            ),
+            "material": (
+                '{"name": "\'MAT\'+str(i)", '
+                '"material_type": "RIGID", '
+                '"density": "2800+i*100"}'
+            ),
+            "model": (
+                '{"name": "\'MOD\'+str(i)", '
+                '"physics": "MECAx", '
+                '"element": "Rxx2D", '
+                '"dimension": 2}'
+            ),
+
+            "contact_law" : (
+                '{"name": "\'LAW\'+str(i)", ' 
+                '"law": "IQS_CLB", '
+                '"friction": 0.3 }'
+
+            ),
+
+            "visibility" : (
+                '{"CorpsCandidat": "RBDY2", '
+                '"candidat": "DISKx", '
+                '"colorCandidat" : "BLUEx", '
+                '"CorpsAntagoniste" :  "RBDY2", '
+                '"antagoniste" : "DISKx", '
+                '"colorAntagoniste" : "REDxx", '
+                '"behav" : "LAW01", '
+                '"alert": 0.05  '
+                '}'
+            ),
+            "dof" : (
+                '{"dof": "imposeDrivenDof", '
+                '"component": "[1,2,3]", '
+                '"dofty": "vlocy" }'
+            ),
+
+            "granulo": (
+                '{"avatar_type": "rigidDisk", '
+                '"center": "[i * r * 2.5, 0.0]", '
+                '"material_name": "TDURx", '
+                '"model_name": "rigid", '
+                '"color": "BLUEx"}'
+            ),
         }
+
+        # Texte d'aide selon le type
+        help_texts = {
+            "avatar": (
+                "💡 Variables : <b>i</b> (index de boucle).<br>"
+                "Exemple : <code>\"center\": \"[i*0.5, 0]\"</code>"
+            ),
+            "material": (
+                "💡 Variables : <b>i</b> (index de boucle).<br>"
+                "Exemple : <code>\"density\": \"2800+i*100\"</code>"
+            ),
+            "model": (
+                "💡 Variables : <b>i</b> (index de boucle).<br>"
+                "Exemple : <code>\"element\": \"T3xxx\"</code>"
+            ),
+            "granulo": (
+                "💡 Variables : <b>i</b> (index 0-based), <b>r</b> (rayon de la distribution).<br>"
+                "Le start/end/step est ignoré — l'itération porte sur tous les rayons.<br>"
+                "Exemple : <code>\"center\": \"[i * r * 2.5, 0.0]\"</code>"
+            ),
+        }
+
         if target_type in templates:
             self.template_input.setPlainText(templates[target_type])
+        self.for_help_text.setText(help_texts.get(target_type, "💡 Variables : <b>i</b> (index de boucle)."))
+
+    def _on_for_dist_changed(self, index: int):
+        """Met à jour le template granulo quand la distribution sélectionnée change."""
+        if self.target_type_combo.currentText() != "granulo":
+            return
+        dist_idx = self.for_dist_combo.itemData(index)
+        if dist_idx is None:
+            return
+        gens = self.controller.state.granulo_generations
+        if dist_idx < len(gens):
+            g = gens[dist_idx]
+            # Proposer un espacement automatique = 2.2 * rmax
+            step = g.radius_max * 2.2
+            dim  = self.controller.state.dimension
+            if dim == 2:
+                center_expr = f"[i * {step:.4g}, 0.0]"
+            else:
+                center_expr = f"[i * {step:.4g}, 0.0, 0.0]"
+            av_type = "rigidDisk" if dim == 2 else "rigidSphere"
+            self.template_input.setPlainText(
+                f'{{"avatar_type": "{av_type}", '
+                f'"center": "{center_expr}", '
+                f'"material_name": "TDURx", '
+                f'"model_name": "rigid", '
+                f'"color": "BLUEx"}}'
+            )
 
     def _on_create(self):
         """Crée une nouvelle boucle"""
         try:
             loop_type = self.type_combo.currentText()
-            
+
+            if loop_type == "Distribution":
+                self._create_distribution_loop()
+                return
+
             if loop_type == "For":
+                target_type = self.target_type_combo.currentText()
                 template_text = self.template_input.toPlainText().strip()
                 if not template_text:
                     raise ValidationError("Le template JSON est requis pour les boucles For")
-                
+
                 template_config = json.loads(template_text)
-                
+
+                if target_type == "granulo":
+                    # Injecter l'indice de la distribution dans le template_config
+                    dist_idx = self.for_dist_combo.currentData()
+                    if dist_idx is None:
+                        raise ValidationError(
+                            "Aucune distribution sélectionnée.\n"
+                            "Créez d'abord une distribution dans l'onglet Granulométrie."
+                        )
+                    template_config['dist_idx'] = dist_idx
+                    # start/end/step ignorés — itération sur les rayons de la distribution
+                    start_expr = "0"
+                    end_expr   = "0"
+                    step_expr  = "1"
+                else:
+                    start_expr = self.start_input.text().strip()
+                    end_expr   = self.end_input.text().strip()
+                    step_expr  = self.step_for_input.text().strip()
+
                 for_loop = ForLoop(
                     loop_var=self.loop_var_input.text().strip(),
-                    start_expr=self.start_input.text().strip(),
-                    end_expr=self.end_input.text().strip(),
-                    step_expr=self.step_for_input.text().strip(),
-                    target_type=self.target_type_combo.currentText(),
+                    start_expr=start_expr,
+                    end_expr=end_expr,
+                    step_expr=step_expr,
+                    target_type=target_type,
                     template_config=template_config,
                     group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None
                 )
-                
+
                 indices = self.controller.generate_for_loop(for_loop)
                 self.loop_generated.emit()
                 QMessageBox.information(
                     self, "Succès",
-                    f"{len(indices)} éléments générés avec succès.\nGroupe : {for_loop.group_name or 'Aucun'}"
+                    f"{len(indices)} éléments générés.\nGroupe : {for_loop.group_name or 'Aucun'}"
                 )
             
             else:
@@ -358,6 +551,102 @@ class LoopTab(BaseTab):
             QMessageBox.critical(self, "Erreur JSON", f"Template JSON invalide:\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Création échouée:\n{e}")
+
+    def _create_distribution_loop(self):
+        """
+        Type 'Distribution' : UI simplifiée pour placer un avatar par rayon.
+        Délègue entièrement à generate_for_loop(target_type='granulo').
+        Les expressions de centre sont construites automatiquement selon la disposition.
+        """
+        import math as _math
+        from ...core.models import ForLoop
+
+        # ── Distribution ──────────────────────────────────────────────────────
+        dist_idx = self.dist_combo.currentData()
+        if dist_idx is None:
+            raise ValidationError(
+                "Aucune distribution disponible.\n"
+                "Créez-en une depuis l'onglet Granulométrie (mode « Distribution uniquement »)."
+            )
+        dist_config = self.controller.state.granulo_generations[dist_idx]
+
+        # ── Paramètres avatars ────────────────────────────────────────────────
+        material  = self.dist_mat_combo.currentText()
+        model_nom = self.dist_mod_combo.currentText()
+        color     = self.dist_color_input.text().strip() or "BLUEx"
+
+        if not material:
+            raise ValidationError("Sélectionnez un matériau pour les avatars.")
+        if not model_nom:
+            raise ValidationError("Sélectionnez un modèle pour les avatars.")
+
+        # ── Disposition ───────────────────────────────────────────────────────
+        pattern     = self.dist_pattern_combo.currentText()
+        step_factor = self.dist_step_spin.value()
+        offset_x    = self.eval_float(self.dist_ox_input.text(), default=0.0, field_name="Offset X")
+        offset_y    = self.eval_float(self.dist_oy_input.text(), default=0.0, field_name="Offset Y")
+        dim         = self.controller.state.dimension
+
+        rmax    = float(dist_config.radius_max)
+        step    = step_factor * rmax * 2.0
+        av_type = "rigidDisk" if dim == 2 else "rigidSphere"
+
+        # Construire l'expression de centre (variables i et r disponibles dans generate_for_loop)
+        if pattern == "Grille":
+            nb   = dist_config.nb_particles
+            cols = max(1, int(_math.ceil(_math.sqrt(nb))))
+            s    = f"{step:.6g}"
+            ox   = f"{offset_x:.6g}"
+            oy   = f"{offset_y:.6g}"
+            if dim == 2:
+                center_expr = f"[{ox} + (i % {cols}) * {s}, {oy} + (i // {cols}) * {s}]"
+            else:
+                center_expr = f"[{ox} + (i % {cols}) * {s}, {oy} + (i // {cols}) * {s}, 0.0]"
+        else:  # Ligne
+            s  = f"{step:.6g}"
+            ox = f"{offset_x:.6g}"
+            oy = f"{offset_y:.6g}"
+            if dim == 2:
+                center_expr = f"[{ox} + i * {s}, {oy}]"
+            else:
+                center_expr = f"[{ox} + i * {s}, {oy}, 0.0]"
+
+        # ── Construire le template_config ─────────────────────────────────────
+        template_config = {
+            "dist_idx":      dist_idx,
+            "avatar_type":   av_type,
+            "center":        center_expr,
+            "material_name": material,
+            "model_name":    model_nom,
+            "color":         color,
+        }
+
+        group_name = (
+            self.group_name_input.text().strip()
+            if self.store_check.isChecked()
+            else None
+        )
+
+        # ── Déléguer à generate_for_loop ──────────────────────────────────────
+        for_loop = ForLoop(
+            loop_var='i',
+            start_expr='0',
+            end_expr='0',
+            step_expr='1',
+            target_type='granulo',
+            template_config=template_config,
+            group_name=group_name,
+        )
+
+        indices = self.controller.generate_for_loop(for_loop)
+        self.loop_generated.emit()
+        self.refresh()
+        QMessageBox.information(
+            self, "✅ Distribution placée",
+            f"{len(indices)} avatars créés depuis la distribution "
+            f"[{dist_config.radius_min:.4g} – {dist_config.radius_max:.4g}].\n"
+            f"Disposition : {pattern}  |  Groupe : {group_name or 'Aucun'}"
+        )
 
     def _on_edit_from_tree(self):
         """Charge une boucle depuis l'arbre pour édition"""
@@ -665,15 +954,23 @@ class LoopTab(BaseTab):
         self.invert_check.setChecked(False)
         self.store_check.setChecked(False)
         self.group_name_input.setText("boucle_groupe")
-        
+
         self.loop_var_input.setText("i")
         self.start_input.setText("0")
         self.end_input.setText("10")
         self.step_for_input.setText("1")
         self.template_input.clear()
 
+        # Réinitialiser le widget Distribution
+        self.dist_color_input.setText("BLUEx")
+        self.dist_step_spin.setValue(2.2)
+        self.dist_ox_input.setText("0.0")
+        self.dist_oy_input.setText("0.0")
+        self.dist_pattern_combo.setCurrentIndex(0)
+
     def refresh(self):
         """Rafraîchit l'affichage"""
+        # ── Avatar combo (boucles classiques) ─────────────────────────────────
         self.avatar_combo.clear()
         for i, avatar in enumerate(self.controller.state.avatars):
             if avatar.origin == AvatarOrigin.MANUAL:
@@ -682,32 +979,83 @@ class LoopTab(BaseTab):
         if self.avatar_combo.count() == 0:
             self.avatar_combo.addItem("(Aucun avatar manuel disponible)", None)
 
-        self.tree.clear()
-        
-        for idx, loop in enumerate(self.controller.state.loops):
-            avatar_idx = loop.model_avatar_index
-            avatar_label = f"#{avatar_idx}" if avatar_idx < len(self.controller.state.avatars) else "Inconnu"
-            group_str = loop.group_name or "—"
+        # ── Distribution combos (widget Distribution + widget For/granulo) ────
+        dist_items = []
+        for i, gen in enumerate(self.controller.state.granulo_generations):
+            label = (
+                f"#{i+1}  [{gen.radius_min:.4g} – {gen.radius_max:.4g}]"
+                f"  ({gen.nb_particles} rayons)"
+            )
+            dist_items.append((label, i))
 
+        for combo in (self.dist_combo, self.for_dist_combo):
+            combo.blockSignals(True)
+            combo.clear()
+            for label, idx in dist_items:
+                combo.addItem(label, idx)
+            if not dist_items:
+                combo.addItem("(Aucune distribution disponible)", None)
+            combo.blockSignals(False)
+
+        # ── Combos matériau / modèle (widget Distribution) ───────────────────
+        self.dist_mat_combo.clear()
+        for m in self.controller.get_materials():
+            self.dist_mat_combo.addItem(m.name)
+        self.dist_mod_combo.clear()
+        for m in self.controller.get_models():
+            self.dist_mod_combo.addItem(m.name)
+
+        # ── Arbre ─────────────────────────────────────────────────────────────
+        self.tree.clear()
+
+        for idx, loop in enumerate(self.controller.state.loops):
+            avatar_idx   = loop.model_avatar_index
+            avatar_label = (
+                f"#{avatar_idx}"
+                if avatar_idx < len(self.controller.state.avatars)
+                else "Inconnu"
+            )
             item = QTreeWidgetItem([
                 str(idx + 1),
                 loop.loop_type,
                 str(loop.count),
                 avatar_label,
-                group_str
+                loop.group_name or "—",
             ])
             item.setData(0, Qt.ItemDataRole.UserRole, idx)
             self.tree.addTopLevelItem(item)
-        
-        for idx, for_loop in enumerate(self.controller.state.for_loops):
-            global_idx = len(self.controller.state.loops) + idx
-            item = QTreeWidgetItem([
-                str(global_idx + 1),
-                f"For ({for_loop.target_type})",
-                str(len(for_loop.generated_indices)),
-                f"{for_loop.loop_var}: {for_loop.start_expr}→{for_loop.end_expr}",
-                for_loop.group_name or "—"
-            ])
-            item.setForeground(1, QBrush(QColor(0, 100, 200)))
-            item.setData(0, Qt.ItemDataRole.UserRole, global_idx)
-            self.tree.addTopLevelItem(item)
+
+        if hasattr(self.controller.state, 'for_loops'):
+            for idx, for_loop in enumerate(self.controller.state.for_loops):
+                global_idx = len(self.controller.state.loops) + idx
+                tc         = for_loop.template_config or {}
+
+                if for_loop.target_type == 'granulo':
+                    # Boucle sur distribution (For/granulo ou Distribution)
+                    dist_idx = tc.get('dist_idx', '?')
+                    gens     = self.controller.state.granulo_generations
+                    if isinstance(dist_idx, int) and dist_idx < len(gens):
+                        g      = gens[dist_idx]
+                        detail = f"dist#{dist_idx+1}  [{g.radius_min:.4g}–{g.radius_max:.4g}]"
+                    else:
+                        detail = f"dist#{dist_idx}"
+                    item = QTreeWidgetItem([
+                        str(global_idx + 1),
+                        "For (granulo)",
+                        str(len(for_loop.generated_indices)),
+                        detail,
+                        for_loop.group_name or "—",
+                    ])
+                    item.setForeground(1, QBrush(QColor(160, 80, 0)))
+                else:
+                    item = QTreeWidgetItem([
+                        str(global_idx + 1),
+                        f"For ({for_loop.target_type})",
+                        str(len(for_loop.generated_indices)),
+                        f"{for_loop.loop_var}: {for_loop.start_expr}→{for_loop.end_expr}",
+                        for_loop.group_name or "—",
+                    ])
+                    item.setForeground(1, QBrush(QColor(0, 100, 200)))
+
+                item.setData(0, Qt.ItemDataRole.UserRole, global_idx)
+                self.tree.addTopLevelItem(item)

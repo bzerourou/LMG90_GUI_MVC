@@ -328,6 +328,26 @@ class GranuloGenerator:
     """Génère des distributions granulométriques"""
     
     @staticmethod
+    def generate_radii(config: GranuloGeneration) -> np.ndarray:
+        """
+        Génère uniquement la distribution de rayons sans dépôt (granulo_Random).
+
+        Args:
+            config: Configuration de la génération — seuls nb_particles,
+                    radius_min, radius_max et seed sont utilisés.
+
+        Returns:
+            Array numpy de rayons de forme (nb_particles,).
+        """
+        from pylmgc90 import pre
+        return pre.granulo_Random(
+            config.nb_particles,
+            config.radius_min,
+            config.radius_max,
+            config.seed
+        )
+
+    @staticmethod
     def generate(config: GranuloGeneration) -> Tuple[int, np.ndarray, np.ndarray]:
         """
         Génère une distribution granulométrique avec dépôt.
