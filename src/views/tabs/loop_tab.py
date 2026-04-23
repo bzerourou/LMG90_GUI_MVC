@@ -80,7 +80,7 @@ class LoopTab(BaseTab):
         form = QFormLayout()
 
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["Cercle", "Grille", "Ligne", "Spirale", "For", "Distribution"])
+        self.type_combo.addItems(["Cercle", "Grille", "Ligne", "Spirale", "For"])
         self.type_combo.currentTextChanged.connect(self._on_type_changed)
         form.addRow("Type de boucle :", self.type_combo)
 
@@ -344,18 +344,17 @@ class LoopTab(BaseTab):
         """Appelé quand le type cible change (boucle For)."""
         is_granulo = (target_type == "granulo")
 
-        # Afficher/masquer le sélecteur de distribution
-        self.for_dist_label.setVisible(is_granulo)
-        self.for_dist_combo.setVisible(is_granulo)
+        # Le sélecteur de distribution n'est plus nécessaire pour granulo
+        self.for_dist_label.setVisible(False)
+        self.for_dist_combo.setVisible(False)
 
-        # Masquer start/end/step pour granulo (itération sur les rayons, pas range)
-        # On les laisse visibles mais on les grise visuellement
+        # start/end/step : toujours actifs pour granulo (c'est un range normal)
         for w in (self.start_input, self.end_input, self.step_for_input):
-            w.setEnabled(not is_granulo)
+            w.setEnabled(True)
 
-        # Templates d'exemple
-        # Templates d'exemple
+        # Templates d'exemple par type
         templates = {
+
             "avatar": (
                 '{"avatar_type": "rigidDisk", '
                 '"center": "[i*0.5, 0.0]", '
@@ -400,38 +399,50 @@ class LoopTab(BaseTab):
             ),
 
             "granulo": (
-                '{"avatar_type": "rigidDisk", '
-                '"center": "[i * r * 2.5, 0.0]", '
-                '"material_name": "TDURx", '
-                '"model_name": "rigid", '
-                '"color": "BLUEx"}'
+                '{\n'
+                '  "nb_particles": 50,\n'
+                '  "radius_min": 0.04,\n'
+                '  "radius_max": 0.05,\n'
+                '  "container_type": "Box2D",\n'
+                '  "container_params": {\n'
+                '    "lx": 4.0,\n'
+                '    "ly": 2.0\n'
+                '  },\n'
+                '  "origin" : "[i* 3.0, 0.0]",\n'
+                '  "material_name": "TDURx",\n'
+                '  "model_name": "rigid",\n'
+                '  "avatar_type": "rigidDisk"\n'
+                '}'
             ),
         }
 
-        # Texte d'aide selon le type
         help_texts = {
             "avatar": (
-                "💡 Variables : <b>i</b> (index de boucle).<br>"
-                "Exemple : <code>\"center\": \"[i*0.5, 0]\"</code>"
+                "💡 Variable : <b>i</b> (valeur courante de la boucle).<br>"
+                "Toutes les valeurs string sont évaluées comme expressions Python."
             ),
             "material": (
-                "💡 Variables : <b>i</b> (index de boucle).<br>"
-                "Exemple : <code>\"density\": \"2800+i*100\"</code>"
+                "💡 Variable : <b>i</b> (valeur courante).<br>"
+                "Exemple : <code>\"density\": \"2800 + i*100\"</code>"
             ),
             "model": (
-                "💡 Variables : <b>i</b> (index de boucle).<br>"
+                "💡 Variable : <b>i</b> (valeur courante).<br>"
                 "Exemple : <code>\"element\": \"T3xxx\"</code>"
             ),
             "granulo": (
-                "💡 Variables : <b>i</b> (index 0-based), <b>r</b> (rayon de la distribution).<br>"
-                "Le start/end/step est ignoré — l'itération porte sur tous les rayons.<br>"
-                "Exemple : <code>\"center\": \"[i * r * 2.5, 0.0]\"</code>"
+                "💡 Variable : <b>i</b> (valeur courante de la boucle).<br>"
+                "Chaque itération crée un <b>dépôt granulométrique complet</b>.<br>"
+                "Les valeurs de <code>container_params</code> peuvent être des expressions avec <b>i</b> "
+                "pour espacer les dépôts.<br>"
+                "Exemple : <code>\"xmin\": \"i * 2.0\"</code> — dépôt décalé de 2.0 à chaque tour."
             ),
         }
 
         if target_type in templates:
             self.template_input.setPlainText(templates[target_type])
-        self.for_help_text.setText(help_texts.get(target_type, "💡 Variables : <b>i</b> (index de boucle)."))
+        self.for_help_text.setText(help_texts.get(
+            target_type, "💡 Variable : <b>i</b> (valeur courante de la boucle)."
+        ))
 
     def _on_for_dist_changed(self, index: int):
         """Met à jour le template granulo quand la distribution sélectionnée change."""
@@ -476,29 +487,11 @@ class LoopTab(BaseTab):
 
                 template_config = json.loads(template_text)
 
-                if target_type == "granulo":
-                    # Injecter l'indice de la distribution dans le template_config
-                    dist_idx = self.for_dist_combo.currentData()
-                    if dist_idx is None:
-                        raise ValidationError(
-                            "Aucune distribution sélectionnée.\n"
-                            "Créez d'abord une distribution dans l'onglet Granulométrie."
-                        )
-                    template_config['dist_idx'] = dist_idx
-                    # start/end/step ignorés — itération sur les rayons de la distribution
-                    start_expr = "0"
-                    end_expr   = "0"
-                    step_expr  = "1"
-                else:
-                    start_expr = self.start_input.text().strip()
-                    end_expr   = self.end_input.text().strip()
-                    step_expr  = self.step_for_input.text().strip()
-
                 for_loop = ForLoop(
                     loop_var=self.loop_var_input.text().strip(),
-                    start_expr=start_expr,
-                    end_expr=end_expr,
-                    step_expr=step_expr,
+                    start_expr=self.start_input.text().strip(),
+                    end_expr=self.end_input.text().strip(),
+                    step_expr=self.step_for_input.text().strip(),
                     target_type=target_type,
                     template_config=template_config,
                     group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None
@@ -554,14 +547,15 @@ class LoopTab(BaseTab):
 
     def _create_distribution_loop(self):
         """
-        Type 'Distribution' : UI simplifiée pour placer un avatar par rayon.
-        Délègue entièrement à generate_for_loop(target_type='granulo').
-        Les expressions de centre sont construites automatiquement selon la disposition.
+        Type 'Distribution' : UI simplifiée pour créer N dépôts granulométriques
+        identiques (même distribution) espacés automatiquement.
+        Équivalent à un For (granulo) avec container_params construits depuis
+        la distribution sélectionnée et la disposition choisie.
         """
         import math as _math
         from ...core.models import ForLoop
 
-        # ── Distribution ──────────────────────────────────────────────────────
+        # ── Distribution source ───────────────────────────────────────────────
         dist_idx = self.dist_combo.currentData()
         if dist_idx is None:
             raise ValidationError(
@@ -569,6 +563,12 @@ class LoopTab(BaseTab):
                 "Créez-en une depuis l'onglet Granulométrie (mode « Distribution uniquement »)."
             )
         dist_config = self.controller.state.granulo_generations[dist_idx]
+
+        # ── Nombre de dépôts ──────────────────────────────────────────────────
+        n_deposits = self.eval_int(
+            getattr(self, 'dist_n_spin', None) and self.dist_n_spin.value() or "1",
+            default=1, field_name="Nombre de dépôts"
+        ) if hasattr(self, 'dist_n_spin') else 1
 
         # ── Paramètres avatars ────────────────────────────────────────────────
         material  = self.dist_mat_combo.currentText()
@@ -580,45 +580,83 @@ class LoopTab(BaseTab):
         if not model_nom:
             raise ValidationError("Sélectionnez un modèle pour les avatars.")
 
-        # ── Disposition ───────────────────────────────────────────────────────
-        pattern     = self.dist_pattern_combo.currentText()
+        # ── Paramètres position ───────────────────────────────────────────────
         step_factor = self.dist_step_spin.value()
         offset_x    = self.eval_float(self.dist_ox_input.text(), default=0.0, field_name="Offset X")
         offset_y    = self.eval_float(self.dist_oy_input.text(), default=0.0, field_name="Offset Y")
         dim         = self.controller.state.dimension
 
-        rmax    = float(dist_config.radius_max)
-        step    = step_factor * rmax * 2.0
-        av_type = "rigidDisk" if dim == 2 else "rigidSphere"
+        # La taille d'un dépôt est estimée depuis container_params si dispo, sinon rmax*2
+        cp   = dist_config.container_params or {}
+        rmax = float(dist_config.radius_max)
 
-        # Construire l'expression de centre (variables i et r disponibles dans generate_for_loop)
-        if pattern == "Grille":
-            nb   = dist_config.nb_particles
-            cols = max(1, int(_math.ceil(_math.sqrt(nb))))
-            s    = f"{step:.6g}"
+        # Tenter d'estimer la largeur du conteneur (Box2D → xmax-xmin)
+        if 'xmax' in cp and 'xmin' in cp:
+            box_w = float(cp['xmax']) - float(cp['xmin'])
+            box_h = float(cp.get('ymax', cp.get('ymin', 0)) or 0) - float(cp.get('ymin', 0) or 0)
+        else:
+            box_w = rmax * 2.0 * 10   # estimation grossière
+            box_h = box_w
+
+        step_x = (box_w + rmax * 2.0) * step_factor
+        step_y = (box_h + rmax * 2.0) * step_factor
+
+        pattern = self.dist_pattern_combo.currentText()
+
+        # ── Construire les expressions container_params avec i ────────────────
+        # On reprend les valeurs absolues de la distribution et on décale avec i
+        base_cp = dict(cp)
+
+        if pattern == "Ligne":
+            # Décaler en X seulement
             ox   = f"{offset_x:.6g}"
-            oy   = f"{offset_y:.6g}"
-            if dim == 2:
-                center_expr = f"[{ox} + (i % {cols}) * {s}, {oy} + (i // {cols}) * {s}]"
+            sx   = f"{step_x:.6g}"
+            if 'xmin' in base_cp:
+                xmin_base = float(base_cp['xmin'])
+                xmax_base = float(base_cp.get('xmax', xmin_base + box_w))
+                ymin_base = float(base_cp.get('ymin', -box_h/2))
+                ymax_base = float(base_cp.get('ymax',  box_h/2))
+                container_params = {
+                    "xmin": f"{xmin_base + offset_x:.6g} + i * {sx}",
+                    "xmax": f"{xmax_base + offset_x:.6g} + i * {sx}",
+                    "ymin": f"{ymin_base + offset_y:.6g}",
+                    "ymax": f"{ymax_base + offset_y:.6g}",
+                }
             else:
-                center_expr = f"[{ox} + (i % {cols}) * {s}, {oy} + (i // {cols}) * {s}, 0.0]"
-        else:  # Ligne
-            s  = f"{step:.6g}"
-            ox = f"{offset_x:.6g}"
-            oy = f"{offset_y:.6g}"
-            if dim == 2:
-                center_expr = f"[{ox} + i * {s}, {oy}]"
+                container_params = dict(base_cp)
+        else:  # Grille
+            # Décaler en X et Y selon la colonne/ligne
+            nb   = n_deposits
+            cols = max(1, int(_math.ceil(_math.sqrt(nb))))
+            sx   = f"{step_x:.6g}"
+            sy   = f"{step_y:.6g}"
+            if 'xmin' in base_cp:
+                xmin_base = float(base_cp['xmin'])
+                xmax_base = float(base_cp.get('xmax', xmin_base + box_w))
+                ymin_base = float(base_cp.get('ymin', -box_h/2))
+                ymax_base = float(base_cp.get('ymax',  box_h/2))
+                container_params = {
+                    "xmin": f"{xmin_base + offset_x:.6g} + (i % {cols}) * {sx}",
+                    "xmax": f"{xmax_base + offset_x:.6g} + (i % {cols}) * {sx}",
+                    "ymin": f"{ymin_base + offset_y:.6g} + (i // {cols}) * {sy}",
+                    "ymax": f"{ymax_base + offset_y:.6g} + (i // {cols}) * {sy}",
+                }
             else:
-                center_expr = f"[{ox} + i * {s}, {oy}, 0.0]"
+                container_params = dict(base_cp)
 
-        # ── Construire le template_config ─────────────────────────────────────
+        # ── Template config ───────────────────────────────────────────────────
+        av_type = dist_config.avatar_type or ("rigidDisk" if dim == 2 else "rigidSphere")
         template_config = {
-            "dist_idx":      dist_idx,
-            "avatar_type":   av_type,
-            "center":        center_expr,
-            "material_name": material,
-            "model_name":    model_nom,
-            "color":         color,
+            "nb_particles":    dist_config.nb_particles,
+            "radius_min":      dist_config.radius_min,
+            "radius_max":      dist_config.radius_max,
+            "container_type":  dist_config.container_type,
+            "container_params": container_params,
+            "material_name":   material,
+            "model_name":      model_nom,
+            "avatar_type":     av_type,
+            "color":           color,
+            "seed":            dist_config.seed,
         }
 
         group_name = (
@@ -627,11 +665,10 @@ class LoopTab(BaseTab):
             else None
         )
 
-        # ── Déléguer à generate_for_loop ──────────────────────────────────────
         for_loop = ForLoop(
             loop_var='i',
             start_expr='0',
-            end_expr='0',
+            end_expr=str(n_deposits),
             step_expr='1',
             target_type='granulo',
             template_config=template_config,
@@ -642,9 +679,10 @@ class LoopTab(BaseTab):
         self.loop_generated.emit()
         self.refresh()
         QMessageBox.information(
-            self, "✅ Distribution placée",
-            f"{len(indices)} avatars créés depuis la distribution "
-            f"[{dist_config.radius_min:.4g} – {dist_config.radius_max:.4g}].\n"
+            self, "✅ Distribution(s) créée(s)",
+            f"{n_deposits} dépôt(s) — {len(indices)} avatars au total.\n"
+            f"Distribution : [{dist_config.radius_min:.4g} – {dist_config.radius_max:.4g}]  "
+            f"({dist_config.nb_particles} particules)\n"
             f"Disposition : {pattern}  |  Groupe : {group_name or 'Aucun'}"
         )
 

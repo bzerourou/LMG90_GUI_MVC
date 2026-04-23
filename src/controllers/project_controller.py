@@ -957,37 +957,39 @@ class ProjectController(QObject):
         """
         # Génération des positions et rayons
         nb_particles, coordinates, radii = GranuloGenerator.generate(config)
-        
+
+        from ..core.models import AvatarType
         generated_indices = []
-        for i in range(nb_particles):
-            center = coordinates[i].tolist()
-            radius = float(radii[i])
-            
-            # Créer l'avatar
-            from ..core.models import AvatarType
-            avatar = Avatar(
-                avatar_type=AvatarType(config.avatar_type),
-                center=center,
-                material_name=config.material_name,
-                model_name=config.model_name,
-                color=config.color,
-                origin=AvatarOrigin.GRANULO,
-                radius=radius
-            )
-            
-            idx = self.add_avatar(avatar)
-            generated_indices.append(idx)
-        
+        prev_batch = self._batch_mode
+        self._batch_mode = True          # inhibe state_changed pendant la création des avatars
+        try:
+            for i in range(nb_particles):
+                center = coordinates[i].tolist()
+                radius = float(radii[i])
+
+                avatar = Avatar(
+                    avatar_type=AvatarType(config.avatar_type),
+                    center=center,
+                    material_name=config.material_name,
+                    model_name=config.model_name,
+                    color=config.color,
+                    origin=AvatarOrigin.GRANULO,
+                    radius=radius,
+                )
+                idx = self.add_avatar(avatar)
+                generated_indices.append(idx)
+        finally:
+            self._batch_mode = prev_batch   # restaurer l'état précédent
+
         config.generated_indices = generated_indices
         if not self._is_loading:
             self.state.granulo_generations.append(config)
-        
-        # Ajouter au groupe si spécifié
+
         if config.group_name:
             if config.group_name not in self.state.avatar_groups:
                 self.state.avatar_groups[config.group_name] = []
             self.state.avatar_groups[config.group_name].extend(generated_indices)
-        
+
         return generated_indices
     
     def remove_granulo(self, index: int) -> bool:
@@ -1108,56 +1110,113 @@ class ProjectController(QObject):
             'float': float,
         }
 
-        # ── Cas spécial : boucle sur une distribution granulométrique ─────────
+        # ── Cas granulo : un dépôt complet par itération ─────────────────────
+        #
+        # Le template_config décrit un dépôt granulométrique.
+        # Le champ "origin" (expression Python avec 'i') définit le décalage
+        # appliqué à toutes les coordonnées du dépôt après génération pylmgc90.
+        # Les paramètres du conteneur (lx, ly, r, …) restent fixes.
+        #
+        # Champs reconnus :
+        #   nb_particles      int
+        #   radius_min        float
+        #   radius_max        float
+        #   container_type    str   "Box2D" | "Disk2D" | "Couette2D" | "Drum2D"
+        #   container_params  dict  ex. {"lx": 2.0, "ly": 1.0}  — valeurs fixes
+        #   origin            str   expression → liste [ox, oy] ou [ox, oy, oz]
+        #                           ex. "[i * 3.0, 0.0]"
+        #   material_name     str
+        #   model_name        str
+        #   avatar_type       str
+        #   color             str   (optionnel)
+        #   seed              int   (optionnel)
+        #
+        # Exemple :
+        #   {
+        #     "nb_particles": 500,
+        #     "radius_min": 0.01,
+        #     "radius_max": 0.05,
+        #     "container_type": "Box2D",
+        #     "container_params": {"lx": 2.0, "ly": 1.0},
+        #     "origin": "[i * 3.0, 0.0]",
+        #     "material_name": "TDURx",
+        #     "model_name": "rigid",
+        #     "avatar_type": "rigidDisk"
+        #   }
         if for_loop.target_type == 'granulo':
-            tc = for_loop.template_config
+            evaluator.allowed_names = base_context
+            start = evaluator.eval_expression(for_loop.start_expr)
+            end   = evaluator.eval_expression(for_loop.end_expr)
+            step  = evaluator.eval_expression(for_loop.step_expr)
 
-            dist_idx = tc.get('dist_idx')
-            if dist_idx is None or not (0 <= dist_idx < len(self.state.granulo_generations)):
-                raise ValueError(
-                    f"Distribution introuvable (dist_idx={dist_idx}). "
-                    "Créez d'abord une distribution dans l'onglet Granulométrie."
-                )
-            dist_config = self.state.granulo_generations[dist_idx]
-
-            # Générer les rayons via pylmgc90
-            radii = GranuloGenerator.generate_radii(dist_config)
-
+            tc       = for_loop.template_config
             loop_var = for_loop.loop_var
-            self._batch_mode = True
+
+            def _ev(val, ctx):
+                """Évalue val comme expr Python si c'est une str, sinon retourne tel quel."""
+                if not isinstance(val, str):
+                    return val
+                evaluator.allowed_names = ctx
+                try:
+                    return evaluator.eval_expression(val)
+                except Exception:
+                    return val
+
+            # Construire la config une seule fois (les params géométriques sont fixes)
             try:
-                for i, r in enumerate(radii):
-                    context = {**base_context, loop_var: i, 'i': i, 'r': float(r)}
-                    evaluator.allowed_names = context
+                base_config = GranuloGeneration(
+                    nb_particles   = int(tc.get('nb_particles', 50)),
+                    radius_min     = float(tc.get('radius_min', 0.01)),
+                    radius_max     = float(tc.get('radius_max', 0.05)),
+                    container_type = str(tc.get('container_type', 'Box2D')),
+                    container_params = {k: float(v) for k, v in tc.get('container_params', {}).items()},
+                    material_name  = str(tc.get('material_name', '')),
+                    model_name     = str(tc.get('model_name', '')),
+                    avatar_type    = str(tc.get('avatar_type', 'rigidDisk')),
+                    color          = str(tc.get('color', 'BLUEx')),
+                    seed           = tc.get('seed'),
+                    group_name     = for_loop.group_name,
+                )
+            except Exception as exc:
+                raise ValueError(f"Erreur dans le template granulo : {exc}")
 
-                    evaluated_config = {}
-                    for key, value in tc.items():
-                        if key == 'dist_idx':
-                            continue
-                        if isinstance(value, str):
-                            try:
-                                evaluated_config[key] = evaluator.eval_expression(value)
-                            except Exception:
-                                evaluated_config[key] = value
-                        else:
-                            evaluated_config[key] = value
+            # Générer le dépôt de référence une seule fois via pylmgc90
+            nb_p, coords_ref, radii_ref = GranuloGenerator.generate(base_config)
 
-                    avatar = Avatar(
-                        avatar_type=AvatarType(
-                            evaluated_config.get('avatar_type',
-                                'rigidDisk' if self.state.dimension == 2 else 'rigidSphere')
-                        ),
-                        center=evaluated_config['center'],
-                        material_name=evaluated_config.get('material_name', ''),
-                        model_name=evaluated_config.get('model_name', ''),
-                        color=evaluated_config.get('color', 'BLUEx'),
-                        origin=AvatarOrigin.LOOP,
-                        radius=float(r),
-                    )
-                    idx = self.add_avatar(avatar)
-                    generated_indices.append(idx)
+            from ..core.models import AvatarType as _AvatarType
+            av_type_obj = _AvatarType(base_config.avatar_type)
+
+            prev_batch        = self._batch_mode
+            self._batch_mode  = True
+            try:
+                current = start
+                while (step > 0 and current < end) or (step < 0 and current > end):
+                    ctx = {**base_context, loop_var: current, 'i': current}
+
+                    # Évaluer l'origine du dépôt
+                    origin_raw = tc.get('origin', '[0.0, 0.0]')
+                    origin     = list(_ev(origin_raw, ctx))
+
+                    # Créer les avatars avec coordonnées décalées
+                    for k in range(nb_p):
+                        coord  = coords_ref[k].tolist()
+                        center = [coord[j] + (origin[j] if j < len(origin) else 0.0)
+                                  for j in range(len(coord))]
+                        avatar = Avatar(
+                            avatar_type   = av_type_obj,
+                            center        = center,
+                            material_name = base_config.material_name,
+                            model_name    = base_config.model_name,
+                            color         = base_config.color,
+                            origin        = AvatarOrigin.GRANULO,
+                            radius        = float(radii_ref[k]),
+                        )
+                        idx = self.add_avatar(avatar)
+                        generated_indices.append(idx)
+
+                    current += step
             finally:
-                self._batch_mode = False
+                self._batch_mode = prev_batch
 
             for_loop.generated_indices = generated_indices
             if not self._is_loading:
@@ -1166,7 +1225,7 @@ class ProjectController(QObject):
             if for_loop.group_name:
                 self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(generated_indices)
 
-            self.state_changed.emit()
+            self.state_changed.emit()   # un seul emit pour toute la boucle
             return generated_indices
 
         # ── Boucle For classique (range) ──────────────────────────────────────
