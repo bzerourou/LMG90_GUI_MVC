@@ -943,16 +943,21 @@ class ScriptGenerator:
         """Boucles For génériques"""
         if not hasattr(self.state, 'for_loops') or not self.state.for_loops:
             return
-        f.write("#Boucles for génériques\n")
+        f.write("# Boucles for génériques\n")
         for idx, for_loop in enumerate(self.state.for_loops):
             f.write(f"# Boucle For {idx + 1} : {for_loop.target_type}\n")
-            
-            # Évaluer les expressions de début/fin/step
+
+            # Cas spécial granulo : le code pré-boucle doit précéder la ligne for
+            if for_loop.target_type == "granulo":
+                self._write_for_granulo(f, idx, for_loop)
+                f.write("\n")
+                continue
+
+            # Tous les autres types : ligne for puis corps
             f.write(f"for {for_loop.loop_var} in range({for_loop.start_expr}, {for_loop.end_expr}, {for_loop.step_expr}):\n")
-            
-            # Générer l'élément selon le type
+
             template = for_loop.template_config
-            
+
             if for_loop.target_type == "avatar":
                 self._write_for_avatar(f, template, for_loop.loop_var)
             elif for_loop.target_type == "material":
@@ -965,7 +970,7 @@ class ScriptGenerator:
                 self._write_for_visibility(f, template, for_loop.loop_var)
             elif for_loop.target_type == "dof":
                 self._write_for_dof(f, template, for_loop.loop_var)
-            
+
             f.write("\n")
     
     
@@ -1024,6 +1029,85 @@ class ScriptGenerator:
             f.write(f"\n    )\n")
             f.write(f"    bodies.addAvatar(body)\n")
             f.write(f"    bodies_list.append(body)\n")
+
+    def _write_for_granulo(self, f: 'TextIO', idx: int, for_loop) -> None:
+        """
+        Génère le code pour une boucle For de type 'granulo'.
+
+        Structure du script généré :
+          1. Avant la boucle : granulo_Random + dépôt pylmgc90 (calculé UNE SEULE FOIS)
+          2. La boucle for   : évaluation de l'expression 'origin' (peut contenir la
+                               variable de boucle), décalage des coordonnées de référence,
+                               puis création des avatars.
+
+        Le template_config attendu :
+          {
+            'nb_particles'    : int,
+            'radius_min'      : float,
+            'radius_max'      : float,
+            'container_type'  : str  (ex: 'Box2D'),
+            'container_params': dict (ex: {'lx': 2.0, 'ly': 1.0}),
+            'origin'          : str  (expression Python avec la var de boucle,
+                                      ex: '[i * 3.0, 0.0]'),
+            'material_name'   : str,
+            'model_name'      : str,
+            'avatar_type'     : str  (ex: 'rigidDisk'),
+            'color'           : str,
+            'seed'            : int | None
+          }
+        """
+        template         = for_loop.template_config
+        loop_var         = for_loop.loop_var
+        safe             = f"fg{idx}"   # suffixe unique : fg0, fg1, …
+
+        nb               = template.get('nb_particles',    100)
+        r_min            = template.get('radius_min',       0.01)
+        r_max            = template.get('radius_max',       0.05)
+        seed             = template.get('seed')
+        container_type   = template.get('container_type',  'Box2D')
+        container_params = template.get('container_params', {})
+        origin_expr      = template.get('origin',          '[0.0, 0.0]')
+        mat              = template.get('material_name',   'TDURx')
+        mod              = template.get('model_name',      'rigid')
+        avatar_type      = template.get('avatar_type',     'rigidDisk')
+        color            = template.get('color',           'BLUEx')
+
+        deposit_func = _DEPOSIT_FUNC.get(container_type, 'depositInBox2D')
+        deposit_keys = _DEPOSIT_PARAMS.get(container_type, ['lx', 'ly'])
+
+        # ── 1. Génération des rayons et dépôt — UNE SEULE FOIS avant la boucle ──
+        f.write(f"# Génération granulo (calculée une seule fois, réutilisée à chaque itération)\n")
+        f.write(f"_radii_{safe} = pre.granulo_Random(\n")
+        f.write(f"    nb={nb},\n")
+        f.write(f"    r_min={r_min},\n")
+        f.write(f"    r_max={r_max}")
+        if seed:
+            f.write(f",\n    seed={seed}")
+        f.write(f"\n)\n")
+
+        f.write(f"_nb_rem_{safe}, _coords_ref_{safe} = pre.{deposit_func}(\n")
+        f.write(f"    radii=_radii_{safe},\n")
+        for key in deposit_keys:
+            val = container_params.get(key, 1.0)
+            f.write(f"    {key}={val},\n")
+        f.write(f")\n")
+        f.write(f"_coords_ref_{safe}.shape = [_coords_ref_{safe}.size // 2, 2]\n")
+        f.write(f"_radii_{safe} = _radii_{safe}[:_nb_rem_{safe}]\n\n")
+
+        # ── 2. Boucle for : décalage de l'origin + création des avatars ─────────
+        f.write(f"for {loop_var} in range({for_loop.start_expr}, {for_loop.end_expr}, {for_loop.step_expr}):\n")
+        f.write(f"    _origin_{safe} = {origin_expr}\n")
+        f.write(f"    _coords_{safe} = _coords_ref_{safe} + np.array(_origin_{safe})\n")
+        f.write(f"    for _j in range(len(_radii_{safe})):\n")
+        f.write(f"        av = pre.{avatar_type}(\n")
+        f.write(f"            center=_coords_{safe}[_j],\n")
+        f.write(f"            model=mods['{mod}'],\n")
+        f.write(f"            material=mats['{mat}'],\n")
+        f.write(f"            color='{color}',\n")
+        f.write(f"            r=float(_radii_{safe}[_j])\n")
+        f.write(f"        )\n")
+        f.write(f"        bodies.addAvatar(av)\n")
+        f.write(f"        bodies_list.append(av)\n")
 
     def _write_for_material(self, f, template: dict, loop_var: str):
         """Génère un matériau dans une boucle for"""
@@ -1102,6 +1186,12 @@ class ScriptGenerator:
 
         f.write('# Génération granulométrique\n')
         for i, gen in enumerate(self.state.granulo_generations):
+            # Les entrées "Distribution" sont des références pures utilisées par les
+            # boucles For granulo — elles n'ont pas de dépôt pylmgc90 direct.
+            if gen.container_type == "Distribution":
+                f.write(f"# Distribution {i+1} (référence pour boucles For — pas de dépôt direct)\n\n")
+                continue
+
             f.write(f"# Dépôt granulo {i+1}  : {gen.color}----\n")
             
             container_params_str = ', '.join(f"{k}={v}" for k, v in gen.container_params.items())
