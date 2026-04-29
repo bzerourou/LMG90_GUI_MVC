@@ -235,6 +235,7 @@ Accessible via **Outils → Préférences** ou le raccourci `Ctrl+,`. La boîte 
 
 LMGC90_GUI inclut un convertisseur bétâ (script python) vers un .lmgc (JSON).
 Il vous suffit seulement de donner le chemin de votre script puis le nom de votre fichier et de cliquer sur le bouton "Convertir".
+
 ![](captures/convert.JPG)
 
 > **Remarque** : traduit selon la complexité de votre script.
