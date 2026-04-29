@@ -20,6 +20,7 @@ Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI
 - [Post-traitement](postpro.md)
 - [Calcul](calculs.md) 
 - [Visualisation](visualisation.md)
+- [développeur ](dev.md)
 
 **Exemples prêts à l'emploi** → dossier [examples/](../exemples/)
 

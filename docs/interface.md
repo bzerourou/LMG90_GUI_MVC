@@ -67,6 +67,7 @@ Les assistants guident l'utilisateur étape par étape dans les tâches les plus
 | **Granulométrie numpy** _(bêta)_ | — | Génère et dépose des avatars à partir de numpy, sans passer par les routines pylmgc90. Recommandé pour les assemblages de plus de 5 000 avatars. |
 | **Déformable** | `Ctrl+Shift+D` | Guide la création ou l'importation d'éléments déformables (maillages rectangles, disques, sphères, cylindres ou fichiers externes `.msh` / `.geo`). |
 | **Maçonnerie** | `Ctrl+Shift+M` | Spécialisé dans la création d'empilements de briques 2D et 3D (`brick2D` / `brick3D`) selon différents appareillages (standard, running bond, paneresse simple, paneresse double, etc.). |
+| **Factory** | `Ctrl+Shift+F` | Spécialisé dans la Factrory d'avatars 2D/3D, les faire apparaitre visuellement ou dans le calcul. |
 
   ![](captures/assistant_projet.JPG)
 
@@ -89,7 +90,7 @@ La duplication des éléments qui portent le même nom entraîne des erreurs, pe
 |--------|-----------|-------------|
 | **Générer DATBOX** | — | Génère les fichiers `.dat` utilisés par LMGC90 pour le calcul (DATBOX/). |
 | **Générer Script Python** | — | Génère le script Python de pré-traitement (`pre.py`) reproduisant l'intégralité du modèle construit dans l'interface. |
-| **Convertir script lmgc90** | `Ctrl+Shift+C` | Une boite de dialogue qui scanne un script python pylmgc90 et le convertie vers un fichier .lmgc90 |
+| **Convertir script lmgc90** | `Ctrl+Shift+C` | Une boite de dialogue qui scanne un script python pylmgc90 et le convertie vers un fichier .lmgc90  [version bêta](#convertir)|
 | **Variables dynamiques** | `Ctrl+V` | Ouvre une boîte de dialogue permettant de définir des variables réutilisables dans les champs numériques de l'interface (rayon, espacement, offset, etc.). C'est également une fenêtre d'inspection des propriétés des objets LMGC90 présents en mémoire. Voir la page [Variables dynamiques](dynam_variables.md). |
 | **Préférences** | `Ctrl+,` | Ouvre la boîte de dialogue de configuration de l'application. Voir section [Préférences](#5-préférences). |
 
@@ -230,11 +231,13 @@ Accessible via **Outils → Préférences** ou le raccourci `Ctrl+,`. La boîte 
 | **Historique des projets récents** | Nombre maximum de projets conservés dans la liste **Fichier → Projets récents**. |
 | **Affichage des avatars** | Active ou désactive l'affichage des avatars dans l'arbre du modèle et dans le tableau de l'onglet Avatar. Désactiver cette option améliore les performances sur les projets comportant un grand nombre d'avatars. 
 
----
+### Convertir 
 
-### 6. Barre d'état 
+LMGC90_GUI inclut un convertisseur bétâ (script python) vers un .lmgc (JSON).
+Il vous suffit seulement de donner le chemin de votre script puis le nom de votre fichier et de cliquer sur le bouton "Convertir".
 
-Affiche des messages d'informations sur l'état des opérations en cours.
+> **Remarque** : traduit selon la complexité de votre script.
+![]()
 
 ---
 
