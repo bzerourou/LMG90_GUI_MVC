@@ -374,7 +374,7 @@ class MasonryWizard(QWizard):
                 if tf_rotate:
                     _alpha = _math.radians(tf_alpha_deg)
                     _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
-                    _ctr = _np.array([tf_cx, tf_cy, tf_cz])
+                    _ctr = _np.array([tf_cx, tf_cy])
                     for b in body_list:
                         b.rotate(description='axis', center=_ctr,
                                  axis=_ax, alpha=_alpha)
