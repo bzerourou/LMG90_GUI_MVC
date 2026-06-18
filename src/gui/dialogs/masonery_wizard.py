@@ -374,7 +374,10 @@ class MasonryWizard(QWizard):
                 if tf_rotate:
                     _alpha = _math.radians(tf_alpha_deg)
                     _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
-                    _ctr = _np.array([tf_cx, tf_cy])
+                    if dimension == 3:
+                        _ctr = _np.array([tf_cx, tf_cy, tf_cz])
+                    else:
+                        _ctr = _np.array([tf_cx, tf_cy])
                     for b in body_list:
                         b.rotate(description='axis', center=_ctr,
                                  axis=_ax, alpha=_alpha)
@@ -538,6 +541,7 @@ class MasonryDimensionPage(QWizardPage):
         dim_group.setLayout(dim_layout)
         layout.addWidget(dim_group)
         layout.addStretch()
+
 
 
 class MasonryMaterialPage(QWizardPage):
@@ -725,6 +729,7 @@ class BrickDimensionsPage(QWizardPage):
 
         layout.addLayout(form)
         layout.addStretch()
+
 
     def initializePage(self):
         wizard    = self.wizard()
@@ -1051,11 +1056,10 @@ class TransformPage(QWizardPage):
         rot_form.addRow("Centre z :", self.cz_spin)
 
         self.axis_combo = QComboBox()
-        self.axis_combo.addItems(["Z", "X", "Y"])
+
         self.axis_combo.setToolTip(
             "Axe de rotation.\n"
             "Z = rotation dans le plan XY (90° pour angle droit)\n"
-            "X / Y = bascule hors-plan"
         )
         self.axis_combo.setEnabled(False)
         rot_form.addRow("Axe :", self.axis_combo)
@@ -1128,27 +1132,53 @@ class TransformPage(QWizardPage):
             w.setEnabled(v)
 
     def _on_rotate_toggled(self, v: bool):
-        for w in (self.cx_spin, self.cy_spin, self.cz_spin,
-                  self.axis_combo, self.alpha_spin):
-            w.setEnabled(v)
+        is3d = self.wizard().page(
+            MasonryWizard.PAGE_DIMENSION
+        ).dim_3d_radio.isChecked()
+
+        self.cx_spin.setEnabled(v)
+        self.cy_spin.setEnabled(v)
+        self.alpha_spin.setEnabled(v)
+        if is3d:
+            self.cz_spin.setEnabled(v)
+            self.axis_combo.setEnabled(v)
+        else:
+            self.cz_spin.setEnabled(False)
+            self.axis_combo.setEnabled(v)
+
 
     def _on_copy_toggled(self, v: bool):
         for w in (self.copy_dx_spin, self.copy_dy_spin, self.copy_dz_spin):
             w.setEnabled(v)
 
+    def _update_axis_options(self, is3d: bool):
+        self.axis_combo.clear()
+        if is3d:
+            self.axis_combo.addItems(["X", "Y", "Z"])
+        else:
+            self.axis_combo.addItem("Z")  # rotation dans le plan XY
+
     def initializePage(self):
-        """Afficher/masquer dz selon la dimension."""
+        """Afficher/masquer les options selon la dimension."""
         dim_page = self.wizard().page(MasonryWizard.PAGE_DIMENSION)
-        is3d     = dim_page.dim_3d_radio.isChecked()
-        self.tz_label.setVisible(is3d)
-        self.tz_spin.setVisible(is3d)
-        self.cz_spin.setVisible(is3d)
-        self.copy_dz_label.setVisible(is3d)
-        self.copy_dz_spin.setVisible(is3d)
-        # En 2D, l'axe Z est le seul pertinent pour les rotations
-        if not is3d:
+        is3d = dim_page.dim_3d_radio.isChecked()
+
+        self.axis_combo.blockSignals(True)
+
+        self.axis_combo.clear()
+        if is3d:
+            self.axis_combo.addItems(["X", "Y", "Z"])
             self.axis_combo.setCurrentText("Z")
-            self.axis_combo.setEnabled(False)
+        else:
+            self.axis_combo.addItem("Z")
+            self.axis_combo.setCurrentIndex(0)
+
+        self.axis_combo.blockSignals(False)
+
+        self.axis_combo.setEnabled(
+            not is3d and self.rotate_check.isChecked()
+        )
+
 
 
 class MasonrySummaryPage(QWizardPage):
