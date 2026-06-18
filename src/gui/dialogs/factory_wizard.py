@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
     QCheckBox, QGroupBox, QTextEdit, QWidget, QFrame,
     QScrollArea, QMessageBox, QButtonGroup, QToolButton,
-    QPushButton
+    QPushButton, QDialog, QDialogButtonBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -20,6 +20,8 @@ from ...core.particle_factory import (
     FactoryConfig, FactoryType, ZoneShape, ContainerShape,
     SizeDistribution, ParticleFactory
 )
+from ...core.models import Material, MaterialType, Model
+from ...core.validators import ValidationError
 import math
 from typing import List, Optional
 
@@ -82,6 +84,25 @@ _STYLE_CODE = """
         border-radius: 3px;
     }
 """
+_STYLE_QUICK_ADD_BTN = """
+    QToolButton {
+        font-size: 12pt;
+        font-weight: bold;
+        padding: 0px;
+        border: 1px solid #3a5a9a;
+        border-radius: 4px;
+        background: #eef3ff;
+        color: #2a4a8a;
+        min-width: 26px;
+        min-height: 26px;
+        max-width: 26px;
+        max-height: 26px;
+    }
+    QToolButton:hover {
+        background: #2a5aaa;
+        color: white;
+    }
+"""
 _LMGC90_COLORS = ['BLUEx', 'REDxx', 'VERTx', 'JAUNx', 'GRAYx',
                    'ORANx', 'CYANx', 'MAGEx', 'VIOLx', 'ROSEx',
                    'BROWx', 'GOLDx', 'WHITx']
@@ -119,6 +140,143 @@ def _spin(value: int, minimum: int = 0, maximum: int = 100_000) -> QSpinBox:
     sb.setRange(minimum, maximum)
     sb.setValue(value)
     return sb
+
+
+# ============================================================================
+# Dialogues de création rapide — Matériau / Modèle
+# ============================================================================
+class QuickMaterialDialog(QDialog):
+    """Boîte de dialogue simplifiée pour créer un matériau de base (RIGID ou ELAS)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("➕ Nouveau matériau simple")
+        self.setMinimumWidth(360)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.name_input = QLineEdit("TDURx")
+        form.addRow("Nom :", self.name_input)
+
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["RIGID (corps rigide)", "ELAS (élastique)"])
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        form.addRow("Type :", self.type_combo)
+
+        self.density = _dbl(2500., 0., 1e9, 2, 10.0)
+        form.addRow("Densité (kg/m³) :", self.density)
+
+        self.young = _dbl(7.0e10, 0., 1e15, 1, 1e8)
+        self._young_label = QLabel("Module de Young (Pa) :")
+        form.addRow(self._young_label, self.young)
+
+        self.poisson = _dbl(0.3, 0., 0.5, 3, 0.01)
+        self._poisson_label = QLabel("Coefficient de Poisson :")
+        form.addRow(self._poisson_label, self.poisson)
+
+        layout.addLayout(form)
+
+        hint = QLabel(
+            "💡 Crée un matériau minimal. Pour des propriétés avancées, "
+            "utilisez l’onglet Matériaux du projet."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(_STYLE_SUBTITLE)
+        layout.addWidget(hint)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._on_type_changed(0)
+
+    def _on_type_changed(self, idx: int):
+        is_elas = (idx == 1)
+        self._young_label.setVisible(is_elas)
+        self.young.setVisible(is_elas)
+        self._poisson_label.setVisible(is_elas)
+        self.poisson.setVisible(is_elas)
+
+    def get_material(self) -> Material:
+        name = self.name_input.text().strip() or "TDURx"
+        if self.type_combo.currentIndex() == 0:
+            return Material(
+                name=name,
+                material_type=MaterialType.RIGID,
+                density=self.density.value(),
+            )
+        return Material(
+            name=name,
+            material_type=MaterialType.ELAS,
+            density=self.density.value(),
+            properties={
+                'MatProp': {
+                    'young': self.young.value(),
+                    'nu': self.poisson.value(),
+                }
+            },
+        )
+
+
+class QuickModelDialog(QDialog):
+    """Boîte de dialogue simplifiée pour créer un modèle de corps rigide de base."""
+
+    def __init__(self, dimension: int = 3, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("➕ Nouveau modèle simple")
+        self.setMinimumWidth(360)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.name_input = QLineEdit("rigid")
+        form.addRow("Nom :", self.name_input)
+
+        self.dim_combo = QComboBox()
+        self.dim_combo.addItems(["3D", "2D"])
+        self.dim_combo.setCurrentIndex(0 if dimension == 3 else 1)
+        form.addRow("Dimension :", self.dim_combo)
+
+        layout.addLayout(form)
+
+        hint = QLabel(
+            "💡 Crée un modèle rigide standard (MECAx / Rxx2D ou Rxx3D), "
+            "suffisant pour la plupart des avatars rigides."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(_STYLE_SUBTITLE)
+        layout.addWidget(hint)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_model(self) -> Model:
+        name = self.name_input.text().strip() or "rigid"
+        dim = 3 if self.dim_combo.currentIndex() == 0 else 2
+        element = "Rxx3D" if dim == 3 else "Rxx2D"
+        return Model(
+            name=name,
+            physics="MECAx",
+            element=element,
+            dimension=dim,
+        )
+
+
+def _make_quick_add_button(tooltip: str) -> QToolButton:
+    """Crée un petit bouton ➕ standard pour création rapide à côté d'une combobox."""
+    btn = QToolButton()
+    btn.setText("➕")
+    btn.setToolTip(tooltip)
+    btn.setStyleSheet(_STYLE_QUICK_ADD_BTN)
+    return btn
 
 
 # ============================================================================
@@ -338,8 +496,21 @@ class FactoryParticlesPage(QWizardPage):
         mf = QFormLayout(mm_group)
         self.material_combo = QComboBox()
         self.model_combo = QComboBox()
-        mf.addRow("Matériau :", self.material_combo)
-        mf.addRow("Modèle :", self.model_combo)
+
+        mat_row = QHBoxLayout()
+        self._btn_add_material = _make_quick_add_button("Créer rapidement un nouveau matériau")
+        self._btn_add_material.clicked.connect(self._on_quick_add_material)
+        mat_row.addWidget(self._btn_add_material)
+        mat_row.addWidget(self.material_combo)
+        mf.addRow("Matériau :", mat_row)
+
+        mod_row = QHBoxLayout()
+        self._btn_add_model = _make_quick_add_button("Créer rapidement un nouveau modèle")
+        self._btn_add_model.clicked.connect(self._on_quick_add_model)
+        mod_row.addWidget(self._btn_add_model)
+        mod_row.addWidget(self.model_combo)
+        mf.addRow("Modèle :", mod_row)
+
         inner_layout.addWidget(mm_group)
 
         # Nombre + couleur
@@ -367,6 +538,35 @@ class FactoryParticlesPage(QWizardPage):
             self.material_combo.addItem(mat.name)
         for mod in getattr(state, 'models', []):
             self.model_combo.addItem(mod.name)
+
+    def _on_quick_add_material(self):
+        """Ouvre une boîte de dialogue pour créer rapidement un matériau simple."""
+        dlg = QuickMaterialDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        material = dlg.get_material()
+        try:
+            self.controller.add_material(material)
+        except ValidationError as e:
+            QMessageBox.warning(self, "Matériau invalide", str(e))
+            return
+        self.material_combo.addItem(material.name)
+        self.material_combo.setCurrentText(material.name)
+
+    def _on_quick_add_model(self):
+        """Ouvre une boîte de dialogue pour créer rapidement un modèle simple."""
+        dim = getattr(self.controller.state, 'dimension', 3)
+        dlg = QuickModelDialog(dimension=dim, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        model = dlg.get_model()
+        try:
+            self.controller.add_model(model)
+        except ValidationError as e:
+            QMessageBox.warning(self, "Modèle invalide", str(e))
+            return
+        self.model_combo.addItem(model.name)
+        self.model_combo.setCurrentText(model.name)
 
     def get_particle_params(self) -> dict:
         # Index 0 = "rigidDisk (2D)", index 1 = "rigidSphere (3D)"
