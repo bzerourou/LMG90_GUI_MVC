@@ -25,6 +25,8 @@ _log = get_logger('main_window')
 from ..gui.dialogs.fast_granulo_dialg import GranuloFastDialog
 from ..gui.dialogs.convert_dialog import ConvertDialog
 
+import threading
+
 
 class MainWindow(QMainWindow):
     """Fenêtre principale de l'application"""
@@ -42,7 +44,7 @@ class MainWindow(QMainWindow):
             self.controller.state.preferences = ProjectPreferences()
         
         # Configuration fenêtre
-        self.setWindowTitle(f"LMGC90_GUI v0.4.0 - {self.controller.state.name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
@@ -469,6 +471,7 @@ class MainWindow(QMainWindow):
         self.empty_avatar_tab.avatar_created.connect(self._refresh_all)
         self.empty_avatar_tab.avatar_updated.connect(self._refresh_all)
         self.empty_avatar_tab.avatar_deleted.connect(self._refresh_all)
+        
         #loops
         self.loop_tab.loop_generated.connect(self._refresh_all)
         self.loop_tab.loop_deleted.connect(self._refresh_all)
@@ -480,7 +483,7 @@ class MainWindow(QMainWindow):
         self.dof_tab.operation_applied.connect(self._refresh_all)   
         self.dof_tab.operation_deleted.connect(self._refresh_all)
         # rafraîchir viewer
-        #self.dof_tab.operation_applied.connect(self.viewer_tab.refresh)
+        self.dof_tab.operation_applied.connect(self.viewer_tab.refresh)
         #contact
         self.contact_tab.law_created.connect(self._refresh_all)
         self.contact_tab.law_updated.connect(self._refresh_all)
@@ -523,7 +526,7 @@ class MainWindow(QMainWindow):
         if ok and name.strip():
             name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name.strip())
             self.controller.new_project(name)
-            self.setWindowTitle(f"LMGC90_GUI v0.4.0 - {name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
@@ -541,7 +544,7 @@ class MainWindow(QMainWindow):
         if filepath:
             try:
                 self.controller.load_project(Path(filepath))
-                self.setWindowTitle(f"LMGC90_GUI v0.4.0 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
                 self.project_loaded.emit()
                 self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
@@ -690,11 +693,11 @@ class MainWindow(QMainWindow):
         """Affiche À propos"""
         QMessageBox.information(
             self, "À propos",
-            "LMGC90_GUI v0.4.0\n"
+            "LMGC90_GUI v0.4.5\n"
             "UI pour LMGC90\n"
             "par Zerourou B.\n"
             "bachir.zerourou@yahoo.fr\n"
-            "© 2025 - Open Source"
+            "© 2026 - Open Source"
         )
 
     def _on_help(self) :
@@ -778,7 +781,7 @@ class MainWindow(QMainWindow):
         """Ouvre un projet récent"""
         try:
             self.controller.load_project(filepath)
-            self.setWindowTitle(f"LMGC90_GUI v0.4.0 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
             self.project_loaded.emit()
             self.statusBar().showMessage(f"Projet chargé", 5000)
             
@@ -826,7 +829,7 @@ class MainWindow(QMainWindow):
         
         wizard = ProjectSetupWizard(self.controller, self)
         if wizard.exec():
-            self.setWindowTitle(f"LMGC90_GUI v0.4.0 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
 
@@ -925,23 +928,37 @@ class MainWindow(QMainWindow):
         dialog = ConvertDialog(self)
         dialog.exec()
     
-    
+
+    def _launch_visu(self):
+        from pylmgc90 import pre
+        pre.visuAvatars(
+            self.controller._bodies_container,
+            with_axis=True,
+            drvdof_color=[1., 0., 0.]
+        )
+
     def _on_lmgc_visualization(self):
-        """Lance la visualisation LMGC90"""
         try:
-            from pylmgc90 import pre
-            
             if not self.controller._pylmgc_bodies:
-                QMessageBox.warning(self, "Attention", "Aucun avatar à visualiser")
+                QMessageBox.warning(
+                    self,
+                    "Attention",
+                    "Aucun avatar à visualiser"
+                )
                 return
-            
-            self.statusBar().showMessage("Visualisation...", 2000)
-            QApplication.processEvents()
-            
-            pre.visuAvatars(self.controller._bodies_container, with_axis=True, drvdof_color=[1.,0 ,0])
-            
+
+            thread = threading.Thread(
+                target=self._launch_visu,
+                daemon=True
+            )
+            thread.start()
+
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Visualisation échouée :\n{e}")
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"Visualisation échouée :\n{e}"
+            )
     
     def _on_paraview(self):
         """Ouvre ParaView"""
