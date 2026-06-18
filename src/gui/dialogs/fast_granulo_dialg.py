@@ -8,11 +8,11 @@ N'interagit avec controller qu'une seule fois à la fin (batch unique).
 """
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QDialog, QScrollArea, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QPushButton, QProgressBar,
     QGroupBox, QCheckBox, QSpinBox, QDoubleSpinBox,
     QTextEdit, QDialogButtonBox, QWidget, QFrame, QSizePolicy,
-    QMessageBox, QFileDialog
+    QMessageBox, QFileDialog, QToolButton
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QPalette
@@ -21,6 +21,179 @@ from pathlib import Path
 
 from ...utils.fast_granulo_engin import GranuloFastEngine, GranuloFileWriter, GranuloStateIntegrator
 from ...controllers.project_controller import ProjectController
+from ...core.models import Material, MaterialType, Model
+from ...core.validators import ValidationError
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Dialogues de création rapide — Matériau / Modèle
+# ─────────────────────────────────────────────────────────────────────────────
+
+_STYLE_QUICK_ADD_BTN = """
+    QToolButton {
+        font-size: 12pt;
+        font-weight: bold;
+        padding: 0px;
+        border: 1px solid #3a5a9a;
+        border-radius: 4px;
+        background: #eef3ff;
+        color: #2a4a8a;
+        min-width: 26px;
+        min-height: 26px;
+        max-width: 26px;
+        max-height: 26px;
+    }
+    QToolButton:hover {
+        background: #2a5aaa;
+        color: white;
+    }
+"""
+
+
+def _dbl(value: float, minimum: float = 0., maximum: float = 1e6,
+         decimals: int = 3, step: float = 1.0) -> QDoubleSpinBox:
+    sb = QDoubleSpinBox()
+    sb.setRange(minimum, maximum)
+    sb.setDecimals(decimals)
+    sb.setSingleStep(step)
+    sb.setValue(value)
+    return sb
+
+
+def _make_quick_add_button(tooltip: str) -> QToolButton:
+    """Crée un petit bouton ➕ standard pour création rapide à côté d'une combobox."""
+    btn = QToolButton()
+    btn.setText("➕")
+    btn.setToolTip(tooltip)
+    btn.setStyleSheet(_STYLE_QUICK_ADD_BTN)
+    return btn
+
+
+class QuickMaterialDialog(QDialog):
+    """Boîte de dialogue simplifiée pour créer un matériau de base (RIGID ou ELAS)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("➕ Nouveau matériau simple")
+        self.setMinimumWidth(360)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.name_input = QLineEdit("TDURx")
+        self.name_input.setMaxLength(5)
+        form.addRow("Nom (5 car. max) :", self.name_input)
+
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["RIGID (corps rigide)", "ELAS (élastique)"])
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        form.addRow("Type :", self.type_combo)
+
+        self.density = _dbl(2500., 0., 1e9, 2, 10.0)
+        form.addRow("Densité (kg/m³) :", self.density)
+
+        self.young = _dbl(7.0e10, 0., 1e15, 1, 1e8)
+        self._young_label = QLabel("Module de Young (Pa) :")
+        form.addRow(self._young_label, self.young)
+
+        self.poisson = _dbl(0.3, 0., 0.5, 3, 0.01)
+        self._poisson_label = QLabel("Coefficient de Poisson :")
+        form.addRow(self._poisson_label, self.poisson)
+
+        layout.addLayout(form)
+
+        hint = QLabel(
+            "💡 Crée un matériau minimal. Pour des propriétés avancées, "
+            "utilisez l’onglet Matériaux du projet."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #607090; font-size: 9pt; padding: 0 14px 6px;")
+        layout.addWidget(hint)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._on_type_changed(0)
+
+    def _on_type_changed(self, idx: int):
+        is_elas = (idx == 1)
+        self._young_label.setVisible(is_elas)
+        self.young.setVisible(is_elas)
+        self._poisson_label.setVisible(is_elas)
+        self.poisson.setVisible(is_elas)
+
+    def get_material(self) -> Material:
+        name = self.name_input.text().strip() or "TDURx"
+        if self.type_combo.currentIndex() == 0:
+            return Material(
+                name=name,
+                material_type=MaterialType.RIGID,
+                density=self.density.value(),
+            )
+        return Material(
+            name=name,
+            material_type=MaterialType.ELAS,
+            density=self.density.value(),
+            properties={
+                'MatProp': {
+                    'young': self.young.value(),
+                    'nu': self.poisson.value(),
+                }
+            },
+        )
+
+
+class QuickModelDialog(QDialog):
+    """Boîte de dialogue simplifiée pour créer un modèle de corps rigide de base."""
+
+    def __init__(self, dimension: int = 3, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("➕ Nouveau modèle simple")
+        self.setMinimumWidth(360)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.name_input = QLineEdit("rigid")
+        self.name_input.setMaxLength(5)
+        form.addRow("Nom (5 car. max) :", self.name_input)
+
+        self.dim_combo = QComboBox()
+        self.dim_combo.addItems(["3D", "2D"])
+        self.dim_combo.setCurrentIndex(0 if dimension == 3 else 1)
+        form.addRow("Dimension :", self.dim_combo)
+
+        layout.addLayout(form)
+
+        hint = QLabel(
+            "💡 Crée un modèle rigide standard (MECAx / Rxx2D ou Rxx3D), "
+            "suffisant pour la plupart des avatars rigides."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #607090; font-size: 9pt; padding: 0 14px 6px;")
+        layout.addWidget(hint)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_model(self) -> Model:
+        name = self.name_input.text().strip() or "rigid"
+        dim = 3 if self.dim_combo.currentIndex() == 0 else 2
+        element = "Rxx3D" if dim == 3 else "Rxx2D"
+        return Model(
+            name=name,
+            physics="MECAx",
+            element=element,
+            dimension=dim,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,26 +271,50 @@ class GranuloFastDialog(QDialog):
     # ── Interface ────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
-        root.setSpacing(10)
+        # ────────────────────────────────────────────────────────────────────
+        main_layout = QVBoxLayout(self)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setSpacing(10)
+        scroll_layout.setContentsMargins(15, 15, 15, 15)
 
-        # En-tête
+        # ── Créer la QScrollArea ────────────────────────────────────────────
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidget(scroll_content)
+        self.scroll_area.setWidgetResizable(True)  # Important : permet le redimensionnement
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setStyleSheet(
+            "QScrollArea { border: none; background: #f5f5f5; }"
+        )
+
+        # ── En-tête ─────────────────────────────────────────────────────────
         header = QLabel("⚡ Génération très rapide — jusqu'à 5 000+ particules")
         header.setStyleSheet(
             "font-size: 13px; font-weight: bold; color: #1565C0;"
             "padding: 8px; background: #E3F2FD; border-radius: 5px;"
         )
-        root.addWidget(header)
+        scroll_layout.addWidget(header)
 
-        # ── Ligne 1 : Propriétés physiques ───────────────────────────────────
+        # ── Ligne 1 : Propriétés physiques ──────────────────────────────────
         phys_group = QGroupBox("Propriétés physiques")
         phys_form  = QFormLayout(phys_group)
 
         self.material_combo = QComboBox()
-        phys_form.addRow("Matériau :", self.material_combo)
+        mat_row = QHBoxLayout()
+        self._btn_add_material = _make_quick_add_button("Créer rapidement un nouveau matériau")
+        self._btn_add_material.clicked.connect(self._on_quick_add_material)
+        mat_row.addWidget(self._btn_add_material)
+        mat_row.addWidget(self.material_combo)
+        phys_form.addRow("Matériau :", mat_row)
 
         self.model_combo = QComboBox()
-        phys_form.addRow("Modèle :", self.model_combo)
+        mod_row = QHBoxLayout()
+        self._btn_add_model = _make_quick_add_button("Créer rapidement un nouveau modèle")
+        self._btn_add_model.clicked.connect(self._on_quick_add_model)
+        mod_row.addWidget(self._btn_add_model)
+        mod_row.addWidget(self.model_combo)
+        phys_form.addRow("Modèle :", mod_row)
 
         dim = self.controller.state.dimension
         self.avatar_type = "rigidDisk" if dim == 2 else "rigidSphere"
@@ -128,9 +325,9 @@ class GranuloFastDialog(QDialog):
         self.color_input = QLineEdit("BLUEx")
         phys_form.addRow("Couleur :", self.color_input)
 
-        root.addWidget(phys_group)
+        scroll_layout.addWidget(phys_group)
 
-        # ── Ligne 2 : Distribution ───────────────────────────────────────────
+        # ── Ligne 2 : Distribution ──────────────────────────────────────────
         dist_group = QGroupBox("Distribution des rayons")
         dist_form  = QFormLayout(dist_group)
 
@@ -167,9 +364,9 @@ class GranuloFastDialog(QDialog):
         seed_row.addStretch()
         dist_form.addRow("", seed_row)
 
-        root.addWidget(dist_group)
+        scroll_layout.addWidget(dist_group)
 
-        # ── Ligne 3 : Conteneur ──────────────────────────────────────────────
+        # ── Ligne 3 : Conteneur ─────────────────────────────────────────────
         cont_group = QGroupBox("Géométrie du conteneur")
         cont_vbox  = QVBoxLayout(cont_group)
 
@@ -211,10 +408,10 @@ class GranuloFastDialog(QDialog):
         self._param_form.addRow(self._lbl_r,    self._r)
         self._param_form.addRow(self._lbl_rint, self._rint)
         self._param_form.addRow(self._lbl_rext, self._rext)
-        root.addWidget(cont_group)
+        scroll_layout.addWidget(cont_group)
         self._update_container_params(self.container_combo.currentText())
 
-        # ── Ligne 4 : Groupe & sortie ────────────────────────────────────────
+        # ── Ligne 4 : Groupe & sortie ───────────────────────────────────────
         out_group = QGroupBox("Groupe & export fichier")
         out_form  = QFormLayout(out_group)
 
@@ -241,9 +438,9 @@ class GranuloFastDialog(QDialog):
         dir_row.addWidget(browse_btn)
         out_form.addRow("Dossier :", dir_row)
 
-        root.addWidget(out_group)
+        scroll_layout.addWidget(out_group)
 
-        # ── Progression ──────────────────────────────────────────────────────
+        # ── Progression ─────────────────────────────────────────────────────
         prog_group = QGroupBox("Progression")
         prog_vbox  = QVBoxLayout(prog_group)
 
@@ -269,9 +466,9 @@ class GranuloFastDialog(QDialog):
         )
         prog_vbox.addWidget(self.log_text)
 
-        root.addWidget(prog_group)
+        scroll_layout.addWidget(prog_group)
 
-        # ── Boutons ──────────────────────────────────────────────────────────
+        # ── Boutons ─────────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
 
         self.gen_btn = QPushButton("⚡ Générer")
@@ -296,7 +493,16 @@ class GranuloFastDialog(QDialog):
         btn_row.addWidget(self.cancel_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.close_btn)
-        root.addLayout(btn_row)
+        scroll_layout.addLayout(btn_row)
+
+        # ── Ajouter un espacement final ─────────────────────────────────────
+        scroll_layout.addStretch()
+
+        # ── Définir la QScrollArea comme layout principal ───────────────────
+
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(self.scroll_area)
 
     def _populate_combos(self):
         self.material_combo.clear()
@@ -306,6 +512,35 @@ class GranuloFastDialog(QDialog):
         self.model_combo.clear()
         for m in self.controller.get_models():
             self.model_combo.addItem(m.name)
+
+    def _on_quick_add_material(self):
+        """Ouvre une boîte de dialogue pour créer rapidement un matériau simple."""
+        dlg = QuickMaterialDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        material = dlg.get_material()
+        try:
+            self.controller.add_material(material)
+        except ValidationError as e:
+            QMessageBox.warning(self, "Matériau invalide", str(e))
+            return
+        self.material_combo.addItem(material.name)
+        self.material_combo.setCurrentText(material.name)
+
+    def _on_quick_add_model(self):
+        """Ouvre une boîte de dialogue pour créer rapidement un modèle simple."""
+        dim = getattr(self.controller.state, 'dimension', 3)
+        dlg = QuickModelDialog(dimension=dim, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        model = dlg.get_model()
+        try:
+            self.controller.add_model(model)
+        except ValidationError as e:
+            QMessageBox.warning(self, "Modèle invalide", str(e))
+            return
+        self.model_combo.addItem(model.name)
+        self.model_combo.setCurrentText(model.name)
 
     def _update_container_params(self, container_type):
         """Affiche/cache les champs selon le conteneur — sans jamais détruire les widgets."""
