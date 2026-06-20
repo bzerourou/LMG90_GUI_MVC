@@ -10,9 +10,9 @@
 ![](docs/captures/interface2.JPG)
 
 ## Documentation (fr)
-[Documentation de LMGC90_GUI](docs/fr/overview.md)
+[Documentation de LMGC90_GUI](docs/fr/overview.md) . [pdf](docs/LMGC90_GUI_Documentation_fr.pdf)
 
-[English documentation of LMGC90_GUI](docs/overview.md)]
+[English documentation of LMGC90_GUI](docs/overview.md). [pdf](docs/LMGC90_GUI_Documentation_en.pdf)
 
 ## 🎯 Points Clés de la Refactorisation
 
