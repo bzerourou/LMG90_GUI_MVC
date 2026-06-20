@@ -1,14 +1,14 @@
-# Lois de contact
+# Contact Laws
 
-L'onglet **Contact** (`Ctrl+9`) permet de créer, modifier et supprimer les **lois de contact** (`tact_behav`) de pylmgc90. Chaque loi définit le comportement mécanique à la frontière entre deux corps en contact. Une loi doit être créée ici **avant** de pouvoir être référencée dans une table de visibilité (onglet Visibilité).
+The **Contact** tab (`Ctrl+9`) allows you to create, modify, and delete pylmgc90 **contact laws** (`tact_behav`). Each law defines the mechanical behavior at the boundary between two bodies in contact. A law must be created here **before** it can be referenced in a visibility table (Visibility tab).
 
 ---
 
-## Principe de fonctionnement
+## Operating Principle
 
-Une **loi de contact** (`ContactLaw`) est un objet pylmgc90 créé par `pre.tact_behav(name, law, ...)`. Elle est identifiée par un nom unique dans le projet et caractérise la physique du contact : frottement, cohésion, rigidité, endommagement…
+A **contact law** (`ContactLaw`) is a pylmgc90 object created by `pre.tact_behav(name, law, ...)`. It is identified by a unique name within the project and characterizes the physics of the contact: friction, cohesion, stiffness, damage…
 
-**Appel pylmgc90 généré :**
+**Generated pylmgc90 call:**
 
 ```python
 law_IQS_CLB = pre.tact_behav(
@@ -21,361 +21,361 @@ tacts.addBehav(law_IQS_CLB)
 
 ---
 
-## Interface de l'onglet
+## Tab Interface
 
-L'onglet comprend trois zones :
+The tab consists of three areas:
 
-- **Liste des lois** (en haut) : arbre avec colonnes Nom, Type, Friction, Propriétés. Les lois **référencées** par au moins une table de visibilité apparaissent en **vert**. Clic droit pour Modifier, Supprimer ou afficher les Informations.
-- **Formulaire de création / modification** (au milieu) : champs qui s'adaptent automatiquement au type choisi.
-- **Aide contextuelle** (en bas) : description et liste des paramètres du type sélectionné.
+- **List of laws** (top): a tree with columns Name, Type, Friction, Properties. Laws **referenced** by at least one visibility table appear in **green**. Right-click to Edit, Delete, or display Information.
+- **Creation / editing form** (middle): fields that adapt automatically to the chosen type.
+- **Contextual help** (bottom): description and list of parameters for the selected type.
 
-### Boutons
+### Buttons
 
-| Bouton | Mode | Action |
+| Button | Mode | Action |
 |--------|------|--------|
-| **✅ Créer Loi** | Création | Valide le formulaire et crée la loi. |
-| **💾 Enregistrer Modifications** | Édition | Met à jour la loi sélectionnée. |
-| **❌ Annuler** | Édition | Revient au mode création sans sauvegarder. |
-| **🔄 Réinitialiser** | Tous | Vide le formulaire et remet les valeurs par défaut. |
-| **✏️ Modifier Sélection** | Tous | Charge la loi sélectionnée dans le formulaire. |
-| **🗑️ Supprimer Sélection** | Tous | Supprime la loi (avec vérification de référence). |
+| **✅ Create Law** | Creation | Validates the form and creates the law. |
+| **💾 Save Changes** | Editing | Updates the selected law. |
+| **❌ Cancel** | Editing | Returns to creation mode without saving. |
+| **🔄 Reset** | All | Clears the form and restores default values. |
+| **✏️ Edit Selection** | All | Loads the selected law into the form. |
+| **🗑️ Delete Selection** | All | Deletes the law (with reference check). |
 
 ---
 
-## Champs du formulaire
+## Form Fields
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| **Nom** | Identifiant unique de la loi (20 caractères max). Utilisé dans les tables de visibilité. Défaut : `law01`. |
-| **Catégorie** | Filtre le combo Type. Voir les 4 catégories ci-dessous. |
-| **Type** | Type de loi pylmgc90. Les champs spécifiques s'affichent/masquent dynamiquement selon le type. |
+| **Name** | Unique identifier of the law (20 characters max). Used in visibility tables. Default: `law01`. |
+| **Category** | Filters the Type combo box. See the 4 categories below. |
+| **Type** | pylmgc90 law type. Specific fields are shown/hidden dynamically depending on the type. |
 
 ---
 
-## Les 4 catégories de lois
+## The 4 Law Categories
 
-### Catégorie 1 — Rigide / Rigide
+### Category 1 — Rigid / Rigid
 
-Lois applicables entre deux corps rigides (`RBDY2` / `RBDY3`).
+Laws applicable between two rigid bodies (`RBDY2` / `RBDY3`).
 
 ---
 
-#### `IQS_CLB` — Coulomb Inégalité Quasi-Statique _(la plus courante)_
+#### `IQS_CLB` — Quasi-Static Inequality Coulomb _(the most common)_
 
-Loi de Coulomb standard. Contact unilatéral avec frottement de Coulomb sec. Approche non-lisse Inégalité Quasi-Statique (IQS).
+Standard Coulomb law. Unilateral contact with dry Coulomb friction. Non-smooth Quasi-Static Inequality (IQS) approach.
 
-| Paramètre | Label interface | Description | Défaut |
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `fric` | Coefficient de friction | Coefficient de Coulomb μ. La force tangentielle ne peut pas dépasser μ × force normale. | `0.3` |
+| `fric` | Friction coefficient | Coulomb coefficient μ. The tangential force cannot exceed μ × normal force. | `0.3` |
 
-**Valeurs typiques de `fric` :**
+**Typical `fric` values:**
 
-| Matériau | `fric` |
+| Material | `fric` |
 |----------|--------|
-| Sable / billes de verre | 0,3 – 0,5 |
-| Béton / roches | 0,5 – 0,8 |
-| Métaux polis | 0,1 – 0,3 |
-| Bois / plastique | 0,3 – 0,6 |
-| Sans frottement (glissant) | `0.0` |
+| Sand / glass beads | 0.3 – 0.5 |
+| Concrete / rocks | 0.5 – 0.8 |
+| Polished metals | 0.1 – 0.3 |
+| Wood / plastic | 0.3 – 0.6 |
+| Frictionless (sliding) | `0.0` |
 
-**Appel pylmgc90 :**
+**pylmgc90 call:**
 ```python
 law = pre.tact_behav(name='loi1', law='IQS_CLB', fric=0.3)
 ```
 
 ---
 
-#### `IQS_CLB_g0` — Coulomb avec jeu initial
+#### `IQS_CLB_g0` — Coulomb with Initial Gap
 
-Identique à `IQS_CLB` mais initialise le jeu géométrique initial entre contacteurs à `g0=0`. Utile lorsque les corps sont déjà en contact dès `t = 0` (sans interpénétration initiale).
+Identical to `IQS_CLB` but initializes the initial geometric gap between contactors to `g0=0`. Useful when bodies are already in contact at `t = 0` (with no initial interpenetration).
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `fric` | Coefficient de frottement de Coulomb. | `0.3` |
+| `fric` | Coulomb friction coefficient. | `0.3` |
 
-**Applications :** assemblages mécaniques pré-serrés, compression progressive, contacts avec rugosité initiale.
-
----
-
-#### `IQS_DS_CLB` — Coulomb avec rigidités statique/dynamique
-
-Loi discrète avec deux rigidités de contact distinctes : une rigidité statique (avant glissement) et une dynamique (en glissement).
-
-| Paramètre | Label interface | Description | Défaut |
-|-----------|----------------|-------------|--------|
-| `fric` | Coefficient de friction | Coefficient de Coulomb. | `0.3` |
-| `stfr` | Rigidité de contact statique | Rigidité normale statique (N/m). | `1e8` |
-| `dyfr` | Rigidité de contact dynamique | Rigidité normale dynamique (N/m). | `1e8` |
-
-**Applications :** systèmes de freinage (μ_statique > μ_dynamique), glissement de plaques tectoniques, mécanismes avec vibrations auto-induites.
+**Applications:** pre-tightened mechanical assemblies, progressive compression, contacts with initial roughness.
 
 ---
 
-#### `IQS_MOHR_DS_CLB` — Mohr-Coulomb avec cohésion
+#### `IQS_DS_CLB` — Coulomb with Static/Dynamic Stiffness
 
-Critère de Mohr-Coulomb incluant une cohésion normale et tangentielle. Permet de modéliser des matériaux avec adhésion initiale (ciment, argile humide).
+Discrete law with two distinct contact stiffnesses: a static stiffness (before sliding) and a dynamic one (during sliding).
 
-| Paramètre | Label interface | Description | Défaut |
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `fric` | Coefficient de friction | Coefficient de Coulomb μ. | `0.3` |
-| `stfr` | Rigidité statique | Rigidité avant rupture de cohésion (N/m). | `1e8` |
-| `dyfr` | Rigidité dynamique | Rigidité après rupture (N/m). | `1e8` |
-| `cohn` | Cohésion normale | Force d'adhésion en traction (Pa). | `0.0` |
-| `coht` | Cohésion tangentielle | Résistance tangentielle additionnelle (Pa). | `0.0` |
+| `fric` | Friction coefficient | Coulomb coefficient. | `0.3` |
+| `stfr` | Static contact stiffness | Static normal stiffness (N/m). | `1e8` |
+| `dyfr` | Dynamic contact stiffness | Dynamic normal stiffness (N/m). | `1e8` |
 
-**Applications :** géomécanique (argiles, sols cohésifs), matériaux granulaires humides, poudres avec forces de van der Waals.
+**Applications:** braking systems (μ_static > μ_dynamic), tectonic plate sliding, mechanisms with self-induced vibrations.
 
 ---
 
-#### `IQS_MAC_CZM` — Zone cohésive MAC (rigide/rigide)
+#### `IQS_MOHR_DS_CLB` — Mohr-Coulomb with Cohesion
 
-Modèle de zone cohésive Mohr-Coulomb-Allix-Corigliano. Simule la rupture progressive et le délaminage entre corps rigides.
+Mohr-Coulomb criterion including normal and tangential cohesion. Allows modeling materials with initial adhesion (cement, wet clay).
 
-| Paramètre | Label interface | Description | Défaut |
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `stfr` | Rigidité statique | Rigidité tangentielle avant endommagement (N/m). | `1e10` |
-| `dyfr` | Rigidité dynamique | Rigidité normale avant endommagement (N/m). | `1e10` |
-| `cn` | Résistance normale | Résistance à la traction normale (Pa). | `1e6` |
-| `ct` | Résistance tangentielle | Résistance au cisaillement (Pa). | `1e6` |
-| `b` | Paramètre de mélange | Couplage modes I/II (0 = pur mode I, 1 = équipartition). | `1.0` |
-| `w` | Énergie de rupture | Énergie de fracture critique (J/m²). | `0.01` |
+| `fric` | Friction coefficient | Coulomb coefficient μ. | `0.3` |
+| `stfr` | Static stiffness | Stiffness before cohesion failure (N/m). | `1e8` |
+| `dyfr` | Dynamic stiffness | Stiffness after failure (N/m). | `1e8` |
+| `cohn` | Normal cohesion | Tensile adhesion force (Pa). | `0.0` |
+| `coht` | Tangential cohesion | Additional tangential resistance (Pa). | `0.0` |
 
-**Applications :** rupture de liaisons, fissuration, délaminage composite.
+**Applications:** geomechanics (clays, cohesive soils), wet granular materials, powders with van der Waals forces.
+
+---
+
+#### `IQS_MAC_CZM` — MAC Cohesive Zone (rigid/rigid)
+
+Mohr-Coulomb-Allix-Corigliano cohesive zone model. Simulates progressive failure and delamination between rigid bodies.
+
+| Parameter | Interface Label | Description | Default |
+|-----------|----------------|-------------|--------|
+| `stfr` | Static stiffness | Tangential stiffness before damage (N/m). | `1e10` |
+| `dyfr` | Dynamic stiffness | Normal stiffness before damage (N/m). | `1e10` |
+| `cn` | Normal strength | Normal tensile strength (Pa). | `1e6` |
+| `ct` | Tangential strength | Shear strength (Pa). | `1e6` |
+| `b` | Mixing parameter | Mode I/II coupling (0 = pure mode I, 1 = equipartition). | `1.0` |
+| `w` | Fracture energy | Critical fracture energy (J/m²). | `0.01` |
+
+**Applications:** bond failure, cracking, composite delamination.
 
 ---
 
 #### `RST_CLB` — Restitution + Coulomb
 
-Contact avec coefficient de restitution (chocs élastiques ou partiellement élastiques) et friction de Coulomb.
+Contact with a restitution coefficient (elastic or partially elastic impacts) and Coulomb friction.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `fric` | Coefficient de frottement de Coulomb. | `0.3` |
+| `fric` | Coulomb friction coefficient. | `0.3` |
 
-**Applications :** impact de billes, rebonds, chocs mécaniques.
-
----
-
-### Catégorie 2 — Rigide / Déformable (ou Déf / Déf)
-
-Lois applicables entre un corps rigide (`RBDY2`/`RBDY3`) et un corps déformable EF (`MAILx`), ou entre deux corps déformables.
+**Applications:** ball impacts, bouncing, mechanical shocks.
 
 ---
 
-#### `GAP_SGR_CLB` — Contact jeu + Coulomb (rigide/déformable)
+### Category 2 — Rigid / Deformable (or Def / Def)
 
-Loi standard pour contact rigide/déformable. Gère le jeu initial entre la surface rigide et le maillage EF.
+Laws applicable between a rigid body (`RBDY2`/`RBDY3`) and a deformable FE body (`MAILx`), or between two deformable bodies.
 
-| Paramètre | Description | Défaut |
+---
+
+#### `GAP_SGR_CLB` — Gap Contact + Coulomb (rigid/deformable)
+
+Standard law for rigid/deformable contact. Manages the initial gap between the rigid surface and the FE mesh.
+
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `fric` | Coefficient de frottement de Coulomb. | `0.3` |
+| `fric` | Coulomb friction coefficient. | `0.3` |
 
-**Applications :** contact outil/pièce, frappe, indentation, compression EF.
+**Applications:** tool/workpiece contact, impact, indentation, FE compression.
 
 ---
 
-#### `GAP_SGR_CLB_g0` — GAP avec initialisation à g0
+#### `GAP_SGR_CLB_g0` — GAP with g0 Initialization
 
-Identique à `GAP_SGR_CLB` avec initialisation du jeu à zéro. Utiliser si les corps sont initialement en contact tangent.
+Identical to `GAP_SGR_CLB` with the gap initialized to zero. Use if the bodies are initially in tangential contact.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `fric` | Coefficient de frottement de Coulomb. | `0.3` |
+| `fric` | Coulomb friction coefficient. | `0.3` |
 
 ---
 
-#### `GAP_MOHR_DS_CLB` — Mohr-Coulomb jeu (rigide/déformable)
+#### `GAP_MOHR_DS_CLB` — Mohr-Coulomb Gap (rigid/deformable)
 
-Critère de Mohr-Coulomb avec gestion du jeu pour contact rigide/déformable.
+Mohr-Coulomb criterion with gap management for rigid/deformable contact.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `fric` | Coefficient de Coulomb. | `0.3` |
-| `stfr` | Rigidité statique (N/m). | `1e8` |
-| `dyfr` | Rigidité dynamique (N/m). | `1e8` |
-| `cohn` | Cohésion normale (Pa). | `0.0` |
-| `coht` | Cohésion tangentielle (Pa). | `0.0` |
+| `fric` | Coulomb coefficient. | `0.3` |
+| `stfr` | Static stiffness (N/m). | `1e8` |
+| `dyfr` | Dynamic stiffness (N/m). | `1e8` |
+| `cohn` | Normal cohesion (Pa). | `0.0` |
+| `coht` | Tangential cohesion (Pa). | `0.0` |
 
 ---
 
-#### `MAC_CZM` — Zone cohésive MAC (rigide/déformable ou déf/déf)
+#### `MAC_CZM` — MAC Cohesive Zone (rigid/deformable or def/def)
 
-Modèle de zone cohésive MAC appliqué aux interfaces rigide/déformable. Mêmes paramètres que `IQS_MAC_CZM`.
+MAC cohesive zone model applied to rigid/deformable interfaces. Same parameters as `IQS_MAC_CZM`.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `stfr`, `dyfr` | Rigidités (N/m). | `1e10` |
-| `cn`, `ct` | Résistances normale et tangentielle (Pa). | `1e6` |
-| `b` | Paramètre de mélange. | `1.0` |
-| `w` | Énergie de rupture (J/m²). | `0.01` |
+| `stfr`, `dyfr` | Stiffnesses (N/m). | `1e10` |
+| `cn`, `ct` | Normal and tangential strengths (Pa). | `1e6` |
+| `b` | Mixing parameter. | `1.0` |
+| `w` | Fracture energy (J/m²). | `0.01` |
 
 ---
 
-#### `MAL_CZM` — Zone cohésive MAL (rigide/déformable ou déf/déf)
+#### `MAL_CZM` — MAL Cohesive Zone (rigid/deformable or def/def)
 
-Variante du modèle CZM basée sur la formulation MAL (Mixed Augmented Lagrangian). Mêmes paramètres que `MAC_CZM`.
-
----
-
-### Catégorie 3 — Point / Point
-
-Lois applicables entre contacteurs ponctuels (`PT2Dx`, `PT3Dx`, nœuds EF). Modélisent des liaisons filaires ou des barres discrètes.
+Variant of the CZM model based on the MAL (Mixed Augmented Lagrangian) formulation. Same parameters as `MAC_CZM`.
 
 ---
 
-#### `ELASTIC_WIRE` — Câble élastique
+### Category 3 — Point / Point
 
-Lien actif uniquement en **traction** (câble inextensible dans un sens). Modèle de câble simple.
+Laws applicable between point contactors (`PT2Dx`, `PT3Dx`, FE nodes). Model wire links or discrete rods.
 
-| Paramètre | Label interface | Description | Défaut |
+---
+
+#### `ELASTIC_WIRE` — Elastic Cable
+
+Link active only in **tension** (cable inextensible in one direction). Simple cable model.
+
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `stiffness` | Rigidité axiale | Rigidité EA du câble (N). | `1e6` |
-| `prestrain` | Pré-déformation | Pré-tension initiale (adimensionnel, ex. `0.01` = 1 %). | `0.0` |
+| `stiffness` | Axial stiffness | Cable stiffness EA (N). | `1e6` |
+| `prestrain` | Pre-strain | Initial pre-tension (dimensionless, e.g. `0.01` = 1%). | `0.0` |
 
-**Applications :** câbles de suspension, tirants d'ancrage, renforts fibreux.
+**Applications:** suspension cables, anchor tie rods, fiber reinforcements.
 
 ---
 
-#### `BRITTLE_ELASTIC_WIRE` — Câble élastique fragile
+#### `BRITTLE_ELASTIC_WIRE` — Brittle Elastic Cable
 
-Câble élastique qui se rompt de façon fragile (sans déformation plastique) lorsque la contrainte dépasse `sigc`.
+Elastic cable that fails in a brittle manner (without plastic deformation) when the stress exceeds `sigc`.
 
-| Paramètre | Label interface | Description | Défaut |
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `stiffness` | Rigidité axiale | Rigidité EA du câble (N). | `1e6` |
-| `prestrain` | Pré-déformation | Pré-tension initiale. | `0.0` |
-| `sigc` | Résistance à la rupture | Contrainte maximale avant rupture fragile (Pa). | `1e6` |
+| `stiffness` | Axial stiffness | Cable stiffness EA (N). | `1e6` |
+| `prestrain` | Pre-strain | Initial pre-tension. | `0.0` |
+| `sigc` | Failure strength | Maximum stress before brittle failure (Pa). | `1e6` |
 
-**Applications :** fibres fragiles, fils de verre, rupture de renfort.
+**Applications:** brittle fibers, glass fibers, reinforcement failure.
 
 ---
 
-#### `ELASTIC_ROD` — Barre élastique
+#### `ELASTIC_ROD` — Elastic Rod
 
-Barre rigide pouvant travailler en **traction et en compression** (contrairement au câble). Modèle de barre linéaire.
+Rigid rod that can work in **both tension and compression** (unlike the cable). Linear rod model.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| `stiffness` | Rigidité axiale EA (N). | `1e6` |
-| `prestrain` | Pré-déformation initiale. | `0.0` |
+| `stiffness` | Axial stiffness EA (N). | `1e6` |
+| `prestrain` | Initial pre-strain. | `0.0` |
 
-**Applications :** structures treillis, liaisons rigides point à point, raidisseurs.
+**Applications:** truss structures, point-to-point rigid links, stiffeners.
 
 ---
 
-#### `VOIGT_ROD` — Barre visco-élastique de Voigt
+#### `VOIGT_ROD` — Voigt Visco-Elastic Rod
 
-Barre avec comportement visco-élastique (ressort + amortisseur en parallèle — modèle de Kelvin-Voigt).
+Rod with visco-elastic behavior (spring + damper in parallel — Kelvin-Voigt model).
 
-| Paramètre | Label interface | Description | Défaut |
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `stiffness` | Rigidité axiale | Rigidité du ressort EA (N). | `1e6` |
-| `viscosity` | Viscosité | Coefficient d'amortissement visqueux (N·s). | `1e3` |
-| `prestrain` | Pré-déformation | Pré-tension initiale. | `0.0` |
+| `stiffness` | Axial stiffness | Spring stiffness EA (N). | `1e6` |
+| `viscosity` | Viscosity | Viscous damping coefficient (N·s). | `1e3` |
+| `prestrain` | Pre-strain | Initial pre-tension. | `0.0` |
 
-**Applications :** amortisseurs, structures avec dissipation visqueuse, modèles de sol visco-élastique.
-
----
-
-### Catégorie 4 — Toutes (any / any)
-
-Lois universelles applicables quelle que soit la paire de contacteurs.
+**Applications:** dampers, structures with viscous dissipation, visco-elastic soil models.
 
 ---
 
-#### `COUPLED_DOF` — Couplage de degrés de liberté
+### Category 4 — Any (any / any)
 
-Couplage parfait (saut de vitesse et de déplacement nul à l'interface). Liaison cinématique rigide.
-
-**Aucun paramètre requis.**
-
-**Applications :** liaison parfaite entre deux corps, couplage de DDL dans les assemblages multi-corps.
+Universal laws applicable regardless of the contactor pair.
 
 ---
 
-#### `NORMAL_COUPLED_DOF` — Couplage en direction normale
+#### `COUPLED_DOF` — Degree-of-Freedom Coupling
 
-Couplage uniquement dans la direction normale au contact. Permet un glissement tangentiel libre.
+Perfect coupling (zero velocity and displacement jump at the interface). Rigid kinematic link.
 
-**Aucun paramètre requis.**
+**No parameters required.**
+
+**Applications:** perfect link between two bodies, DOF coupling in multi-body assemblies.
 
 ---
 
-#### `ELASTIC_REPELL_CLB` — Répulsion élastique + Coulomb
+#### `NORMAL_COUPLED_DOF` — Normal Direction Coupling
 
-Contact mou par pénalisation élastique en direction normale, avec frottement de Coulomb. Méthode de régularisation (alternative aux lois IQS strictes).
+Coupling only in the direction normal to the contact. Allows free tangential sliding.
 
-| Paramètre | Label interface | Description | Défaut |
+**No parameters required.**
+
+---
+
+#### `ELASTIC_REPELL_CLB` — Elastic Repulsion + Coulomb
+
+Soft contact via elastic penalization in the normal direction, with Coulomb friction. Regularization method (alternative to strict IQS laws).
+
+| Parameter | Interface Label | Description | Default |
 |-----------|----------------|-------------|--------|
-| `fric` | Coefficient de friction | Coefficient de Coulomb. | `0.3` |
-| `Kn` | Rigidité normale | Rigidité de pénalité normale (N/m). | `1e8` |
+| `fric` | Friction coefficient | Coulomb coefficient. | `0.3` |
+| `Kn` | Normal stiffness | Normal penalty stiffness (N/m). | `1e8` |
 
-**Applications :** contacts mous, pénalisation douce, modèles avec interpénétration contrôlée.
+**Applications:** soft contacts, gentle penalization, models with controlled interpenetration.
 
 ---
 
-## Tableau récapitulatif des 18 lois
+## Summary Table of the 18 Laws
 
-| Loi | Catégorie | Paramètres | Usage principal |
+| Law | Category | Parameters | Main Use |
 |-----|-----------|-----------|-----------------|
-| `IQS_CLB` | Rig/Rig | `fric` | Contact granulaire standard |
-| `IQS_CLB_g0` | Rig/Rig | `fric` | Contact avec jeu initial nul |
-| `IQS_DS_CLB` | Rig/Rig | `fric`, `stfr`, `dyfr` | Frottement statique/dynamique |
-| `IQS_MOHR_DS_CLB` | Rig/Rig | `fric`, `stfr`, `dyfr`, `cohn`, `coht` | Matériaux cohésifs |
-| `IQS_MAC_CZM` | Rig/Rig | `stfr`, `dyfr`, `cn`, `ct`, `b`, `w` | Rupture, délaminage |
-| `RST_CLB` | Rig/Rig | `fric` | Chocs avec restitution |
-| `GAP_SGR_CLB` | Rig/Déf | `fric` | Contact outil/pièce EF |
-| `GAP_SGR_CLB_g0` | Rig/Déf | `fric` | Contact EF avec jeu nul |
-| `GAP_MOHR_DS_CLB` | Rig/Déf | `fric`, `stfr`, `dyfr`, `cohn`, `coht` | Interface cohésive EF |
-| `MAC_CZM` | Rig/Déf | `stfr`, `dyfr`, `cn`, `ct`, `b`, `w` | Zone cohésive EF |
-| `MAL_CZM` | Rig/Déf | `stfr`, `dyfr`, `cn`, `ct`, `b`, `w` | Zone cohésive MAL |
-| `ELASTIC_WIRE` | Pt/Pt | `stiffness`, `prestrain` | Câble (traction seule) |
-| `BRITTLE_ELASTIC_WIRE` | Pt/Pt | `stiffness`, `prestrain`, `sigc` | Câble fragile |
-| `ELASTIC_ROD` | Pt/Pt | `stiffness`, `prestrain` | Barre élastique |
-| `VOIGT_ROD` | Pt/Pt | `stiffness`, `viscosity`, `prestrain` | Barre visco-élastique |
-| `COUPLED_DOF` | Any/Any | _(aucun)_ | Liaison rigide parfaite |
-| `NORMAL_COUPLED_DOF` | Any/Any | _(aucun)_ | Couplage normal seul |
-| `ELASTIC_REPELL_CLB` | Any/Any | `fric`, `Kn` | Contact mou par pénalité |
+| `IQS_CLB` | Rig/Rig | `fric` | Standard granular contact |
+| `IQS_CLB_g0` | Rig/Rig | `fric` | Contact with zero initial gap |
+| `IQS_DS_CLB` | Rig/Rig | `fric`, `stfr`, `dyfr` | Static/dynamic friction |
+| `IQS_MOHR_DS_CLB` | Rig/Rig | `fric`, `stfr`, `dyfr`, `cohn`, `coht` | Cohesive materials |
+| `IQS_MAC_CZM` | Rig/Rig | `stfr`, `dyfr`, `cn`, `ct`, `b`, `w` | Failure, delamination |
+| `RST_CLB` | Rig/Rig | `fric` | Impacts with restitution |
+| `GAP_SGR_CLB` | Rig/Def | `fric` | FE tool/workpiece contact |
+| `GAP_SGR_CLB_g0` | Rig/Def | `fric` | FE contact with zero gap |
+| `GAP_MOHR_DS_CLB` | Rig/Def | `fric`, `stfr`, `dyfr`, `cohn`, `coht` | FE cohesive interface |
+| `MAC_CZM` | Rig/Def | `stfr`, `dyfr`, `cn`, `ct`, `b`, `w` | FE cohesive zone |
+| `MAL_CZM` | Rig/Def | `stfr`, `dyfr`, `cn`, `ct`, `b`, `w` | MAL cohesive zone |
+| `ELASTIC_WIRE` | Pt/Pt | `stiffness`, `prestrain` | Cable (tension only) |
+| `BRITTLE_ELASTIC_WIRE` | Pt/Pt | `stiffness`, `prestrain`, `sigc` | Brittle cable |
+| `ELASTIC_ROD` | Pt/Pt | `stiffness`, `prestrain` | Elastic rod |
+| `VOIGT_ROD` | Pt/Pt | `stiffness`, `viscosity`, `prestrain` | Visco-elastic rod |
+| `COUPLED_DOF` | Any/Any | _(none)_ | Perfect rigid link |
+| `NORMAL_COUPLED_DOF` | Any/Any | _(none)_ | Normal coupling only |
+| `ELASTIC_REPELL_CLB` | Any/Any | `fric`, `Kn` | Soft penalty contact |
 
 ---
 
-## Gestion des lois
+## Managing Laws
 
-### Créer une loi
+### Creating a Law
 
-Remplir le formulaire et cliquer sur **✅ Créer Loi**. La loi est créée via `add_contact_law()` qui appelle `LMGC90Bridge.create_contact_law()` → `pre.tact_behav(...)` → `tacts.addBehav(...)`. Le signal `law_created` est émis → `_refresh_all()`. Les lois créées sont stockées dans `state.contact_laws` (liste de `ContactLaw`) et classifiées par `ContactLawType` (enum) et `CONTACT_LAW_CATEGORIES` (dict catégorie → lois).
+Fill in the form and click **✅ Create Law**. The law is created via `add_contact_law()`, which calls `LMGC90Bridge.create_contact_law()` → `pre.tact_behav(...)` → `tacts.addBehav(...)`. The `law_created` signal is emitted → `_refresh_all()`. Created laws are stored in `state.contact_laws` (a list of `ContactLaw`) and classified by `ContactLawType` (enum) and `CONTACT_LAW_CATEGORIES` (category → laws dict).
 
-### Modifier une loi
+### Editing a Law
 
-Double-cliquer dans la liste ou cliquer sur **✏️ Modifier Sélection**. Le formulaire passe en mode édition (bouton ✅ remplacé par 💾). Modifier les valeurs et cliquer sur **💾 Enregistrer Modifications** (`update_contact_law()`). Appuyer sur **❌ Annuler** pour revenir au mode création sans sauvegarder.
+Double-click in the list or click **✏️ Edit Selection**. The form switches to edit mode (the ✅ button is replaced by 💾). Modify the values and click **💾 Save Changes** (`update_contact_law()`). Press **❌ Cancel** to return to creation mode without saving.
 
-> **Renommage :** renommer une loi met automatiquement à jour le champ `behavior_name` de toutes les tables de visibilité qui y font référence.
+> **Renaming:** renaming a law automatically updates the `behavior_name` field of all visibility tables that reference it.
 
-### Supprimer une loi
+### Deleting a Law
 
-Sélectionner et cliquer sur **🗑️ Supprimer Sélection** (`remove_contact_law()`). Si la loi est référencée par une ou plusieurs tables de visibilité, un avertissement liste les références et bloque la suppression. Supprimer d'abord les tables de visibilité concernées.
+Select it and click **🗑️ Delete Selection** (`remove_contact_law()`). If the law is referenced by one or more visibility tables, a warning lists the references and blocks the deletion. Delete the relevant visibility tables first.
 
-### Informations sur une loi
+### Law Information
 
-Clic droit → **ℹ️ Informations** affiche une boîte de dialogue avec le type, tous les paramètres et la liste des tables de visibilité qui l'utilisent.
+Right-click → **ℹ️ Information** displays a dialog box with the type, all the parameters, and the list of visibility tables that use it.
 
 ---
 
-## Indicateur visuel dans la liste
+## Visual Indicator in the List
 
-| Couleur du nom | Signification |
+| Name Color | Meaning |
 |----------------|--------------|
-| **Vert** | Loi référencée par au moins une table de visibilité |
-| Noir (normal) | Loi non encore référencée |
+| **Green** | Law referenced by at least one visibility table |
+| Black (normal) | Law not yet referenced |
 
 ---
 
-## Remarques importantes
+## Important Notes
 
-**Cohérence avec la table de visibilité :** la loi choisie doit être compatible avec les types de corps/contacteurs de la table de visibilité. Une loi `GAP_SGR_CLB` ne fonctionnera pas avec une paire `RBDY2/DISKx — RBDY2/DISKx` (rigide/rigide) — utiliser `IQS_CLB` dans ce cas.
+**Consistency with the visibility table:** the chosen law must be compatible with the body/contactor types of the visibility table. A `GAP_SGR_CLB` law will not work with an `RBDY2/DISKx — RBDY2/DISKx` (rigid/rigid) pair — use `IQS_CLB` in that case.
 
-**Cohérence avec le détecteur de contact :** le type de loi doit correspondre au détecteur activé dans l'onglet Calcul. Par exemple, `ELASTIC_WIRE` nécessite le détecteur `PT2Lx` (point/ligne) ou similaire.
+**Consistency with the contact detector:** the law type must match the detector enabled in the Computation tab. For example, `ELASTIC_WIRE` requires the `PT2Lx` (point/line) detector or similar.
 
-**Valeurs numériques :** les champs acceptent la notation scientifique Python (`1e8`, `1e-3`, `3.14e6`). Les valeurs sont évaluées au moment de la création de la loi.
+**Numerical values:** the fields accept Python scientific notation (`1e8`, `1e-3`, `3.14e6`). Values are evaluated at the time the law is created.
 
-**Suppression protégée :** une loi utilisée par au moins une table de visibilité ne peut pas être supprimée directement. Cette protection évite les erreurs de référence dans le projet.
+**Protected deletion:** a law used by at least one visibility table cannot be deleted directly. This protection prevents reference errors in the project.

@@ -1,49 +1,49 @@
-# Variables dynamiques
-Les **variables dynamiques** de LMGC90_GUI permettent d'écrire des expressions Python directement dans les champs de saisie de l'interface, en utilisant les données du projet (avatars, matériaux, modèles, groupes) comme des variables. Elles remplacent les valeurs numériques figées par des expressions calculées à la volée, et se propagent automatiquement dans tous les onglets.
+# Dynamic Variables
+LMGC90_GUI's **dynamic variables** allow you to write Python expressions directly into the interface's input fields, using the project's data (avatars, materials, models, groups) as variables. They replace fixed numeric values with expressions computed on the fly, and propagate automatically across all tabs.
 
 ![](captures/variables.JPG)
 
 ---
 
-## Accès au gestionnaire de variables
+## Accessing the Variable Manager
 
-| Méthode | Action |
+| Method | Action |
 |---------|--------|
-| Menu **Outils → Variables dynamiques** | Ouvre le gestionnaire |
-| Raccourci | `Ctrl+V` |
+| **Tools → Dynamic Variables** menu | Opens the manager |
+| Shortcut | `Ctrl+V` |
 
 ---
 
-## Le gestionnaire de variables dynamiques
+## The Dynamic Variables Manager
 
-Le gestionnaire (`DynamicVarsDialog`) utilise `SafeEvaluator` avec `build_eval_context()` pour évaluer les expressions de façon sécurisée. Il affiche un tableau à 4 colonnes : **Nom**, **Expression**, **Valeur évaluée**, **Type**. Chaque variable est une expression Python stockée sous forme de chaîne et évaluée au moment de son utilisation.
+The manager (`DynamicVarsDialog`) uses `SafeEvaluator` with `build_eval_context()` to evaluate expressions safely. It displays a 4-column table: **Name**, **Expression**, **Evaluated Value**, **Type**. Each variable is a Python expression stored as a string and evaluated at the time it is used.
 
-### Ajouter une variable
+### Adding a Variable
 
-1. Saisir un **Nom** — identifiant Python valide (`thickness`, `r_min`, `x_wall`).
-2. Saisir une **Expression** — voir les possibilités ci-dessous.
-3. L'**Aperçu** se met à jour en temps réel : résultat en vert si valide, erreur en rouge.
-4. Cliquer sur **Ajouter / Modifier**.
+1. Enter a **Name** — a valid Python identifier (`thickness`, `r_min`, `x_wall`).
+2. Enter an **Expression** — see the possibilities below.
+3. The **Preview** updates in real time: result shown in green if valid, error in red.
+4. Click **Add / Update**.
 
-### Modifier une variable
+### Editing a Variable
 
-Cliquer sur la ligne dans le tableau → les champs Nom et Expression sont remplis → modifier → **Ajouter / Modifier**.
+Click on the row in the table → the Name and Expression fields are filled in → edit → **Add / Update**.
 
-### Supprimer une variable
+### Deleting a Variable
 
-Sélectionner la ligne et cliquer sur **Supprimer**.
+Select the row and click **Delete**.
 
-### Rafraîchir
+### Refreshing
 
-Cliquer sur **Rafraîchir** pour réévaluer toutes les variables avec l'état courant du projet (utile après avoir ajouté des avatars).
+Click **Refresh** to re-evaluate all variables against the current project state (useful after adding avatars).
 
-> **Persistance :** les variables sont sauvegardées dans le fichier `.lmgc90` du projet (`state.dynamic_vars`). Elles sont rechargées automatiquement à l'ouverture.
+> **Persistence:** variables are saved in the project's `.lmgc90` file (`state.dynamic_vars`). They are automatically reloaded when the project is opened.
 
 ---
 
-## Types d'expressions supportées
+## Supported Expression Types
 
-### Constantes numériques
+### Numeric Constants
 
 ```python
 thickness = 0.5
@@ -52,9 +52,9 @@ n_cols = 15
 pi_val = 3.14159
 ```
 
-### Expressions mathématiques
+### Mathematical Expressions
 
-Toutes les expressions Python numériques sont supportées :
+All numeric Python expressions are supported:
 
 ```python
 diameter = 2 * radius
@@ -65,36 +65,36 @@ diag = sqrt(lx**2 + ly**2)
 clamp = max(0.0, min(1.0, ratio))
 ```
 
-**Fonctions mathématiques disponibles :**
+**Available mathematical functions:**
 
-| Symbole | Description |
+| Symbol | Description |
 |---------|-------------|
 | `pi` | π ≈ 3.14159… |
 | `e` | e ≈ 2.71828… |
-| `sqrt(x)` | Racine carrée |
-| `abs(x)` | Valeur absolue |
+| `sqrt(x)` | Square root |
+| `abs(x)` | Absolute value |
 | `min(a, b)` | Minimum |
 | `max(a, b)` | Maximum |
-| `round(x, n)` | Arrondi à n décimales |
-| `sum(liste)` | Somme d'une liste |
-| `len(objet)` | Longueur |
-| `math.sin(x)` | Sinus (x en radians) |
-| `math.cos(x)` | Cosinus |
-| `math.tan(x)` | Tangente |
-| `math.log(x)` | Logarithme naturel |
-| `math.log10(x)` | Logarithme décimal |
-| `math.exp(x)` | Exponentielle |
-| `math.floor(x)` | Partie entière inférieure |
-| `math.ceil(x)` | Partie entière supérieure |
-| `math.radians(deg)` | Degrés → radians |
-| `math.degrees(rad)` | Radians → degrés |
-| `np.array(liste)` | Tableau numpy |
-| `np.linspace(a,b,n)` | Tableau régulièrement espacé |
-etc,
+| `round(x, n)` | Rounded to n decimal places |
+| `sum(list)` | Sum of a list |
+| `len(object)` | Length |
+| `math.sin(x)` | Sine (x in radians) |
+| `math.cos(x)` | Cosine |
+| `math.tan(x)` | Tangent |
+| `math.log(x)` | Natural logarithm |
+| `math.log10(x)` | Base-10 logarithm |
+| `math.exp(x)` | Exponential |
+| `math.floor(x)` | Floor (round down) |
+| `math.ceil(x)` | Ceiling (round up) |
+| `math.radians(deg)` | Degrees → radians |
+| `math.degrees(rad)` | Radians → degrees |
+| `np.array(list)` | numpy array |
+| `np.linspace(a,b,n)` | Evenly spaced array |
+etc.
 
-### Variables référençant d'autres variables
+### Variables Referencing Other Variables
 
-Les variables sont évaluées dans l'ordre de définition — une variable peut référencer les précédentes :
+Variables are evaluated in the order in which they are defined — a variable can reference previous ones:
 
 ```python
 thickness = 0.05
@@ -105,77 +105,77 @@ grid_size = step * 10
 
 ---
 
-## Accès aux données du projet
+## Accessing Project Data
 
 ### Avatars — `avatar[i]`
 
-Accès à un avatar par son index (0-based). Toutes les propriétés sont en lecture seule.
+Access to an avatar by its index (0-based). All properties are read-only.
 
-| Expression | Description | Type retourné |
+| Expression | Description | Returned Type |
 |------------|-------------|---------------|
-| `avatar[i].center` | Centre complet `[x, y]` ou `[x, y, z]` | `list` |
-| `avatar[i].x` | Coordonnée X du centre | `float` |
-| `avatar[i].y` | Coordonnée Y du centre | `float` |
-| `avatar[i].z` | Coordonnée Z du centre (3D) | `float` ou `None` |
-| `avatar[i].radius` | Rayon de l'avatar | `float` ou `None` |
-| `avatar[i].color` | Couleur LMGC90 (`'BLUEx'`) | `str` |
-| `avatar[i].material_name` | Nom du matériau | `str` |
-| `avatar[i].model_name` | Nom du modèle | `str` |
-| `avatar[i].avatar_type` | Type pylmgc90 (`'rigidDisk'`) | `str` |
-| `avatar[i].origin` | Origine : `'manual'`, `'loop'`, `'granulo'` | `str` |
-| `avatar[i].generation_type` | `'regular'`, `'full'`, `'bevel'` ou `None` | `str` ou `None` |
-| `avatar[i].is_hollow` | Disque creux | `bool` |
-| `avatar[i].nb_vertices` | Nombre de sommets (polygone) | `int` ou `None` |
-| `avatar[i].vertices` | Liste des sommets | `list` ou `None` |
-| `avatar[i].axis` | Axes du jonc `{axe1, axe2, axe3}` | `dict` ou `None` |
-| `avatar[i].contactors` | Liste des contacteurs | `list` |
-| `avatar[i].wall_params` | Paramètres bruts de mur | `dict` |
-| `avatar[i].brick_lx` | Longueur brique maçonnerie (`wall_params['l']`) | `float` ou `None` |
-| `avatar[i].brick_ly` | Hauteur/profondeur brique (`wall_params['h']`) | `float` ou `None` |
-| `avatar[i].brick_lz` | Hauteur 3D brique (`wall_params['lz']`) | `float` ou `None` |
-| `avatar[i].mesh_params` | Paramètres de maillage EF | `dict` ou `None` |
-| `avatar[i].index` | Indice de l'avatar dans la liste | `int` |
+| `avatar[i].center` | Full center `[x, y]` or `[x, y, z]` | `list` |
+| `avatar[i].x` | X coordinate of the center | `float` |
+| `avatar[i].y` | Y coordinate of the center | `float` |
+| `avatar[i].z` | Z coordinate of the center (3D) | `float` or `None` |
+| `avatar[i].radius` | Radius of the avatar | `float` or `None` |
+| `avatar[i].color` | LMGC90 color (`'BLUEx'`) | `str` |
+| `avatar[i].material_name` | Material name | `str` |
+| `avatar[i].model_name` | Model name | `str` |
+| `avatar[i].avatar_type` | pylmgc90 type (`'rigidDisk'`) | `str` |
+| `avatar[i].origin` | Origin: `'manual'`, `'loop'`, `'granulo'` | `str` |
+| `avatar[i].generation_type` | `'regular'`, `'full'`, `'bevel'` or `None` | `str` or `None` |
+| `avatar[i].is_hollow` | Hollow disk | `bool` |
+| `avatar[i].nb_vertices` | Number of vertices (polygon) | `int` or `None` |
+| `avatar[i].vertices` | List of vertices | `list` or `None` |
+| `avatar[i].axis` | Axes of the jonc `{axe1, axe2, axe3}` | `dict` or `None` |
+| `avatar[i].contactors` | List of contactors | `list` |
+| `avatar[i].wall_params` | Raw wall parameters | `dict` |
+| `avatar[i].brick_lx` | Masonry brick length (`wall_params['l']`) | `float` or `None` |
+| `avatar[i].brick_ly` | Brick height/depth (`wall_params['h']`) | `float` or `None` |
+| `avatar[i].brick_lz` | 3D brick height (`wall_params['lz']`) | `float` or `None` |
+| `avatar[i].mesh_params` | FE mesh parameters | `dict` or `None` |
+| `avatar[i].index` | Index of the avatar in the list | `int` |
 
-#### Nœuds pylmgc90 — `avatar[i].nodes`
+#### pylmgc90 Nodes — `avatar[i].nodes`
 
-La propriété `nodes` simule l'accès aux nœuds pylmgc90. La convention pylmgc90 numérote les nœuds à partir de 1 — `nodes[1]` est le nœud principal, identique à `nodes[0]` en Python.
+The `nodes` property simulates access to pylmgc90 nodes. The pylmgc90 convention numbers nodes starting from 1 — `nodes[1]` is the main node, identical to `nodes[0]` in Python.
 
 | Expression | Description |
 |------------|-------------|
-| `avatar[i].nodes[1].coor` | Coordonnées du nœud principal `[x, y]` ou `[x, y, z]` |
-| `avatar[i].nodes[1].coor[0]` | Coordonnée X du nœud |
-| `avatar[i].nodes[1].coor[1]` | Coordonnée Y du nœud |
-| `avatar[i].nodes[1].coor[2]` | Coordonnée Z du nœud (3D) |
-| `avatar[i].nodes[0].coor` | Identique à `nodes[1]` (convention Python) |
-| `avatar[i].nodes[k].coor` | k-ième sommet pour les polygones (k ≥ 1) |
+| `avatar[i].nodes[1].coor` | Coordinates of the main node `[x, y]` or `[x, y, z]` |
+| `avatar[i].nodes[1].coor[0]` | X coordinate of the node |
+| `avatar[i].nodes[1].coor[1]` | Y coordinate of the node |
+| `avatar[i].nodes[1].coor[2]` | Z coordinate of the node (3D) |
+| `avatar[i].nodes[0].coor` | Identical to `nodes[1]` (Python convention) |
+| `avatar[i].nodes[k].coor` | k-th vertex for polygons (k ≥ 1) |
 
-> **Pourquoi `nodes[1]` ?** pylmgc90 numérote les nœuds à partir de 1. LMGC90_GUI supporte les deux conventions : `nodes[0]` et `nodes[1]` pointent tous les deux vers le nœud principal.
+> **Why `nodes[1]`?** pylmgc90 numbers nodes starting from 1. LMGC90_GUI supports both conventions: `nodes[0]` and `nodes[1]` both point to the main node.
 
-#### Itération sur les avatars
+#### Iterating Over Avatars
 
 ```python
-nb = len(avatar)                    # Nombre total d'avatars
-liste = list(avatar)                # Tous les avatars comme liste de proxies
-centres = [av.center for av in avatar]  # Liste de tous les centres
+nb = len(avatar)                    # Total number of avatars
+liste = list(avatar)                # All avatars as a list of proxies
+centres = [av.center for av in avatar]  # List of all centers
 rayons  = [av.radius for av in avatar if av.radius is not None]
 ```
 
 ---
 
-### Groupes — `group['nom']`
+### Groups — `group['name']`
 
-Accès à un groupe d'avatars par son nom. Retourne une liste d'`AvatarProxy`.
+Access to a group of avatars by its name. Returns a list of `AvatarProxy`.
 
 | Expression | Description |
 |------------|-------------|
-| `group['mur_briques']` | Liste des avatars du groupe |
-| `group['mur_briques'][0].center` | Centre du premier avatar du groupe |
-| `group['mur_briques'][0].x` | Coordonnée X du premier avatar |
-| `len(group['mur_briques'])` | Nombre d'avatars dans le groupe |
-| `'mur_briques' in group` | Test d'existence du groupe (bool) |
-| `list(group)` | Liste de tous les noms de groupes |
+| `group['mur_briques']` | List of avatars in the group |
+| `group['mur_briques'][0].center` | Center of the first avatar in the group |
+| `group['mur_briques'][0].x` | X coordinate of the first avatar |
+| `len(group['mur_briques'])` | Number of avatars in the group |
+| `'mur_briques' in group` | Test for the group's existence (bool) |
+| `list(group)` | List of all group names |
 
-**Exemples :**
+**Examples:**
 ```python
 nb_briques  = len(group['mur_facade'])
 premier_x   = group['mur_facade'][0].x
@@ -185,18 +185,18 @@ all_centers = [av.center for av in group['granulo_box2d']]
 
 ---
 
-### Matériaux — `material['nom']`
+### Materials — `material['name']`
 
 | Expression | Description | Type |
 |------------|-------------|------|
-| `material['beton'].name` | Nom du matériau | `str` |
-| `material['beton'].density` | Densité (kg/m³) | `float` |
+| `material['beton'].name` | Material name | `str` |
+| `material['beton'].density` | Density (kg/m³) | `float` |
 | `material['beton'].material_type` | Type (`'RIGID'`, `'ELAS'`…) | `str` |
-| `material['beton']['young']` | Propriété personnalisée (module de Young) | `float` |
-| `material['beton']['nu']` | Propriété personnalisée (coefficient de Poisson) | `float` |
-| `material['beton'].young` | Idem via attribut | `float` |
+| `material['beton']['young']` | Custom property (Young's modulus) | `float` |
+| `material['beton']['nu']` | Custom property (Poisson's ratio) | `float` |
+| `material['beton'].young` | Same, via attribute | `float` |
 
-**Exemples :**
+**Examples:**
 ```python
 rho = material['granite'].density
 E   = material['acier']['young']
@@ -205,17 +205,17 @@ nu  = material['acier'].nu
 
 ---
 
-### Modèles — `model['nom']`
+### Models — `model['name']`
 
 | Expression | Description | Type |
 |------------|-------------|------|
-| `model['rigid'].name` | Nom du modèle | `str` |
-| `model['rigid'].physics` | Physique (`'MECAx'`, `'THERx'`…) | `str` |
-| `model['rigid'].element` | Élément fini (`'Rxx2D'`, `'Q4xxx'`…) | `str` |
-| `model['rigid'].dimension` | Dimension (2 ou 3) | `int` |
-| `model['femxx']['kinematic']` | Option numérique | dépend de l'option |
+| `model['rigid'].name` | Model name | `str` |
+| `model['rigid'].physics` | Physics (`'MECAx'`, `'THERx'`…) | `str` |
+| `model['rigid'].element` | Finite element (`'Rxx2D'`, `'Q4xxx'`…) | `str` |
+| `model['rigid'].dimension` | Dimension (2 or 3) | `int` |
+| `model['femxx']['kinematic']` | Numeric option | depends on the option |
 
-**Exemple :**
+**Example:**
 ```python
 dim = model['femxx'].dimension
 phys = model['rigid'].physics
@@ -223,20 +223,20 @@ phys = model['rigid'].physics
 
 ---
 
-### Fonctions de filtrage
+### Filtering Functions
 
-Retournent une liste d'`AvatarProxy` filtrée selon un critère.
+Return a list of `AvatarProxy` filtered according to a criterion.
 
-| Fonction | Description | Exemple |
+| Function | Description | Example |
 |----------|-------------|---------|
-| `avatars_by_color('BLUEx')` | Tous les avatars de couleur `'BLUEx'` | `bleus = avatars_by_color('BLUEx')` |
-| `avatars_by_material('beton')` | Tous les avatars utilisant ce matériau | `corps = avatars_by_material('TDURx')` |
-| `avatars_by_type('rigidDisk')` | Tous les avatars de ce type pylmgc90 | `disques = avatars_by_type('rigidDisk')` |
-| `avatars_by_origin('manual')` | Avatars créés manuellement | `manuels = avatars_by_origin('manual')` |
-| `avatars_by_origin('loop')` | Avatars générés par boucle | |
-| `avatars_by_origin('granulo')` | Avatars granulaires | |
+| `avatars_by_color('BLUEx')` | All avatars of color `'BLUEx'` | `bleus = avatars_by_color('BLUEx')` |
+| `avatars_by_material('beton')` | All avatars using this material | `corps = avatars_by_material('TDURx')` |
+| `avatars_by_type('rigidDisk')` | All avatars of this pylmgc90 type | `disques = avatars_by_type('rigidDisk')` |
+| `avatars_by_origin('manual')` | Manually created avatars | `manuels = avatars_by_origin('manual')` |
+| `avatars_by_origin('loop')` | Avatars generated by a loop | |
+| `avatars_by_origin('granulo')` | Granular avatars | |
 
-**Exemples avancés :**
+**Advanced examples:**
 ```python
 nb_bleus = len(avatars_by_color('BLUEx'))
 nb_disques_rouges = len([av for av in avatars_by_color('REDxx') if av.avatar_type == 'rigidDisk'])
@@ -247,82 +247,82 @@ x_max = max(av.x for av in avatars_by_color('BLUEx'))
 
 ---
 
-## Utilisation par onglet
+## Usage by Tab
 
-Les variables dynamiques peuvent être utilisées dans **tous les champs ** des onglets de *LMGC90_GUI*. Il suffit d'écrire le nom de la variable (ou une expression complète) à la place de la valeur numérique.
+Dynamic variables can be used in **every field** of LMGC90_GUI's tabs. Simply write the variable name (or a full expression) in place of the numeric value.
 
-### Onglet Matériau
+### Material Tab
 
-| Champ | Accepte des expressions |
+| Field | Accepts Expressions |
 |-------|------------------------|
-| **Densité** | ✅ — ex : `material['granite'].density * 0.9` |
-| **Propriétés** (`key=val, key=val`) | ✅ — ex : `young=E, nu=nu_beton` |
+| **Density** | ✅ — e.g.: `material['granite'].density * 0.9` |
+| **Properties** (`key=val, key=val`) | ✅ — e.g.: `young=E, nu=nu_beton` |
 
-**Exemples :**
+**Examples:**
 ```
-Densité    : rho
-Propriétés : young=E, nu=nu, elas='standard', anisotropy='isotropic'
+Density    : rho
+Properties : young=E, nu=nu, elas='standard', anisotropy='isotropic'
 ```
 
-### Onglet Avatar vide (Empty Avatar)
+### Empty Avatar Tab
 
-| Champ | Accepte des expressions |
+| Field | Accepts Expressions |
 |-------|------------------------|
-| **Centre** | ✅ — ex : `avatar[0].x + spacing, avatar[0].y` |
-| **Paramètres des contacteurs** | ✅ — ex : `r=radius, axe1=lx/2, axe2=ly/2` |
+| **Center** | ✅ — e.g.: `avatar[0].x + spacing, avatar[0].y` |
+| **Contactor parameters** | ✅ — e.g.: `r=radius, axe1=lx/2, axe2=ly/2` |
 
-**Exemples :**
+**Examples:**
 ```
-Centre             : avatar[0].x + spacing, 0.0
-Paramètres (DISKx) : r=radius
-Paramètres (JONCx) : axe1=brick_lx/2, axe2=brick_ly/2
-Paramètres (POLYG) : nb_vertices=6, vertices=sommets
+Center             : avatar[0].x + spacing, 0.0
+Parameters (DISKx) : r=radius
+Parameters (JONCx) : axe1=brick_lx/2, axe2=brick_ly/2
+Parameters (POLYG) : nb_vertices=6, vertices=sommets
 ```
 
-### Onglet Contact
+### Contact Tab
 
-**Tous les paramètres numériques** de toutes les lois de contact acceptent des expressions :
+**All numeric parameters** of all contact laws accept expressions:
 
-| Paramètre | Exemple d'expression |
+| Parameter | Example Expression |
 |-----------|----------------------|
-| `fric` | `mu` ou `0.5 * material['beton'].density / 2500` |
+| `fric` | `mu` or `0.5 * material['beton'].density / 2500` |
 | `stfr`, `dyfr` | `E * 1e3` |
 | `cohn`, `coht` | `cohesion_sol` |
 | `cn`, `ct` | `resistance_traction` |
 | `stiffness` | `EA_cable` |
 
-**Exemples :**
+**Examples:**
 ```
 fric       : mu
 stiffness  : EA_cable
 cn         : sigma_c
 ```
 
-### Onglet Boucles — Boucles `for` génériques
+### Loops Tab — Generic `for` Loops
 
-Dans les boucles `for` génériques, **toutes les expressions du template** ont accès aux variables dynamiques. Les bornes (`début`, `fin`, `pas`) et tous les champs du template sont évalués avec le contexte complet :
-
-```
-Début : 0
-Fin   : nb_cols
-Pas   : 1
-center (template avatar) : [i * (lx + joint) + lx/2, offset_y]
-radius (template avatar)  : r_min + i * (r_max - r_min) / nb_cols
-name   (template matériau): 'mat' + str(i)
-```
-
-### Onglet Boucles — Boucles géométriques
-
-Les paramètres des boucles géométriques (Cercle, Grille, Ligne, Spirale) peuvent utiliser les variables dynamiques via le formulaire des boucles `for` :
+In generic `for` loops, **every expression in the template** has access to the dynamic variables. The bounds (`start`, `end`, `step`) and all template fields are evaluated with the full context:
 
 ```
-radius (Cercle) : rayon_anneau
-step   (Grille) : pas_grille
+Start : 0
+End   : nb_cols
+Step  : 1
+center (avatar template) : [i * (lx + joint) + lx/2, offset_y]
+radius (avatar template)  : r_min + i * (r_max - r_min) / nb_cols
+name   (material template): 'mat' + str(i)
 ```
 
-### Assistants — Wizard déformable (page DOF)
+### Loops Tab — Geometric Loops
 
-Dans la page Conditions aux Limites de l'assistant déformable, le champ Paramètres utilise `SafeEvaluator.eval_dict()` :
+Geometric loop parameters (Circle, Grid, Line, Spiral) can use dynamic variables via the `for` loops form:
+
+```
+radius (Circle) : rayon_anneau
+step   (Grid) : pas_grille
+```
+
+### Wizards — Deformable Wizard (DOF page)
+
+In the Boundary Conditions page of the deformable wizard, the Parameters field uses `SafeEvaluator.eval_dict()`:
 
 ```
 component=[1,2], dofty="vlocy", ct=vitesse_imposee
@@ -331,27 +331,27 @@ component=[2], ct=deplacement / duree_rampe
 
 ---
 
-## Expressions avancées supportées
+## Supported Advanced Expressions
 
-### Opérateurs
+### Operators
 
-| Opérateur | Exemple |
+| Operator | Example |
 |-----------|---------|
 | `+`, `-`, `*`, `/` | `lx + joint` |
-| `//` | Division entière |
+| `//` | Integer division |
 | `%` | Modulo |
-| `**` | Puissance : `radius**2` |
-| `==`, `!=`, `<`, `<=`, `>`, `>=` | Comparaisons |
-| `and`, `or`, `not` | Logique |
+| `**` | Power: `radius**2` |
+| `==`, `!=`, `<`, `<=`, `>`, `>=` | Comparisons |
+| `and`, `or`, `not` | Logic |
 
-### Expressions ternaires
+### Ternary Expressions
 
 ```python
 r = r_grand if grand else r_petit
 val = x if x > 0 else 0.0
 ```
 
-### Compréhensions de listes
+### List Comprehensions
 
 ```python
 centres = [av.center for av in group['mur']]
@@ -359,14 +359,14 @@ rayons  = [av.radius for av in avatars_by_type('rigidDisk')]
 xs      = [av.x for av in avatar]
 ```
 
-### Listes et tuples
+### Lists and Tuples
 
 ```python
 center_2d = [avatar[0].x, avatar[0].y]
 center_3d = [0.0, 0.0, avatar[0].z + 0.5]
 ```
 
-### Expressions numpy
+### numpy Expressions
 
 ```python
 moyenne = np.array([av.x for av in avatar]).mean()
@@ -375,11 +375,11 @@ coords  = np.array([av.center for av in avatar])
 
 ---
 
-## Comparaison avec un script Python équivalent
+## Comparison with an Equivalent Python Script
 
-Le tableau suivant montre l'équivalence entre une variable dynamique dans l'interface et son code Python en script de pré-traitement.
+The following table shows the equivalence between a dynamic variable in the interface and its Python code in a pre-processing script.
 
-| Variable dynamique (interface) | Équivalent script Python |
+| Dynamic Variable (interface) | Python Script Equivalent |
 |-------------------------------|--------------------------|
 | `r = avatar[0].radius` | `r = bodies[0].nodes[1].coor[...]` |
 | `cx = avatar[0].x` | `cx = bodies[0].nodes[1].coor[0]` |
@@ -393,9 +393,9 @@ Le tableau suivant montre l'équivalence entre une variable dynamique dans l'int
 | `x0 = group['mur'][0].x` | `x0 = bodies[group_mur[0]].nodes[1].coor[0]` |
 | `bleus = avatars_by_color('BLUEx')` | `bleus = [b for b in bodies_list if b.color == 'BLUEx']` |
 
-### Exemple complet
+### Complete Example
 
-**Interface — Variables dynamiques :**
+**Interface — Dynamic Variables:**
 ```
 lx = 0.20
 ly = 0.065
@@ -407,7 +407,7 @@ offset_x = 0.0
 wall_width = nb_cols * spacing
 ```
 
-**Équivalent script Python pré-traitement :**
+**Equivalent pre-processing Python script:**
 ```python
 lx = 0.20
 ly = 0.065
@@ -428,102 +428,102 @@ for row in range(nb_rows):
 
 ---
 
-## Propriétés de l'objet `AvatarProxy` — référence complète
+## `AvatarProxy` Object Properties — Complete Reference
 
-Le tableau suivant liste **toutes les propriétés** accessibles via `avatar[i]` ou dans une liste de groupe.
+The following table lists **all the properties** accessible via `avatar[i]` or within a group list.
 
-| Propriété | Type | Notes |
+| Property | Type | Notes |
 |-----------|------|-------|
-| `.center` | `list[float]` | `[x, y]` en 2D, `[x, y, z]` en 3D |
+| `.center` | `list[float]` | `[x, y]` in 2D, `[x, y, z]` in 3D |
 | `.x` | `float` | `center[0]` |
 | `.y` | `float` | `center[1]` |
-| `.z` | `float` ou `None` | `center[2]` ou `None` si 2D |
-| `.radius` | `float` ou `None` | Rayon du disque/sphère |
-| `.color` | `str` | Code couleur 5 car. (`'BLUEx'`) |
-| `.material_name` | `str` | Nom du matériau associé |
-| `.model_name` | `str` | Nom du modèle associé |
-| `.avatar_type` | `str` | Valeur enum : `'rigidDisk'`, `'rigidSphere'`, `'rigidJonc'`, `'emptyAvatar'`… |
+| `.z` | `float` or `None` | `center[2]` or `None` if 2D |
+| `.radius` | `float` or `None` | Radius of the disk/sphere |
+| `.color` | `str` | 5-character color code (`'BLUEx'`) |
+| `.material_name` | `str` | Name of the associated material |
+| `.model_name` | `str` | Name of the associated model |
+| `.avatar_type` | `str` | Enum value: `'rigidDisk'`, `'rigidSphere'`, `'rigidJonc'`, `'emptyAvatar'`… |
 | `.origin` | `str` | `'manual'`, `'loop'`, `'granulo'` |
-| `.generation_type` | `str` ou `None` | `'regular'`, `'full'`, `'bevel'` |
-| `.is_hollow` | `bool` | Disque creux si `True` |
-| `.nb_vertices` | `int` ou `None` | Nombre de sommets du polygone |
-| `.vertices` | `list` ou `None` | Coordonnées des sommets `[[x1,y1], ...]` |
-| `.axis` | `dict` ou `None` | `{'axe1': v, 'axe2': v, 'axe3': v}` pour joncs/plans |
-| `.contactors` | `list[dict]` | Chaque dict : `{'shape', 'color', 'params'}` |
-| `.wall_params` | `dict` | Paramètres de mur maçonnerie |
-| `.brick_lx` | `float` ou `None` | Longueur brique (`wall_params['l']`) |
-| `.brick_ly` | `float` ou `None` | Hauteur/profondeur brique (`wall_params['h']`) |
-| `.brick_lz` | `float` ou `None` | Hauteur 3D brique (`wall_params['lz']`) |
-| `.mesh_params` | `dict` ou `None` | Paramètres maillage EF |
-| `.index` | `int` | Index dans `state.avatars` |
-| `.nodes[1].coor` | `list[float]` | Nœud principal (convention pylmgc90) |
-| `.nodes[0].coor` | `list[float]` | Idem (convention Python) |
-| `.nodes[k].coor` | `list[float]` | k-ième sommet (polygones) |
+| `.generation_type` | `str` or `None` | `'regular'`, `'full'`, `'bevel'` |
+| `.is_hollow` | `bool` | Hollow disk if `True` |
+| `.nb_vertices` | `int` or `None` | Number of vertices of the polygon |
+| `.vertices` | `list` or `None` | Vertex coordinates `[[x1,y1], ...]` |
+| `.axis` | `dict` or `None` | `{'axe1': v, 'axe2': v, 'axe3': v}` for joncs/planes |
+| `.contactors` | `list[dict]` | Each dict: `{'shape', 'color', 'params'}` |
+| `.wall_params` | `dict` | Masonry wall parameters |
+| `.brick_lx` | `float` or `None` | Brick length (`wall_params['l']`) |
+| `.brick_ly` | `float` or `None` | Brick height/depth (`wall_params['h']`) |
+| `.brick_lz` | `float` or `None` | 3D brick height (`wall_params['lz']`) |
+| `.mesh_params` | `dict` or `None` | FE mesh parameters |
+| `.index` | `int` | Index in `state.avatars` |
+| `.nodes[1].coor` | `list[float]` | Main node (pylmgc90 convention) |
+| `.nodes[0].coor` | `list[float]` | Same (Python convention) |
+| `.nodes[k].coor` | `list[float]` | k-th vertex (polygons) |
 
 ---
 
-## Sécurité — ce qui est autorisé et interdit
+## Security — What Is Allowed and Forbidden
 
-Les expressions sont analysées via `SafeEvaluator` qui inspecte l'AST Python avant exécution. Aucun `eval()` direct n'est utilisé.
+Expressions are parsed via `SafeEvaluator`, which inspects the Python AST before execution. No direct `eval()` is used.
 
-### Autorisé
+### Allowed
 
-- Opérations arithmétiques, comparaisons, logique
-- Appels de fonctions du contexte (`sqrt`, `math.sin`, `len`, `list`…)
-- Compréhensions de listes, tuples, dicts
-- Expressions ternaires (`a if cond else b`)
-- Accès aux attributs et index
-- Conversions : `int(x)`, `float(x)`, `str(x)`, `bool(x)`
+- Arithmetic operations, comparisons, logic
+- Calls to functions from the context (`sqrt`, `math.sin`, `len`, `list`…)
+- List, tuple, and dict comprehensions
+- Ternary expressions (`a if cond else b`)
+- Attribute and index access
+- Conversions: `int(x)`, `float(x)`, `str(x)`, `bool(x)`
 
-### Interdit (bloqué par SafeEvaluator)
+### Forbidden (blocked by SafeEvaluator)
 
 - `import`, `exec`, `eval`, `open`, `__import__`
-- Toute instruction (assignment, boucle `for`/`while`, `if` — seules les expressions sont autorisées)
-- Appels de fonctions non déclarées dans le contexte
-- Accès à `__builtins__`, `__class__`, `__dict__`
+- Any statement (assignment, `for`/`while` loop, `if` — only expressions are allowed)
+- Calls to functions not declared in the context
+- Access to `__builtins__`, `__class__`, `__dict__`
 
-> Si une expression tente une opération interdite, `SafeEvaluator` lève une `ValueError` avec le message `"Opération non autorisée : <NomDuNœudAST>"`.
+> If an expression attempts a forbidden operation, `SafeEvaluator` raises a `ValueError` with the message `"Opération non autorisée : <ASTNodeName>"` ("Operation not allowed").
 
 ---
 
-## Messages d'erreur et débogage
+## Error Messages and Debugging
 
-Lorsqu'une expression échoue dans un onglet, une boîte de dialogue détaillée liste :
-- L'expression fautive
-- Le message d'erreur Python
-- Les variables dynamiques actuellement définies
-- Les références disponibles (`avatar[i].x`, `group['nom']`, etc.)
+When an expression fails in a tab, a detailed dialog box lists:
+- The faulty expression
+- The Python error message
+- The dynamic variables currently defined
+- The available references (`avatar[i].x`, `group['name']`, etc.)
 
-**Causes fréquentes :**
+**Common causes:**
 
-| Erreur | Cause | Solution |
+| Error | Cause | Solution |
 |--------|-------|---------|
-| `NameError: 'thickness'` | Variable pas encore définie | Créer `thickness` dans le gestionnaire |
-| `IndexError: Avatar index 5 invalide` | Il y a moins de 6 avatars | Vérifier l'index |
-| `KeyError: Groupe 'mur' introuvable` | Le groupe n'existe pas | Vérifier le nom dans l'onglet Boucles/Maçonnerie |
-| `Opération non autorisée : Import` | Tentative d'import | Utiliser uniquement les fonctions disponibles |
-| `Syntaxe invalide` | Parenthèses mal fermées | Vérifier la syntaxe Python |
+| `NameError: 'thickness'` | Variable not yet defined | Create `thickness` in the manager |
+| `IndexError: Avatar index 5 invalide` | There are fewer than 6 avatars | Check the index |
+| `KeyError: Groupe 'mur' introuvable` | The group does not exist | Check the name in the Loops/Masonry tab |
+| `Opération non autorisée : Import` | Attempted import | Use only the available functions |
+| `Syntaxe invalide` | Unclosed parentheses | Check the Python syntax |
 
 ---
 
-## Exemples de variables dynamiques prêtes à l'emploi
+## Ready-to-Use Dynamic Variable Examples
 
-### Géométrie de mur maçonné
+### Masonry Wall Geometry
 
 ```python
-lx = 0.20          # Longueur brique
-ly = 0.065         # Hauteur brique
-lz = 0.10          # Profondeur brique (3D)
-joint = 0.010      # Épaisseur joint
-nb_cols = 15       # Nombre de colonnes
-nb_rows = 10       # Nombre de rangs
+lx = 0.20          # Brick length
+ly = 0.065         # Brick height
+lz = 0.10          # Brick depth (3D)
+joint = 0.010      # Joint thickness
+nb_cols = 15       # Number of columns
+nb_rows = 10       # Number of rows
 spacing_x = lx + joint
 spacing_y = ly + joint
 wall_width = nb_cols * spacing_x
 wall_height = nb_rows * spacing_y
 ```
 
-### Paramètres granulaires
+### Granular Parameters
 
 ```python
 r_min = 0.05
@@ -534,7 +534,7 @@ ly_box = 4.0
 nb_particules = 200
 ```
 
-### Coordonnées relatives à un avatar existant
+### Coordinates Relative to an Existing Avatar
 
 ```python
 x_ref = avatar[0].x
@@ -544,18 +544,18 @@ y_cible = y_ref + 0.5
 dist = sqrt((avatar[1].x - avatar[0].x)**2 + (avatar[1].y - avatar[0].y)**2)
 ```
 
-### Paramètres matériaux
+### Material Parameters
 
 ```python
 rho = material['granite'].density
 E = material['acier']['young']
 nu = material['acier']['nu']
-mu = 0.3                        # Coefficient de Coulomb
-K = E / (3 * (1 - 2 * nu))     # Module de compressibilité
-G = E / (2 * (1 + nu))         # Module de cisaillement
+mu = 0.3                        # Coulomb coefficient
+K = E / (3 * (1 - 2 * nu))     # Bulk modulus
+G = E / (2 * (1 + nu))         # Shear modulus
 ```
 
-### Statistiques sur les avatars
+### Avatar Statistics
 
 ```python
 nb_total = len(avatar)

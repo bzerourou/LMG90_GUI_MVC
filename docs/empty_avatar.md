@@ -1,296 +1,296 @@
-# Avatar Vide (Personnalisation avancée)
+# Empty Avatar (Advanced Customization)
 
-**Onglet Avatar vide** Permet de créer des **avatars à contacteurs personnalisés** : soit un corps vide (`emptyAvatar`) entièrement défini par ses contacteurs, soit l'ajout de contacteurs à un **corps déformable existant** (maillage FEM).  
-C'est l'outil le plus flexible de LMGC90_GUI pour les cas avancés qui ne rentrent pas dans les types d'avatars rigides standards.
+**Empty Avatar tab** Allows you to create **avatars with custom contactors**: either an empty body (`emptyAvatar`) fully defined by its contactors, or the addition of contactors to an **existing deformable body** (FEM mesh).  
+This is the most flexible tool in LMGC90_GUI for advanced cases that do not fit into the standard rigid avatar types.
 
 ![](captures/avatar_vide_2disques.JPG)
 
 ---
 
-## Deux modes de fonctionnement
+## Two Operating Modes
 
-Le champ **Mode** en haut du formulaire bascule entre deux comportements distincts :
+The **Mode** field at the top of the form switches between two distinct behaviors:
 
 | Mode | Description |
 |------|-------------|
-| **Avatar vide (emptyAvatar)** | Crée un nouveau corps pylmgc90 entièrement assemblé à partir de ses contacteurs. Le corps est rigide mais sa géométrie est définie manuellement. |
-| **Corps déformable existant** | Ajoute des contacteurs de contact sur un corps déformable (maillage FEM) déjà créé via l'assistant de maillage. Appelle `body.addContactors()` directement sur l'objet pylmgc90. |
+| **Empty avatar (emptyAvatar)** | Creates a new pylmgc90 body fully assembled from its contactors. The body is rigid, but its geometry is defined manually. |
+| **Existing deformable body** | Adds contact contactors to a deformable body (FEM mesh) already created via the mesh wizard. Calls `body.addContactors()` directly on the pylmgc90 object. |
 
 ---
 
-## Mode 1 — Avatar vide (emptyAvatar)
+## Mode 1 — Empty Avatar (emptyAvatar)
 
-### Principe
+### Principle
 
-Un avatar vide est un corps rigide dont la géométrie n'est pas prédéfinie. pylmgc90 l'assemble en trois étapes :
+An empty avatar is a rigid body whose geometry is not predefined. pylmgc90 assembles it in three steps:
 
-1. Création d'un corps vide `pre.avatar(dimension=…)`
-2. Ajout d'un bulk rigide `pre.rigid2d()` ou `pre.rigid3d()`
-3. Ajout d'un nœud principal et des **contacteurs** qui définissent la forme
+1. Creation of an empty body `pre.avatar(dimension=…)`
+2. Addition of a rigid bulk `pre.rigid2d()` or `pre.rigid3d()`
+3. Addition of a main node and the **contactors** that define the shape
 
-Les propriétés inertielles (masse, moment d'inertie) sont calculées automatiquement depuis la géométrie des contacteurs via `body.computeRigidProperties()`.
+The inertial properties (mass, moment of inertia) are computed automatically from the contactors' geometry via `body.computeRigidProperties()`.
 
-### Champs du formulaire
+### Form Fields
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| **Dimension** | `2` ou `3`. Détermine la liste de formes de contacteurs disponibles et le format du centre. |
-| **Centre (x,y) ou (x,y,z)** | Coordonnées du nœud principal de référence. Accepte les expressions Python. |
-| **Matériau** | Matériau de type `RIGID` assigné au corps. |
-| **Modèle** | Modèle avec élément `Rxx2D` (2D) ou `Rxx3D` (3D). |
-| **Couleur** | Couleur pour l'interaction LMGC90 (5 caractères), n'est pas très importante. |
+| **Dimension** | `2` or `3`. Determines the list of available contactor shapes and the format of the center. |
+| **Center (x,y) or (x,y,z)** | Coordinates of the reference main node. Accepts Python expressions. |
+| **Material** | `RIGID`-type material assigned to the body. |
+| **Model** | Model with the `Rxx2D` (2D) or `Rxx3D` (3D) element. |
+| **Color** | Color for LMGC90 interaction (5 characters); not very important. |
 
 ---
 
-## Mode 2 — Corps déformable existant
+## Mode 2 — Existing Deformable Body
 
-### Principe
+### Principle
 
-Ce mode ne crée pas de nouvel avatar — il enrichit un corps déformable (maillage FEM) déjà présent dans le projet en lui ajoutant des contacteurs de surface. Cela est nécessaire pour que le corps déformable puisse interagir avec d'autres corps (rigides ou déformables).
+This mode does not create a new avatar — it enriches a deformable body (FEM mesh) already present in the project by adding surface contactors to it. This is necessary so that the deformable body can interact with other bodies (rigid or deformable).
 
-La fonction appelée sur l'objet pylmgc90 est : `body.addContactors(shape=…, color=…, **params)`.
+The function called on the pylmgc90 object is: `body.addContactors(shape=…, color=…, **params)`.
 
-### Champs spécifiques à ce mode
+### Fields Specific to This Mode
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| **Corps déformable** | Liste déroulante des corps de type `MESH_DEFORMABLE` présents dans le projet. Le format affiché est `#index — géométrie (matériau/modèle)`. |
-| **Groupe (group=)** | Paramètre `group` passé à `addContactors()`. Détermine sur quel groupe de nœuds du maillage le contacteur est appliqué (ex : `102` pour le groupe d'index 102). Laisser vide pour appliquer sur tous les nœuds. |
+| **Deformable body** | Dropdown list of `MESH_DEFORMABLE`-type bodies present in the project. The displayed format is `#index — geometry (material/model)`. |
+| **Group (group=)** | `group` parameter passed to `addContactors()`. Determines which node group of the mesh the contactor is applied to (e.g.: `102` for group index 102). Leave empty to apply to all nodes. |
 
-> **Important :** le corps déformable doit avoir été créé et reconstruit en mémoire (présent dans `_pylmgc_bodies`) avant d'ajouter des contacteurs. Si le projet vient d'être chargé depuis un fichier JSON sans reconstruction, le corps pylmgc90 n'existe pas encore en mémoire et l'ajout de contacteurs échouera.
+> **Important:** the deformable body must have been created and rebuilt in memory (present in `_pylmgc_bodies`) before adding contactors. If the project was just loaded from a JSON file without rebuilding, the pylmgc90 body does not yet exist in memory and adding contactors will fail.
 
 ---
 
-## Gestion des contacteurs
+## Managing Contactors
 
-Chaque ligne de la liste **Contacteurs à ajouter** correspond à un appel `body.addContactors()`. Cliquer sur **➕ Ajouter un contacteur** pour créer une nouvelle ligne. Cliquer sur **×** pour supprimer une ligne.
+Each row in the **Contactors to add** list corresponds to a `body.addContactors()` call. Click **➕ Add a contactor** to create a new row. Click **×** to delete a row.
 
-### Colonnes d'une ligne de contacteur
+### Columns of a Contactor Row
 
-| Colonne | Description |
+| Column | Description |
 |---------|-------------|
-| **Forme** | Type de contacteur pylmgc90. La liste s'adapte au mode (avatar vide ou déformable) et à la dimension. |
-| **Couleur** | Couleur du contacteur (5 caractères LMGC90). Indépendante de la couleur du corps, mais très importante pour la détection de contact |
-| **Params** | Paramètres géométriques du contacteur au format `cle=valeur, cle=valeur`. Rempli automatiquement avec une suggestion selon la forme choisie. |
+| **Shape** | pylmgc90 contactor type. The list adapts to the mode (empty avatar or deformable) and the dimension. |
+| **Color** | Contactor color (5-character LMGC90 code). Independent of the body's color, but very important for contact detection. |
+| **Params** | Geometric parameters of the contactor in the format `key=value, key=value`. Automatically filled with a suggestion based on the chosen shape. |
 
 ---
 
-## Formes de contacteurs disponibles
+## Available Contactor Shapes
 
-### Avatar vide 2D — `shapes_2d`
+### 2D Empty Avatar — `shapes_2d`
 
-| Forme | Description | Paramètres | Suggestion par défaut |
+| Shape | Description | Parameters | Default Suggestion |
 |-------|-------------|------------|-----------------------|
-| `DISKx` | Disque 2D | `byrd` = rayon | `byrd=0.3` |
-| `xKSID` | Disque discret 2D | `byrd` = rayon | `byrd=0.3` |
-| `JONCx` | Jonc / ellipse 2D | `axe1` = demi-axe long, `axe2` = demi-axe court | `axe1=1.0, axe2=0.1` |
-| `POLYG` | Polygone 2D | `nb_vertices` = nombre de sommets, `vertices` = liste `[[x,y],…]` | `nb_vertices=4, vertices=[[-1.,-1.],[1.,-1.],[1.,1.],[-1.,1.]]` |
-| `PT2Dx` | Nœud ponctuel 2D (FEM) | aucun | *(vide)* |
+| `DISKx` | 2D disk | `byrd` = radius | `byrd=0.3` |
+| `xKSID` | 2D discrete disk | `byrd` = radius | `byrd=0.3` |
+| `JONCx` | 2D jonc / ellipse | `axe1` = long half-axis, `axe2` = short half-axis | `axe1=1.0, axe2=0.1` |
+| `POLYG` | 2D polygon | `nb_vertices` = number of vertices, `vertices` = list `[[x,y],…]` | `nb_vertices=4, vertices=[[-1.,-1.],[1.,-1.],[1.,1.],[-1.,1.]]` |
+| `PT2Dx` | 2D point node (FEM) | none | *(empty)* |
 
-### Avatar vide 3D — `shapes_3d`
+### 3D Empty Avatar — `shapes_3d`
 
-| Forme | Description | Paramètres | Suggestion par défaut |
+| Shape | Description | Parameters | Default Suggestion |
 |-------|-------------|------------|-----------------------|
-| `SPHER` | Sphère 3D | `byrd` = rayon | `byrd=0.3` |
-| `PLANx` | Plan 3D | `axe1`, `axe2`, `axe3` = dimensions des axes | `axe1=1.0, axe2=1.0, axe3=0.1` |
-| `CYLND` | Cylindre 3D | `byrd` = rayon, `High` = hauteur | `byrd=0.5, High=1.0` |
-| `DNLYC` | Cylindre creux 3D | `byrd` = rayon, `High` = hauteur | `byrd=0.5, High=1.0` |
-| `POLYR` | Polyèdre 3D | `nb_vertices` = nombre de sommets, `vertices` = liste `[[x,y,z],…]` | `nb_vertices=8, vertices=[[−1,−1,−1],[1,−1,−1],…]` |
-| `PT3Dx` | Nœud ponctuel 3D (FEM) | aucun | *(vide)* |
+| `SPHER` | 3D sphere | `byrd` = radius | `byrd=0.3` |
+| `PLANx` | 3D plane | `axe1`, `axe2`, `axe3` = axis dimensions | `axe1=1.0, axe2=1.0, axe3=0.1` |
+| `CYLND` | 3D cylinder | `byrd` = radius, `High` = height | `byrd=0.5, High=1.0` |
+| `DNLYC` | 3D hollow cylinder | `byrd` = radius, `High` = height | `byrd=0.5, High=1.0` |
+| `POLYR` | 3D polyhedron | `nb_vertices` = number of vertices, `vertices` = list `[[x,y,z],…]` | `nb_vertices=8, vertices=[[−1,−1,−1],[1,−1,−1],…]` |
+| `PT3Dx` | 3D point node (FEM) | none | *(empty)* |
 
-### Corps déformable 2D — `mesh_shapes_2d`
+### 2D Deformable Body — `mesh_shapes_2d`
 
-Ces formes sont destinées à être ajoutées sur un maillage FEM 2D. Elles définissent des contacteurs de surface pour les interactions rigide-déformable.
+These shapes are intended to be added to a 2D FEM mesh. They define surface contactors for rigid-deformable interactions.
 
-| Forme | Description | Usage |
+| Shape | Description | Usage |
 |-------|-------------|-------|
-| `ALpxx` | Contacteur ligne pour maçonnerie FEM 2D | Interactions `ALpMECAx` (CLALp / MECAx) |
-| `CLxx` | Contacteur ligne continu 2D | Interactions `DKMECAx` (disque / MECAx) |
-| `DISKL` | Disque sur nœud FEM 2D | Interaction disque-disque sur maillage |
-| `PT2TL` | Point de transmission 2D | Couplage nœud-nœud FEM |
+| `ALpxx` | Line contactor for 2D FEM masonry | `ALpMECAx` interactions (CLALp / MECAx) |
+| `CLxx` | 2D continuous line contactor | `DKMECAx` interactions (disk / MECAx) |
+| `DISKL` | Disk on a 2D FEM node | Disk-disk interaction on a mesh |
+| `PT2TL` | 2D transmission point | FEM node-to-node coupling |
 
-### Corps déformable 3D — `mesh_shapes_3d`
+### 3D Deformable Body — `mesh_shapes_3d`
 
-| Forme | Description | Usage |
+| Shape | Description | Usage |
 |-------|-------------|-------|
-| `ASpxx` | Contacteur surface pour sphères FEM 3D | Interactions `SPMECAx` (sphère / MECAx 3D) |
-| `CSpxx` | Contacteur surface continu 3D | Interactions rigide-déformable 3D génériques |
-| `PT3Dx` | Nœud ponctuel FEM 3D | Couplage nœud-nœud FEM 3D |
+| `ASpxx` | Surface contactor for 3D FEM spheres | `SPMECAx` interactions (sphere / 3D MECAx) |
+| `CSpxx` | 3D continuous surface contactor | Generic 3D rigid-deformable interactions |
+| `PT3Dx` | 3D FEM point node | 3D FEM node-to-node coupling |
 
 ---
 
-## Détails des paramètres par forme
+## Parameter Details by Shape
 
-### DISKx / xKSID / SPHER — Disque, disque discret, sphère
+### DISKx / xKSID / SPHER — Disk, Discrete Disk, Sphere
 
 ```
 byrd=0.3
 ```
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| `byrd` | Rayon du contacteur (m). Correspond au rayon de contact utilisé dans les détecteurs. |
+| `byrd` | Radius of the contactor (m). Corresponds to the contact radius used in the detectors. |
 
 ---
 
-### JONCx — Jonc / Ellipse 2D
+### JONCx — 2D Jonc / Ellipse
 
 ```
 axe1=1.0, axe2=0.1
 ```
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| `axe1` | Demi-axe principal (m) — axe long de l'ellipse. |
-| `axe2` | Demi-axe secondaire (m) — axe court de l'ellipse. |
+| `axe1` | Main half-axis (m) — long axis of the ellipse. |
+| `axe2` | Secondary half-axis (m) — short axis of the ellipse. |
 
 ---
 
-### POLYG — Polygone 2D
+### POLYG — 2D Polygon
 
 ```
 nb_vertices=4, vertices=[[-1.,-1.],[1.,-1.],[1.,1.],[-1.,1.]]
 ```
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| `nb_vertices` | Nombre de sommets du polygone. |
-| `vertices` | Liste des coordonnées locales des sommets `[[x1,y1],[x2,y2],…]`. Les coordonnées sont relatives au centre du corps. Les sommets doivent être dans l'ordre trigonométrique (anti-horaire). |
+| `nb_vertices` | Number of vertices of the polygon. |
+| `vertices` | List of local vertex coordinates `[[x1,y1],[x2,y2],…]`. The coordinates are relative to the center of the body. The vertices must be in trigonometric (counter-clockwise) order. |
 
 ---
 
-### PLANx — Plan 3D
+### PLANx — 3D Plane
 
 ```
 axe1=1.0, axe2=1.0, axe3=0.1
 ```
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| `axe1` | Dimension selon le premier axe du plan (m). |
-| `axe2` | Dimension selon le deuxième axe du plan (m). |
-| `axe3` | Épaisseur du plan (m) — utilisée pour le calcul des propriétés inertielles. |
+| `axe1` | Dimension along the first axis of the plane (m). |
+| `axe2` | Dimension along the second axis of the plane (m). |
+| `axe3` | Thickness of the plane (m) — used for computing the inertial properties. |
 
 ---
 
-### CYLND / DNLYC — Cylindre 3D
+### CYLND / DNLYC — 3D Cylinder
 
 ```
 byrd=0.5, High=1.0
 ```
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| `byrd` | Rayon du cylindre (m). |
-| `High` | Hauteur (longueur axiale) du cylindre (m). Notez la majuscule. |
+| `byrd` | Radius of the cylinder (m). |
+| `High` | Height (axial length) of the cylinder (m). Note the capital letter. |
 
 ---
 
-### POLYR — Polyèdre 3D
+### POLYR — 3D Polyhedron
 
 ```
 nb_vertices=8, vertices=[[-1.,-1.,-1.],[1.,-1.,-1.],[1.,1.,-1.],[-1.,1.,-1.],
                           [-1.,-1.,1.],[1.,-1.,1.],[1.,1.,1.],[-1.,1.,1.]]
 ```
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| `nb_vertices` | Nombre de sommets du polyèdre. |
-| `vertices` | Liste des coordonnées 3D de chaque sommet `[[x,y,z],…]`. Coordonnées locales relatives au centre. |
+| `nb_vertices` | Number of vertices of the polyhedron. |
+| `vertices` | List of 3D coordinates for each vertex `[[x,y,z],…]`. Local coordinates relative to the center. |
 
-> Pour un polyèdre convexe, les sommets peuvent être fournis dans n'importe quel ordre — pylmgc90 calcule l'enveloppe convexe. Pour un polyèdre non convexe, l'ordre des faces doit être cohérent.
-
----
-
-### PT2Dx / PT3Dx — Nœuds ponctuels
-
-Aucun paramètre. Ces contacteurs représentent un point de contact en un nœud.
-
-```
-(champ Params vide)
-```
+> For a convex polyhedron, the vertices can be provided in any order — pylmgc90 computes the convex hull. For a non-convex polyhedron, the order of the faces must be consistent.
 
 ---
 
-## Exemples complets
+### PT2Dx / PT3Dx — Point Nodes
 
-### Avatar vide 2D — corps polygonal à 6 sommets
+No parameters. These contactors represent a contact point at a node.
 
 ```
-Mode      : Avatar vide (emptyAvatar)
+(Params field empty)
+```
+
+---
+
+## Complete Examples
+
+### 2D Empty Avatar — 6-Vertex Polygonal Body
+
+```
+Mode      : Empty avatar (emptyAvatar)
 Dimension : 2
-Centre    : 0.0, 0.5
-Matériau  : BRIQx
-Modèle    : rigid
-Couleur   : REDxx
+Center    : 0.0, 0.5
+Material  : BRIQx
+Model     : rigid
+Color     : REDxx
 
-Contacteur 1 :
-  Forme  : POLYG
-  Couleur: REDxx
+Contactor 1 :
+  Shape  : POLYG
+  Color  : REDxx
   Params : nb_vertices=6, vertices=[[-0.1,-0.05],[0.1,-0.05],[0.15,0.0],
                                     [0.1,0.05],[-0.1,0.05],[-0.15,0.0]]
 ```
 
 ---
 
-### Avatar vide 3D — corps avec sphère et cylindre
+### 3D Empty Avatar — Body with a Sphere and a Cylinder
 
 ```
-Mode      : Avatar vide (emptyAvatar)
+Mode      : Empty avatar (emptyAvatar)
 Dimension : 3
-Centre    : 0.0, 0.0, 0.5
-Matériau  : ACIER
-Modèle    : rig3D
-Couleur   : CYANx
+Center    : 0.0, 0.0, 0.5
+Material  : ACIER
+Model     : rig3D
+Color     : CYANx
 
-Contacteur 1 :
-  Forme  : SPHER
-  Couleur: CYANx
+Contactor 1 :
+  Shape  : SPHER
+  Color  : CYANx
   Params : byrd=0.2
 
-Contacteur 2 :
-  Forme  : CYLND
-  Couleur: GRAYx
+Contactor 2 :
+  Shape  : CYLND
+  Color  : GRAYx
   Params : byrd=0.05, High=0.8
 ```
 
 ---
 
-### Ajout de contacteurs à un corps déformable
+### Adding Contactors to a Deformable Body
 
 ```
-Mode             : Corps déformable existant
-Corps déformable : #3 — Rectangle (beton/MECAx)
-Groupe (group=)  : 102
+Mode             : Existing deformable body
+Deformable body  : #3 — Rectangle (beton/MECAx)
+Group (group=)   : 102
 
-Contacteur 1 :
-  Forme  : CLxx
-  Couleur: BLUEx
-  Params : (vide)
+Contactor 1 :
+  Shape  : CLxx
+  Color  : BLUEx
+  Params : (empty)
 ```
 
 ---
 
-## Interface — liste des avatars vides
+## Interface — List of Empty Avatars
 
-La liste en haut de l'onglet affiche uniquement les avatars de type `EMPTY_AVATAR`. Les colonnes sont :
+The list at the top of the tab displays only avatars of type `EMPTY_AVATAR`. The columns are:
 
-| Colonne | Description |
+| Column | Description |
 |---------|-------------|
-| `#` | Index de l'avatar dans la liste globale des avatars du projet. |
-| `Couleur` | Code couleur LMGC90 du corps. |
-| `Centre` | Coordonnées du centre de référence arrondies à 2 décimales. |
-| `Contacteurs` | Nombre de contacteurs définis sur ce corps. |
+| `#` | Index of the avatar in the project's overall avatar list. |
+| `Color` | LMGC90 color code of the body. |
+| `Center` | Coordinates of the reference center, rounded to 2 decimal places. |
+| `Contactors` | Number of contactors defined on this body. |
 
-**Menu contextuel (clic droit) :**
-- **✏️ Modifier** — charge l'avatar dans le formulaire pour édition.
-- **🗑️ Supprimer** — supprime l'avatar après confirmation. Refusé si l'avatar est référencé par une boucle ou un groupe.
-- **ℹ️ Informations** — affiche une boîte de dialogue avec le détail de tous les contacteurs.
+**Context menu (right-click):**
+- **✏️ Edit** — loads the avatar into the form for editing.
+- **🗑️ Delete** — deletes the avatar after confirmation. Refused if the avatar is referenced by a loop or a group.
+- **ℹ️ Information** — displays a dialog box with the details of all contactors.
 
 ---
 
-## Remarques importantes
+## Important Notes
 
-**Un avatar vide nécessite au moins un contacteur.** La création est refusée si la liste de contacteurs est vide.
+**An empty avatar requires at least one contactor.** Creation is refused if the contactor list is empty.
 
-**Contacteurs multiples.** Un avatar vide peut avoir autant de contacteurs que nécessaire, de formes différentes. Chaque contacteur génère une ligne `body.addContactors(…)` distincte dans le script.
+**Multiple contactors.** An empty avatar can have as many contactors as needed, of different shapes. Each contactor generates a distinct `body.addContactors(…)` line in the script.

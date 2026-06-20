@@ -1,372 +1,370 @@
-# Calcul
+# Computation
 
-## Vue d'ensemble
+## Overview
 
-L'onglet `calcul` gère la configuration et le lancement des simulations LMGC90. Il génère automatiquement le DATBOX et le script `command.py`, puis exécute ce script.
-## Paramètres de calcul
+The `calcul` (Computation) tab manages the configuration and launching of LMGC90 simulations. It automatically generates the DATBOX and the `command.py` script, then executes that script.
+## Computation Parameters
 
 ![](captures/calcul.JPG)
 
-| Paramètre | Champ UI | Valeur par défaut | Description |
+| Parameter | UI Field | Default Value | Description |
 |---|---|---|---|
-| `dt` | Pas de temps | `1e-3` | Incrément temporel |
-| `nb_steps` | Nombre d'itérations | `1000` | Nombre de pas de calcul |
-| `theta` | Theta intégrateur | `0.5` | Paramètre du schéma d'intégration |
-| `tol` | Tolérance | `1.666e-4` | Tolérance de convergence du solveur |
-| `relax` | Relaxation | `1.0` | Facteur de relaxation |
-| `norm` | Norme | `Quad ` | Norme de convergence (`Quad `, `QM   `, `Maxim`) |
-| `gs_it1` | Itérations GS1 | `50` | Nombre d'itérations Gauss-Seidel (boucle externe) |
-| `gs_it2` | Itérations GS2 | `100` | Nombre d'itérations Gauss-Seidel (boucle interne) |
-| `solver_type` | Solveur | `NLGS` | Type de solveur (`Stored_Delassus_Loops`, `Exchange_Local_Global`, `Exchange_Local_Global` ) |
-| `freq_write` | Fréquence écriture | `50` | Écriture des résultats tous les N pas |
-| `freq_display` | Fréquence affichage | `50` | Mise à jour affichage tous les N pas |
+| `dt` | Time step | `1e-3` | Time increment |
+| `nb_steps` | Number of iterations | `1000` | Number of computation steps |
+| `theta` | Integrator theta | `0.5` | Integration scheme parameter |
+| `tol` | Tolerance | `1.666e-4` | Solver convergence tolerance |
+| `relax` | Relaxation | `1.0` | Relaxation factor |
+| `norm` | Norm | `Quad ` | Convergence norm (`Quad `, `QM   `, `Maxim`) |
+| `gs_it1` | GS1 iterations | `50` | Number of Gauss-Seidel iterations (outer loop) |
+| `gs_it2` | GS2 iterations | `100` | Number of Gauss-Seidel iterations (inner loop) |
+| `solver_type` | Solver | `NLGS` | Solver type (`Stored_Delassus_Loops`, `Exchange_Local_Global`, `Exchange_Local_Global` ) |
+| `freq_write` | Write frequency | `50` | Write results every N steps |
+| `freq_display` | Display frequency | `50` | Update display every N steps |
 
 
-## Fichiers générés au lancement d'un calcul
+## Files Generated When Launching a Computation
 
-| Fichier | Emplacement | Description |
+| File | Location | Description |
 |---|---|---|
-| `DATBOX/` | Dossier du projet | Données d'entrée LMGC90 |
-| `command.py` | Dossier du projet | Script de calcul chipy |
-| `OUTBOX/` | Dossier du projet | Résultats (créé par LMGC90) |
-| `Display/` | Dossier du projet | Fichiers d'affichage |
-| `Postpro/` | Dossier du projet | Fichiers post-traitement |
+| `DATBOX/` | Project folder | LMGC90 input data |
+| `command.py` | Project folder | chipy computation script |
+| `OUTBOX/` | Project folder | Results (created by LMGC90) |
+| `Display/` | Project folder | Display files |
+| `Postpro/` | Project folder | Post-processing files |
 
 
-### Paramétrer vos calculs 
-Il est possible de paramétrer vos scripts calculs via au bouton "Configurer les routines chipy", une boite de dialogue s'ouvrira sur votre interface, 
+### Configuring Your Computations
+You can configure your computation scripts via the "Configure chipy routines" button. A dialog box will open in your interface.
 
 ![](captures/config_calculs.JPG)
 
-#### 1.Onglet Modèle 
-Le premier onglet fait l'objet d'une détéection automatique sur l'hypothèse de votre modèle, et charge tous les paramètres se lon vos avatars, 
+#### 1. Model Tab
+The first tab performs automatic detection based on your model's hypothesis, and loads all parameters according to your avatars.
 
 
 
-|Contraintes planes (mhyp = 1)	|Calcul 2D en état plan de contraintes. Pertinent pour les structures minces.
+|Plane stress (mhyp = 1)	|2D computation under plane stress conditions. Relevant for thin structures.
 | --- | ------- |
-|Déformations planes (mhyp = 2)	|Calcul 2D en état plan de déformations. Pertinent pour les structures infiniment longues en z.|
-|Tridimensionnel (mhyp = 3)	|Calcul 3D complet.|
+|Plane strain (mhyp = 2)	|2D computation under plane strain conditions. Relevant for structures that are infinitely long in z.|
+|Three-dimensional (mhyp = 3)	|Full 3D computation.|
 
-##### Corps déformables 
-|Activer les corps déformables	|Génère ReadDatbox(deformable=True) dans le script. Active automatiquement mecaFEMx si la physique est MECAx.|
+##### Deformable Bodies
+|Enable deformable bodies	|Generates ReadDatbox(deformable=True) in the script. Automatically enables mecaFEMx if the physics is MECAx.|
 |----|--------|
-|Physique FEM	|Détermine le solveur éléments finis utilisé : MECAx (mécanique des solides), THERx (thermique), HYDRx (hydraulique), ou THMx (thermo-hydraulique-mécanique couplé).|
-|Rloc_tol	|Tolérance sur les efforts de contact pour la reprise de Rloc. Valeur typique : 5 × 10⁻². Utilisée dans chipy.SetRlocTol().|
+|FEM Physics	|Determines the finite element solver used: MECAx (solid mechanics), THERx (thermal), HYDRx (hydraulic), or THMx (coupled thermo-hydro-mechanical).|
+|Rloc_tol	|Tolerance on contact forces for Rloc recovery. Typical value: 5 × 10⁻². Used in chipy.SetRlocTol().|
 
 
-#### 2.Routines
-Cet onglet sélectionne les routines chipy à inclure dans la boucle de calcul. Chaque case à cocher correspond à un appel de la famille NewStep / ComputeStep / WriteOut dans le script généré.
+#### 2. Routines
+This tab selects the chipy routines to include in the computation loop. Each checkbox corresponds to a call from the NewStep / ComputeStep / WriteOut family in the generated script.
 
 ![](captures/config_calculs_routines.JPG)
 
-**Corps rigides 2D — RBDY2**
+**2D Rigid Bodies — RBDY2**
 
-–	RBDY2 (NewStep / FreeVelocity / WriteOut) — coché par défaut. Routines obligatoires pour tout corps rigide 2D. Génère RBDY2_NewStep(), RBDY2_FreeVelocity(), RBDY2_WriteOut() dans la boucle.
+–	RBDY2 (NewStep / FreeVelocity / WriteOut) — checked by default. Mandatory routines for any 2D rigid body. Generates RBDY2_NewStep(), RBDY2_FreeVelocity(), RBDY2_WriteOut() in the loop.
 
-**Corps rigides 3D — RBDY3**
+**3D Rigid Bodies — RBDY3**
 
-–	RBDY3 (NewStep / FreeVelocity / WriteOut) — déclenche les routines équivalentes en 3D.
+–	RBDY3 (NewStep / FreeVelocity / WriteOut) — triggers the equivalent 3D routines.
 
-**Détecteurs de contact 2D**
+**2D Contact Detectors**
 
-Chaque case active la détection de contact entre une paire de types de contacteurs. Le script génère XXX_SelectProxTactors() et XXX_RecupRloc() / XXX_StockRloc() correspondants.
-|Détecteur	|Description|
+Each checkbox enables contact detection between a pair of contactor types. The script generates the corresponding XXX_SelectProxTactors() and XXX_RecupRloc() / XXX_StockRloc().
+|Detector	|Description|
 |---|-----|
-|`DKDKx`	|Disque / Disque (coché par défaut) — granulométrie 2D, milieux granulaires|
-|`DKJCx`	|Disque / Jonc — particules avec ellipses|
-|`DKKDx`	|Disque / Polygone (Corde) — interaction disque-paroi polygonale|
-|`PLPLx`	|Plan / Plan — parois planes entre elles|
-|`CLALp`	|Ligne / Ligne maçonnerie — interfaces entre briques (CLALp)|
-|`ALpALp`	|Ligne / Ligne ALp — variante pour contacteurs polygonaux|
+|`DKDKx`	|Disk / Disk (checked by default) — 2D granulometry, granular media|
+|`DKJCx`	|Disk / Jonc — particles with ellipses|
+|`DKKDx`	|Disk / Polygon (Corde) — disk-to-polygonal-wall interaction|
+|`PLPLx`	|Plane / Plane — flat walls against each other|
+|`CLALp`	|Masonry line / line — interfaces between bricks (CLALp)|
+|`ALpALp`	|ALp line / line — variant for polygonal contactors|
 
-**Détecteurs de contact 3D**
-|Détecteur	|Description|
+**3D Contact Detectors**
+|Detector	|Description|
 |---|-----|
-|SPSPx	|Sphère / Sphère — granulométrie 3D|
-|SPCDx	|Sphère / Cylindre|
-|SPPLx	|Sphère / Plan|
-|CDCDx	|ylindre / Cylindre|
-|CDPLx	|Cylindre / Plan|
-|PRPRx	|Polyèdre / Polyèdre|
+|SPSPx	|Sphere / Sphere — 3D granulometry|
+|SPCDx	|Sphere / Cylinder|
+|SPPLx	|Sphere / Plane|
+|CDCDx	|Cylinder / Cylinder|
+|CDPLx	|Cylinder / Plane|
+|PRPRx	|Polyhedron / Polyhedron|
 
-**Corps déformables — Routines FEM**
+**Deformable Bodies — FEM Routines**
 
-–	mecaFEMx — Mécanique des solides : assemblage, calcul des forces internes (Fint), forces externes (Fext), matrice de rigidité (K) et résolution (ComputeDof).
+–	mecaFEMx — Solid mechanics: assembly, computation of internal forces (Fint), external forces (Fext), stiffness matrix (K), and resolution (ComputeDof).
 
-–	therFEMx — Thermique : flux thermique, bilan d'énergie thermique, résolution ComputeDof.
+–	therFEMx — Thermal: heat flux, thermal energy balance, ComputeDof resolution.
 
-–	hydrFEMx — Hydraulique : pression hydraulique, flux fluide, résolution ComputeDof.
+–	hydrFEMx — Hydraulic: hydraulic pressure, fluid flux, ComputeDof resolution.
 
-**Contacteurs mixtes — Rigide / Déformable**
+**Mixed Contactors — Rigid / Deformable**
 
-–	DKMECAx — Interaction entre disques rigides (2D) et maillages mécaniques (MECAx FEM 2D).
+–	DKMECAx — Interaction between rigid disks (2D) and mechanical meshes (2D FEM MECAx).
 
-–	ALpMECAx — Interaction entre interfaces de maçonnerie (CLALp) et maillages mécaniques FEM 2D. Utile pour les simulations 
-de structures maçonnées avec blocs déformables.
+–	ALpMECAx — Interaction between masonry interfaces (CLALp) and 2D FEM mechanical meshes. Useful for simulations
+of masonry structures with deformable blocks.
 
-–	SPMECAx — Interaction entre sphères rigides (3D) et maillages mécaniques FEM 3D.
+–	SPMECAx — Interaction between rigid spheres (3D) and 3D FEM mechanical meshes.
 
-**Routines spéciales**
+**Special Routines**
 
-–	PT2Dx — Nœuds ponctuels 2D : interaction point/point pour les éléments câbles (ELASTIC_WIRE) et barres élastiques (ELASTIC_ROD).
+–	PT2Dx — 2D point nodes: point/point interaction for cable elements (ELASTIC_WIRE) and elastic rods (ELASTIC_ROD).
 
-–	PT3Dx — Équivalent 3D de PT2Dx.
+–	PT3Dx — 3D equivalent of PT2Dx.
 
-–	NODES — Nœuds couplés : routines de couplage de degrés de liberté (COUPLED_DOF, NORMAL_COUPLED_DOF).
+–	NODES — Coupled nodes: degree-of-freedom coupling routines (COUPLED_DOF, NORMAL_COUPLED_DOF).
 
-–	UpdateBulkBehav — Lois de comportement volumique : génère chipy.UpdateBulkBehav() pour les modèles avec plasticité, endommagement ou variables d'histoire.
+–	UpdateBulkBehav — Bulk behavior laws: generates chipy.UpdateBulkBehav() for models with plasticity, damage, or history variables.
 
-#### 3.Extraction
-Cet onglet configure toutes les sorties du calcul : fichiers de visualisation, visibilité des avatars, extraction de vecteurs d'état, forces de contact, énergie et champs FEM.
+#### 3. Extraction
+This tab configures all computation outputs: visualization files, avatar visibility, state vector extraction, contact forces, energy, and FEM fields.
 
 ![](captures/config_calculs_extraction.JPG)
 
-**Messages chipy (logs)**
+**chipy Messages (logs)**
 
-–	Désactiver les messages chipy (utilities_DisableLogMes) — Génère chipy.utilities_DisableLogMes() immédiatement après chipy.Initialize(). Supprime tous les messages de progression dans la console. Recommandé pour les calculs en production ou de longue durée.
+–	Disable chipy messages (utilities_DisableLogMes) — Generates chipy.utilities_DisableLogMes() immediately after chipy.Initialize(). Suppresses all progress messages in the console. Recommended for production or long-duration computations.
 
-**Visualisation (WriteDisplayFiles)**
+**Visualization (WriteDisplayFiles)**
 
-Contrôle l'écriture des fichiers de visualisation vers le répertoire DISPLAY/. Chaque case correspond à une famille d'avatars :
-–	RBDY2_WriteDisplayFiles — Corps rigides 2D (coché par défaut).
-–	RBDY3_WriteDisplayFiles — Corps rigides 3D.
-–	mecaFEMx_WriteDisplayFiles — Maillages déformables mécaniques.
-–	therFEMx_WriteDisplayFiles — Maillages déformables thermiques.
-–	hydrFEMx_WriteDisplayFiles — Maillages déformables hydrauliques.
-–	Écrire les fichiers display dans la boucle — Si coché, les fichiers sont écrits à chaque pas (ou à la fréquence définie). Si décoché, un seul fichier est écrit à la fin du calcul.
+Controls the writing of visualization files to the DISPLAY/ directory. Each checkbox corresponds to a family of avatars:
+–	RBDY2_WriteDisplayFiles — 2D rigid bodies (checked by default).
+–	RBDY3_WriteDisplayFiles — 3D rigid bodies.
+–	mecaFEMx_WriteDisplayFiles — Mechanical deformable meshes.
+–	therFEMx_WriteDisplayFiles — Thermal deformable meshes.
+–	hydrFEMx_WriteDisplayFiles — Hydraulic deformable meshes.
+–	Write display files in the loop — If checked, files are written at every step (or at the defined frequency). If unchecked, only a single file is written at the end of the computation.
 
-**Visibilité des avatars (SetVisible / SetInvisible)**
+**Avatar Visibility (SetVisible / SetInvisible)**
 
-Permet d'afficher ou de masquer des avatars individuellement ou par groupe à des moments précis de la simulation. Chaque ligne de la liste correspond à une règle de visibilité.
-Pour créer une règle, cliquer sur « + Créer une visibilité ». Chaque ligne contient :
+Allows you to show or hide avatars individually or by group at specific moments during the simulation. Each row in the list corresponds to a visibility rule.
+To create a rule, click "+ Create a visibility". Each row contains:
 
-|Action	|SetVisible ou SetInvisible — rend l'avatar visible ou invisible dans chipy.|
+|Action	|SetVisible or SetInvisible — makes the avatar visible or invisible in chipy.|
 |---|-----|
-|Dim.	|2D (RBDY2) ou 3D (RBDY3) — détermine le préfixe de la fonction générée.|
-|IDs avatars	|Liste d'identifiants séparés par des virgules (ex. : 1, 3, 5). Prioritaire sur le groupe si les deux sont renseignés.|
-|Groupe	|Nom d'un groupe d'avatars défini dans le projet. Résolu en liste d'IDs à la génération.|
-|Mode / Timing	|Détermine quand l'appel est généré (voir tableau des modes ci-dessous).|
+|Dim.	|2D (RBDY2) or 3D (RBDY3) — determines the prefix of the generated function.|
+|Avatar IDs	|Comma-separated list of identifiers (e.g.: 1, 3, 5). Takes priority over the group if both are filled in.|
+|Group	|Name of an avatar group defined in the project. Resolved into a list of IDs at generation time.|
+|Mode / Timing	|Determines when the call is generated (see timing modes table below).|
 
-**Modes de temporisation (Timing)**
+**Timing Modes**
 
-Modes de temporisation (Timing)
+Timing Modes
 
-|Mode	|Condition générée	|Usage typique|
+|Mode	|Generated Condition	|Typical Use|
 |---|---|---|
-|Tous les pas	|Aucune condition (appel direct)	|Extraction systématique, bilan énergétique continu|
-Tous les N pas	|if k % N == 0:	|Réduire la fréquence d'écriture pour alléger les sorties|
-|Au pas k =	|if k == K:	|Événement ponctuel : changer la visibilité à un pas précis|
-|Après boucle	|Hors de la boucle (après for k ...)	|État final uniquement, post-traitement en fin de calcul|
+|Every step	|No condition (direct call)	|Systematic extraction, continuous energy balance|
+Every N steps	|if k % N == 0:	|Reduce write frequency to lighten outputs|
+|At step k =	|if k == K:	|One-off event: change visibility at a specific step|
+|After the loop	|Outside the loop (after for k ...)	|Final state only, post-processing at the end of the computation|
 
-**Extraction de vecteurs d'état RBDY2 (RBDY2_GetBodyVector)**
+**RBDY2 State Vector Extraction (RBDY2_GetBodyVector)**
 
-Génère des appels à `chipy.RBDY2_GetBodyVector(vecteur, id)` dans la boucle de calcul. Pour chaque ligne ajoutée via « + Ajouter une extraction RBDY2 », configurer :
+Generates calls to `chipy.RBDY2_GetBodyVector(vector, id)` in the computation loop. For each row added via "+ Add an RBDY2 extraction", configure:
 
-|Vecteur	|Nom du vecteur d'état à extraire (voir liste complète ci-dessous).|
+|Vector	|Name of the state vector to extract (see full list below).|
 |---|------|
-|IDs avatars	|Liste d'IDs séparés par des virgules. Si renseigné, génère une boucle for sur ces IDs.|
-|Groupe	|Groupe d'avatars à parcourir. Priorité inférieure aux IDs si les deux sont renseignés.|
-|Mode / Timing	|Un des quatre modes de temporisation décrits ci-dessus.|
+|Avatar IDs	|Comma-separated list of IDs. If filled in, generates a for loop over these IDs.|
+|Group	|Group of avatars to iterate over. Lower priority than IDs if both are filled in.|
+|Mode / Timing	|One of the four timing modes described above.|
 
-Vecteurs disponibles :
-|Nom	|Description|
+Available vectors:
+|Name	|Description|
 |---|----|
-|Coor0	|Position de référence (configuration initiale)|
-|Coor_	|Position courante|
-|Coorb	|Position au pas précédent|
-|Coorm	|Position moyenne entre deux pas|
-|X____	|Déplacement total accumulé|
-|V____	|Vitesse courante (linéaire et angulaire)|
-|Vbeg_	|Vitesse en début de pas|
-|Vfree	|Vitesse libre (avant résolution du contact)|
-|Fext_	|Forces et moments extérieurs appliqués|
-|Fint_	|Forces et moments internes|
-|Reac_	|Résultante des réactions de contact|
-|Ireac	|Impulsions de réaction de contact|
+|Coor0	|Reference position (initial configuration)|
+|Coor_	|Current position|
+|Coorb	|Position at the previous step|
+|Coorm	|Average position between two steps|
+|X____	|Total accumulated displacement|
+|V____	|Current velocity (linear and angular)|
+|Vbeg_	|Velocity at the beginning of the step|
+|Vfree	|Free velocity (before contact resolution)|
+|Fext_	|Applied external forces and moments|
+|Fint_	|Internal forces and moments|
+|Reac_	|Resultant of contact reactions|
+|Ireac	|Contact reaction impulses|
 
-**Forces et réactions de contact**
+**Contact Forces and Reactions**
 
-–	Forces nodales (inter_handler_Rnod) — Extrait les forces nodales aux points de contact et les écrit dans POSTPRO/.
-–	Vitesses locales (inter_handler_Vloc) — Extrait les vitesses relatives dans le repère local de contact.
-–	Forces locales (inter_handler_Rloc) — Extrait les impulsions/forces dans le repère local de contact.
+–	Nodal forces (inter_handler_Rnod) — Extracts nodal forces at contact points and writes them to POSTPRO/.
+–	Local velocities (inter_handler_Vloc) — Extracts relative velocities in the local contact frame.
+–	Local forces (inter_handler_Rloc) — Extracts impulses/forces in the local contact frame.
 
-**Énergie**
+**Energy**
 
-–	Bilan énergétique global (ComputeEnergy + WriteEnergy) — Calcule et écrit l'énergie cinétique, potentielle et dissipée par frottement.
-–	Énergie cinétique RBDY2 (RBDY2_KineticEnergy) — Écrit l'énergie cinétique de chaque corps rigide 2D séparément.
+–	Global energy balance (ComputeEnergy + WriteEnergy) — Computes and writes the kinetic, potential, and friction-dissipated energy.
+–	RBDY2 kinetic energy (RBDY2_KineticEnergy) — Writes the kinetic energy of each 2D rigid body separately.
 
-**Champs FEM (contraintes, déformations, température…)**
+**FEM Fields (stresses, strains, temperature…)**
 
-–	Champs par élément (mecaFEMx_WriteBodies) — Écrit les champs par élément : contraintes et déformations (MECAx), température (THERx), pression (HYDRx).
-–	Variables internes (mecaFEMx_WriteInternalVariables) — Écrit les variables internes aux points de Gauss : plasticité, endommagement, variables d'histoire.
+–	Per-element fields (mecaFEMx_WriteBodies) — Writes per-element fields: stresses and strains (MECAx), temperature (THERx), pressure (HYDRx).
+–	Internal variables (mecaFEMx_WriteInternalVariables) — Writes internal variables at Gauss points: plasticity, damage, history variables.
 
-### 4.Pilotage
+### 4. Control
 
-Cet onglet contrôle des fonctions avancées du déroulement du calcul : reprise depuis un état sauvegardé, arrêt anticipé sur critère de convergence et séquençage multi-pas.
+This tab controls advanced functions of the computation workflow: resuming from a saved state, early stopping based on a convergence criterion, and multi-step sequencing.
 
 ![](captures/config_pilotage.JPG)
 
-**Restart — Reprise de calcul**
-Permet de reprendre un calcul à partir d'un état précédemment sauvegardé dans les fichiers .dat.last.
+**Restart — Resuming a Computation**
+Allows you to resume a computation from a state previously saved in the .dat.last files.
 
-|Activer le restart	|Génère chipy.ReadIni() puis chipy.SetStep(restart_step) avant la boucle de calcul.|
+|Enable restart	|Generates chipy.ReadIni() then chipy.SetStep(restart_step) before the computation loop.|
 |---|--------|
-|Pas de reprise	|Numéro du pas de temps à partir duquel reprendre (entier, de 0 à 9 999 999).|
+|Restart step	|Number of the time step from which to resume (integer, from 0 to 9,999,999).|
 
-**Critère d'arrêt automatique**
+**Automatic Stopping Criterion**
 
-Interrompt la boucle de calcul avant la fin du nombre de pas prévu si un critère de convergence est satisfait.
+Interrupts the computation loop before the planned number of steps is reached if a convergence criterion is satisfied.
 
 
-|Activer un critère d'arrêt	|Active le mécanisme d'arrêt anticipé. Génère une condition break dans la boucle for k.|
+|Enable a stopping criterion	|Enables the early stopping mechanism. Generates a break condition in the for k loop.|
 |----|---------|
-|Type de critère	|Trois types disponibles : résidu d'énergie (‖E_res‖ < seuil), déplacement maximum (max|u| < seuil), résidu de force (‖F_res‖ < seuil).|
-|Seuil	|Valeur numérique du critère d'arrêt (de 10⁻¹⁶ à 1,0). Valeur par défaut : 10⁻⁶.|
-|Fréquence d'évaluation	|Évaluer le critère tous les N pas. Évite un calcul du critère à chaque itération, ce qui peut être coûteux.|
+|Criterion type	|Three types available: energy residual (‖E_res‖ < threshold), maximum displacement (max|u| < threshold), force residual (‖F_res‖ < threshold).|
+|Threshold	|Numerical value of the stopping criterion (from 10⁻¹⁶ to 1.0). Default value: 10⁻⁶.|
+|Evaluation frequency	|Evaluate the criterion every N steps. Avoids computing the criterion at every iteration, which can be costly.|
 
-**Séquence multi-pas — dt variable**
+**Multi-Step Sequence — Variable dt**
 
-Permet de définir plusieurs phases de calcul avec des pas de temps différents. Utile pour les calculs avec chargements progressifs ou pour affiner le pas de temps à l'approche d'un événement critique.
+Allows you to define several computation phases with different time steps. Useful for computations with progressive loading or to refine the time step as a critical event approaches.
 
-|Activer une séquence multi-pas	|Génère une boucle externe sur les phases : for _dt in dt_sequence: chipy.TimeEvolution_SetTimeStep(_dt) + boucle interne.|
+|Enable a multi-step sequence	|Generates an outer loop over the phases: for _dt in dt_sequence: chipy.TimeEvolution_SetTimeStep(_dt) + inner loop.|
 |----|-------|
-|Nombre de phases	|Entre 2 et 20 phases. Le nombre total de pas (nb_steps) est réparti équitablement entre les phases.|
-|dt par phase	|Liste de valeurs de dt séparées par des virgules, une par phase (ex. : 1e-3, 1e-4, 1e-5).|
+|Number of phases	|Between 2 and 20 phases. The total number of steps (nb_steps) is evenly distributed across the phases.|
+|dt per phase	|Comma-separated list of dt values, one per phase (e.g.: 1e-3, 1e-4, 1e-5).|
 
-### 5. Inspection 2D
+### 5. 2D Inspection
 
-Cet onglet permet d'ajouter des appels d'inspection sur les contacteurs 2D du modèle. Chaque ligne correspond à un appel chipy.XXXX_GetYYYY() inséré dans la boucle de calcul ou après celle-ci.
+This tab lets you add inspection calls on the model's 2D contactors. Each row corresponds to a chipy.XXXX_GetYYYY() call inserted in the computation loop or after it.
 
 ![](captures/config_inspect2D.JPG)
 
-Cliquer sur « + Ajouter une inspection 2D » pour créer une ligne. Chaque ligne contient cinq colonnes :
+Click "+ Add a 2D inspection" to create a row. Each row contains five columns:
 
-|Fonction chipy	|Sélection dans la liste déroulante des fonctions disponibles pour les contacteurs 2D. La description s'affiche dans l'infobulle.|
+|chipy Function	|Selection from the dropdown list of functions available for 2D contactors. The description is displayed in the tooltip.|
 |---|------|
-|IDs (contacteurs)	|Liste d'identifiants chipy séparés par des virgules. Laissé vide pour les fonctions de type GetNb... qui ne prennent pas d'argument.|
-|Groupe	|Nom d'un groupe d'avatars. Résolu en IDs à la génération si les IDs sont vides.|
-|Mode / Timing	|Un des quatre modes de temporisation (Tous les pas, Tous les N pas, Au pas k =, Après boucle).|
-|Var. Python	|Nom de la variable Python dans laquelle stocker le résultat (ex. : vel_disk). Laissé vide si le résultat n'est pas réutilisé.|
+|IDs (contactors)	|Comma-separated list of chipy identifiers. Left empty for GetNb... type functions that take no argument.|
+|Group	|Name of an avatar group. Resolved into IDs at generation time if the IDs are empty.|
+|Mode / Timing	|One of the four timing modes (Every step, Every N steps, At step k =, After the loop).|
+|Python var.	|Name of the Python variable in which to store the result (e.g.: vel_disk). Left empty if the result is not reused.|
 
-**Fonctions disponibles — Contacteurs 2D**
+**Available Functions — 2D Contactors**
 
-Les fonctions sont regroupées par type de contacteur :
+Functions are grouped by contactor type:
 
-`DISKx — Disques rigides 2D`
-–	DISKx_GetNbDISKx — Nombre total de contacteurs DISKx (pas d'ID requis).
-–	DISKx_GetBodyId(i) — ID du corps RBDY2 auquel appartient le contacteur i.
-–	DISKx_GetPtrDISKx2BDYTY(i) — Index local du contacteur dans son corps RBDY2.
-–	DISKx_GetPtrTactBehav(i) — Loi de comportement de contact associée au contacteur i.
-–	DISKx_GetRadius(i) — Rayon du disque i.
-–	DISKx_GetCoor(i) — Coordonnées du centre du disque i.
-–	DISKx_GetVelocity(i) — Vitesse du centre du disque i.
+`DISKx — 2D Rigid Disks`
+–	DISKx_GetNbDISKx — Total number of DISKx contactors (no ID required).
+–	DISKx_GetBodyId(i) — ID of the RBDY2 body to which contactor i belongs.
+–	DISKx_GetPtrDISKx2BDYTY(i) — Local index of the contactor within its RBDY2 body.
+–	DISKx_GetPtrTactBehav(i) — Contact behavior law associated with contactor i.
+–	DISKx_GetRadius(i) — Radius of disk i.
+–	DISKx_GetCoor(i) — Coordinates of the center of disk i.
+–	DISKx_GetVelocity(i) — Velocity of the center of disk i.
 
-`JONCx — Joncs / Ellipses 2D`
-–	JONCx_GetNbJONCx — Nombre total de contacteurs JONCx.
+`JONCx — 2D Joncs / Ellipses`
+–	JONCx_GetNbJONCx — Total number of JONCx contactors.
 –	JONCx_GetBodyId(i), JONCx_GetPtrJONCx2BDYTY(i), JONCx_GetPtrTactBehav(i) — Identification.
-–	JONCx_GetAxes(i) — Demi-axes (a, b) du jonc i.
-–	JONCx_GetCoor(i) — Coordonnées du centre du jonc i.
+–	JONCx_GetAxes(i) — Half-axes (a, b) of jonc i.
+–	JONCx_GetCoor(i) — Coordinates of the center of jonc i.
 
-`POLYR — Polygones rigides 2D`
-–	POLYR_GetNbPOLYR — Nombre total de contacteurs POLYR.
+`POLYR — 2D Rigid Polygons`
+–	POLYR_GetNbPOLYR — Total number of POLYR contactors.
 –	POLYR_GetBodyId(i), POLYR_GetPtrPOLYR2BDYTY(i), POLYR_GetPtrTactBehav(i) — Identification.
-–	POLYR_GetNbVerti(i) — Nombre de sommets du polygone i.
-–	POLYR_GetVerti(i) — Coordonnées de tous les sommets du polygone i.
-–	POLYR_GetCoor(i) — Coordonnées du centre de référence du polygone i.
+–	POLYR_GetNbVerti(i) — Number of vertices of polygon i.
+–	POLYR_GetVerti(i) — Coordinates of all the vertices of polygon i.
+–	POLYR_GetCoor(i) — Coordinates of the reference center of polygon i.
 
-`xKSID — Clusters de disques discrets 2D`
+`xKSID — 2D Discrete Disk Clusters`
 –	xKSID_GetNbxKSID, xKSID_GetBodyId(i), xKSID_GetPtrxKSID2BDYTY(i), xKSID_GetRadius(i).
 
-`RBDY2 — Corps rigides 2D (synthèse)`
-–	RBDY2_GetNbRBDY2 — Nombre total de corps rigides 2D.
-–	RBDY2_KineticEnergy — Énergie cinétique totale de tous les corps RBDY2.
+`RBDY2 — 2D Rigid Bodies (summary)`
+–	RBDY2_GetNbRBDY2 — Total number of 2D rigid bodies.
+–	RBDY2_KineticEnergy — Total kinetic energy of all RBDY2 bodies.
 
-`PT2Dx — Nœuds contacteurs FEM 2D`
-–	PT2Dx_GetNbPT2Dx — Nombre de nœuds contacteurs FEM 2D.
-–	PT2Dx_GetBodyId(i) — ID du corps FEM parent.
-–	PT2Dx_GetCoor(i) — Coordonnées du nœud contacteur i.
+`PT2Dx — 2D FEM Contactor Nodes`
+–	PT2Dx_GetNbPT2Dx — Number of 2D FEM contactor nodes.
+–	PT2Dx_GetBodyId(i) — ID of the parent FEM body.
+–	PT2Dx_GetCoor(i) — Coordinates of contactor node i.
 
-### 6. Inspection 3D
+### 6. 3D Inspection
 
 ![](captures/config_inspect3D.JPG)
 
-Fonctionnement identique à l'onglet Inspection 2D, mais pour les contacteurs 3D. Les familles disponibles sont :
+Works the same way as the 2D Inspection tab, but for 3D contactors. The available families are:
 
-`SPHER — Sphères rigides 3D`
+`SPHER — 3D Rigid Spheres`
 –	SPHER_GetNbSPHER, SPHER_GetBodyId(i), SPHER_GetPtrSPHER2BDYTY(i), SPHER_GetPtrTactBehav(i).
-–	SPHER_GetRadius(i) — Rayon de la sphère i.
-–	SPHER_GetCoor(i), SPHER_GetVelocity(i) — Position et vitesse.
+–	SPHER_GetRadius(i) — Radius of sphere i.
+–	SPHER_GetCoor(i), SPHER_GetVelocity(i) — Position and velocity.
 
-`POLYH — Polyèdres rigides 3D`
+`POLYH — 3D Rigid Polyhedra`
 –	POLYH_GetNbPOLYH, POLYH_GetBodyId(i), POLYH_GetPtrPOLYH2BDYTY(i), POLYH_GetPtrTactBehav(i).
-–	POLYH_GetNbFaces(i), POLYH_GetNbVerti(i), POLYH_GetVerti(i) — Géométrie.
-–	POLYH_GetCoor(i) — Coordonnées du centre de référence.
+–	POLYH_GetNbFaces(i), POLYH_GetNbVerti(i), POLYH_GetVerti(i) — Geometry.
+–	POLYH_GetCoor(i) — Coordinates of the reference center.
 
-`CYLND — Cylindres rigides 3D`
+`CYLND — 3D Rigid Cylinders`
 –	CYLND_GetNbCYLND, CYLND_GetBodyId(i), CYLND_GetPtrCYLND2BDYTY(i), CYLND_GetPtrTactBehav(i).
 –	CYLND_GetRadius(i), CYLND_GetLength(i), CYLND_GetCoor(i).
 
-`PLANE — Plans rigides 3D`
+`PLANE — 3D Rigid Planes`
 –	PLANE_GetNbPLANE, PLANE_GetBodyId(i), PLANE_GetNormal(i), PLANE_GetCoor(i).
 
-`RBDY3 et PT3Dx`
-–	RBDY3_GetNbRBDY3 — Nombre total de corps rigides 3D.
-–	PT3Dx_GetNbPT3Dx, PT3Dx_GetBodyId(i), PT3Dx_GetCoor(i) — Nœuds contacteurs FEM 3D.
+`RBDY3 and PT3Dx`
+–	RBDY3_GetNbRBDY3 — Total number of 3D rigid bodies.
+–	PT3Dx_GetNbPT3Dx, PT3Dx_GetBodyId(i), PT3Dx_GetCoor(i) — 3D FEM contactor nodes.
 
-### 7. Inespection des interactions 
+### 7. Interaction Inspection
 
-Cet onglet inspecte les paires de contacteurs actives (interactions en cours de simulation). L'ID utilisé est l'index de la paire dans la liste chipy (numérotation 1-based).
+This tab inspects the active contactor pairs (interactions currently occurring in the simulation). The ID used is the index of the pair in the chipy list (1-based numbering).
 
 ![](captures/config_interac.JPG)
 
-Les fonctions sont regroupées par type d'interaction :
+Functions are grouped by interaction type:
 
-``DKDKx — Disque / Disque``
-–	DKDKx_GetNbDKDKx — Nombre de paires actives.
-–	DKDKx_GetBodyIds(i) — IDs RBDY2 des deux corps de la paire i.
-–	DKDKx_GetTactors(i) — IDs des deux contacteurs DISKx de la paire i.
-–	DKDKx_GetGapTT(i) — Jeu (gap) de la paire i.
-–	DKDKx_GetStatusTT(i) — Statut de contact : 0 = pas de contact, 1 = contact actif.
-–	DKDKx_GetRlocTT(i) — Réaction locale (Rn, Rt) dans le repère local de contact.
-–	DKDKx_GetVlocTT(i) — Vitesse locale relative (Vn, Vt).
+``DKDKx — Disk / Disk``
+–	DKDKx_GetNbDKDKx — Number of active pairs.
+–	DKDKx_GetBodyIds(i) — RBDY2 IDs of the two bodies in pair i.
+–	DKDKx_GetTactors(i) — IDs of the two DISKx contactors in pair i.
+–	DKDKx_GetGapTT(i) — Gap of pair i.
+–	DKDKx_GetStatusTT(i) — Contact status: 0 = no contact, 1 = active contact.
+–	DKDKx_GetRlocTT(i) — Local reaction (Rn, Rt) in the local contact frame.
+–	DKDKx_GetVlocTT(i) — Relative local velocity (Vn, Vt).
 
-``DKJCx — Disque / Jonc``
+``DKJCx — Disk / Jonc``
 –	DKJCx_GetNbDKJCx, DKJCx_GetBodyIds(i), DKJCx_GetTactors(i), DKJCx_GetGapTT(i), DKJCx_GetStatusTT(i), DKJCx_GetRlocTT(i).
 
-``DKKDx — Disque / Corde (Polygone)``
+``DKKDx — Disk / Corde (Polygon)``
 –	DKKDx_GetNbDKKDx, DKKDx_GetBodyIds(i), DKKDx_GetGapTT(i), DKKDx_GetRlocTT(i).
 
-``PLPLx — Polygone / Polygone``
+``PLPLx — Polygon / Polygon``
 –	PLPLx_GetNbPLPLx, PLPLx_GetBodyIds(i), PLPLx_GetTactors(i), PLPLx_GetGapTT(i), PLPLx_GetStatusTT(i), PLPLx_GetRlocTT(i), PLPLx_GetVlocTT(i).
 
-``CLALp — Brique / Brique (maçonnerie)``
+``CLALp — Brick / Brick (masonry)``
 –	CLALp_GetNbCLALp, CLALp_GetBodyIds(i), CLALp_GetGapTT(i), CLALp_GetStatusTT(i), CLALp_GetRlocTT(i).
-●  Utiliser CLALp avec le mode « Tous les pas » pour suivre l'évolution des forces de contact dans les joints de maçonnerie au cours de la simulation.
+●  Use CLALp with "Every step" mode to track the evolution of contact forces in masonry joints throughout the simulation.
 
 ``ALpALp — ALp / ALp``
 –	ALpALp_GetNbALpALp, ALpALp_GetBodyIds(i), ALpALp_GetGapTT(i), ALpALp_GetRlocTT(i).
 
-``SPSPx — Sphère / Sphère (3D)``
+``SPSPx — Sphere / Sphere (3D)``
 –	SPSPx_GetNbSPSPx, SPSPx_GetBodyIds(i), SPSPx_GetTactors(i), SPSPx_GetGapTT(i), SPSPx_GetStatusTT(i), SPSPx_GetRlocTT(i) (Rn, Rt, Rs), SPSPx_GetVlocTT(i) (Vn, Vt, Vs).
 
-``SPCDx — Sphère / Cylindre (3D)``
+``SPCDx — Sphere / Cylinder (3D)``
 –	SPCDx_GetNbSPCDx, SPCDx_GetBodyIds(i), SPCDx_GetTactors(i), SPCDx_GetGapTT(i), SPCDx_GetRlocTT(i).
 
-``SPPLx — Sphère / Plan (3D)``
+``SPPLx — Sphere / Plane (3D)``
 –	SPPLx_GetNbSPPLx, SPPLx_GetBodyIds(i), SPPLx_GetGapTT(i), SPPLx_GetRlocTT(i).
 
-``CDCDx — Cylindre / Cylindre (3D)``
+``CDCDx — Cylinder / Cylinder (3D)``
 –	CDCDx_GetNbCDCDx, CDCDx_GetBodyIds(i), CDCDx_GetGapTT(i), CDCDx_GetRlocTT(i).
-CDPLx — Cylindre / Plan (3D)
+CDPLx — Cylinder / Plane (3D)
 –	CDPLx_GetNbCDPLx, CDPLx_GetBodyIds(i), CDPLx_GetGapTT(i), CDPLx_GetRlocTT(i).
 
-``PRPRx — Polyèdre / Polyèdre (3D)``
+``PRPRx — Polyhedron / Polyhedron (3D)``
 –	PRPRx_GetNbPRPRx, PRPRx_GetBodyIds(i), PRPRx_GetTactors(i), PRPRx_GetGapTT(i), PRPRx_GetStatusTT(i), PRPRx_GetRlocTT(i) (Rn, Rt, Rs).
 
-``Contacteurs mixtes Rigide / Déformable``
-–	DKMECAx_GetNbDKMECAx, DKMECAx_GetBodyIds(i), DKMECAx_GetGapTT(i), DKMECAx_GetRlocTT(i) — Disque / MECAx FEM 2D.
-–	ALpMECAx_GetNbALpMECAx, ALpMECAx_GetBodyIds(i), ALpMECAx_GetRlocTT(i) — ALp / MECAx FEM 2D.
-–	SPMECAx_GetNbSPMECAx, SPMECAx_GetBodyIds(i), SPMECAx_GetRlocTT(i) — Sphère / MECAx FEM 3D.
-
-
+``Mixed Contactors — Rigid / Deformable``
+–	DKMECAx_GetNbDKMECAx, DKMECAx_GetBodyIds(i), DKMECAx_GetGapTT(i), DKMECAx_GetRlocTT(i) — Disk / 2D FEM MECAx.
+–	ALpMECAx_GetNbALpMECAx, ALpMECAx_GetBodyIds(i), ALpMECAx_GetRlocTT(i) — ALp / 2D FEM MECAx.
+–	SPMECAx_GetNbSPMECAx, SPMECAx_GetBodyIds(i), SPMECAx_GetRlocTT(i) — Sphere / 3D FEM MECAx.

@@ -1,294 +1,294 @@
-# Création d'un Avatar (Corps rigide simple)
+# Creating an Avatar (Simple Rigid Body)
 
-**Onglet Avatar** Permet de créer, modifier et supprimer les corps rigides du projet : disques, sphères, joncs, polygones, murs, cylindres, polyèdres et plus encore.  
-Chaque avatar est défini par un **type**, un **centre**, un **matériau**, un **modèle** et des **paramètres géométriques** spécifiques à son type.
+**Avatar tab** Allows you to create, modify, and delete the rigid bodies of the project: disks, spheres, joncs, polygons, walls, cylinders, polyhedra, and more.  
+Each avatar is defined by a **type**, a **center**, a **material**, a **model**, and **geometric parameters** specific to its type.
 
 ![](captures/avatar_disque.JPG)
 
 ---
 
-## Interface générale
+## General Interface
 
-L'onglet est divisé en deux zones :
+The tab is divided into two areas:
 
-- **Liste des avatars** (en haut) : arbre affichant tous les avatars du projet avec leur index, type, couleur et centre. Double-clic sur une ligne pour l'éditer. Clic droit pour accéder au menu contextuel (Modifier, Supprimer, Informations).
-- **Formulaire de création / modification** (en bas) : champs adaptés au type d'avatar sélectionné.
+- **Avatar list** (top): a tree displaying all the avatars in the project with their index, type, color, and center. Double-click on a row to edit it. Right-click to access the context menu (Edit, Delete, Information).
+- **Creation / editing form** (bottom): fields adapted to the selected avatar type.
 
-## Liste des avatars par dimension
+## List of Avatars by Dimension
 
-### Avatars 2D
+### 2D Avatars
 
-| Type pylmgc90 | Description courte | Paramètres clés |
+| pylmgc90 Type | Short Description | Key Parameters |
 |---------------|--------------------|-----------------|
-| `rigidDisk` | Disque rigide | `r`, `is_hollow` |
-| `rigidJonc` | Ellipse rigide | `axe1`, `axe2` |
-| `rigidPolygon` | Polygone rigide | `generation_type`, `nb_vertices`, `radius` ou `vertices` |
-| `rigidOvoidPolygon` | Ovoïde rigide | `ra`, `rb`, `nb_vertices` |
-| `rigidDiscreteDisk` | Disque discret | `r` |
-| `rigidCluster` | Cluster de disques | `r`, `nb_disk` |
-| `roughWall` | Mur rugueux | `l`, `r`, `nb_vertex` |
-| `fineWall` | Mur fin | `l`, `r`, `nb_vertex` |
-| `smoothWall` | Mur lisse | `l`, `h`, `nb_polyg` |
-| `granuloRoughWall` | Mur granulaire | `l`, `rmin`, `rmax`, `nb_vertex` |
+| `rigidDisk` | Rigid disk | `r`, `is_hollow` |
+| `rigidJonc` | Rigid ellipse | `axe1`, `axe2` |
+| `rigidPolygon` | Rigid polygon | `generation_type`, `nb_vertices`, `radius` or `vertices` |
+| `rigidOvoidPolygon` | Rigid ovoid | `ra`, `rb`, `nb_vertices` |
+| `rigidDiscreteDisk` | Discrete disk | `r` |
+| `rigidCluster` | Disk cluster | `r`, `nb_disk` |
+| `roughWall` | Rough wall | `l`, `r`, `nb_vertex` |
+| `fineWall` | Fine wall | `l`, `r`, `nb_vertex` |
+| `smoothWall` | Smooth wall | `l`, `h`, `nb_polyg` |
+| `granuloRoughWall` | Granular wall | `l`, `rmin`, `rmax`, `nb_vertex` |
 
-### Avatars 3D
+### 3D Avatars
 
-| Type pylmgc90 | Description courte | Paramètres clés |
+| pylmgc90 Type | Short Description | Key Parameters |
 |---------------|--------------------|-----------------|
-| `rigidSphere` | Sphère rigide | `r` |
-| `rigidPlan` | Plan rigide | `axe1`, `axe2`, `axe3` |
-| `rigidCylinder` | Cylindre rigide | `r`, `h` |
-| `rigidPolyhedron` | Polyèdre rigide | `generation_type`, `nb_vertices`, `radius` ou `vertices` + `faces` |
-| `roughWall3D` | Mur rugueux 3D | `lx`, `ly`, `r` |
-| `granuloRoughWall3D` | Mur granulaire 3D | `lx`, `ly`, `rmin`, `rmax` |
+| `rigidSphere` | Rigid sphere | `r` |
+| `rigidPlan` | Rigid plane | `axe1`, `axe2`, `axe3` |
+| `rigidCylinder` | Rigid cylinder | `r`, `h` |
+| `rigidPolyhedron` | Rigid polyhedron | `generation_type`, `nb_vertices`, `radius` or `vertices` + `faces` |
+| `roughWall3D` | 3D rough wall | `lx`, `ly`, `r` |
+| `granuloRoughWall3D` | 3D granular wall | `lx`, `ly`, `rmin`, `rmax` |
 
-### Champs communs à tous les types
+### Fields Common to All Types
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| **Type** | Type d'avatar pylmgc90. Détermine les champs supplémentaires affichés. |
-| **Centre** | Coordonnées du centre de référence. Format `x, y` en 2D ou `x, y, z` en 3D. Accepte les expressions Python (`avatar[0].x + 0.5`). |
-| **Matériau** | Sélection parmi les matériaux définis dans l'onglet Matériaux. |
-| **Modèle** | Sélection parmi les modèles définis dans l'onglet Modèles. |
-| **Couleur** | Couleur d'affichage LMGC90 en 5 caractères. Voir liste des couleurs ci-dessous. |
+| **Type** | pylmgc90 avatar type. Determines the additional fields displayed. |
+| **Center** | Coordinates of the reference center. Format `x, y` in 2D or `x, y, z` in 3D. Accepts Python expressions (`avatar[0].x + 0.5`). |
+| **Material** | Selection from the materials defined in the Materials tab. |
+| **Model** | Selection from the models defined in the Models tab. |
+| **Color** | LMGC90 display color in 5 characters. See the color list below. |
 
 
-### Couleurs LMGC90 disponibles
-Exemples de couleurs que vous pourriez utiliser : 
+### Available LMGC90 Colors
+Examples of colors you could use:
 
-| Code | Couleur |
+| Code | Color |
 |------|---------|
-| `BLUEx` | Bleu |
-| `REDxx` | Rouge |
-| `VERTx` | Vert |
-| `JAUNx` | Jaune |
-| `GRAYx` | Gris |
-| `BLACx` | Noir |
-| `WHITx` | Blanc |
+| `BLUEx` | Blue |
+| `REDxx` | Red |
+| `VERTx` | Green |
+| `JAUNx` | Yellow |
+| `GRAYx` | Gray |
+| `BLACx` | Black |
+| `WHITx` | White |
 | `ORANx` | Orange |
 | `CYANx` | Cyan |
 | `MAGEx` | Magenta |
-| `VIOLx` | Violet |
-| `ROSEx` | Rose |
+| `VIOLx` | Purple |
+| `ROSEx` | Pink |
 
 ---
 
-## Types d'avatars 2D
+## 2D Avatar Types
 
-### 1. rigidDisk — Disque rigide 2D
+### 1. rigidDisk — 2D Rigid Disk
 
-Corps circulaire rigide 2D. C'est le type le plus courant pour les simulations granulaires.
+2D rigid circular body. This is the most common type for granular simulations.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `r` (rayon) | Rayon du disque (m). | `0.1` |
-| `is_hollow` | Si coché, crée un disque creux (`is_Hollow=True`). Utile pour les anneaux rigides. | case à cocher |
+| `r` (radius) | Disk radius (m). | `0.1` |
+| `is_hollow` | If checked, creates a hollow disk (`is_Hollow=True`). Useful for rigid rings. | checkbox |
 
 ---
 
-### rigidJonc — Jonc / Ellipse rigide 2D
+### rigidJonc — 2D Rigid Jonc / Ellipse
 
-Corps elliptique rigide 2D. Défini par deux demi-axes.
+2D rigid elliptical body. Defined by two half-axes.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `axe1` | Demi-axe principal (m) — longueur. | `0.15` |
-| `axe2` | Demi-axe secondaire (m) — largeur. | `0.05` |
+| `axe1` | Main half-axis (m) — length. | `0.15` |
+| `axe2` | Secondary half-axis (m) — width. | `0.05` |
 
 
 ---
 
-### rigidPolygon — Polygone rigide 2D
+### rigidPolygon — 2D Rigid Polygon
 
-Corps polygonal rigide 2D. Trois modes de génération disponibles selon `generation_type`.
+2D rigid polygonal body. Three generation modes available depending on `generation_type`.
 
-| Paramètre | Description | Valeurs |
+| Parameter | Description | Values |
 |-----------|-------------|---------|
-| `generation_type` | Mode de génération de la forme. | `regular` · `full` · `bevel` |
-| `nb_vertices` | Nombre de sommets (pour `regular` et `full`). | `3` à `20` |
-| `radius` | Rayon du cercle circonscrit (m) — utilisé pour `regular`. Non utilisé pour `full` et `bevel`. | `0.1` |
-| `vertices` | Liste explicite de sommets `[[x1,y1],[x2,y2],…]` — utilisé pour `full` et `bevel`. | `[[-0.1,-0.1],[0.1,-0.1],[0.,0.1]]` |
+| `generation_type` | Shape generation mode. | `regular` · `full` · `bevel` |
+| `nb_vertices` | Number of vertices (for `regular` and `full`). | `3` to `20` |
+| `radius` | Radius of the circumscribed circle (m) — used for `regular`. Not used for `full` and `bevel`. | `0.1` |
+| `vertices` | Explicit list of vertices `[[x1,y1],[x2,y2],…]` — used for `full` and `bevel`. | `[[-0.1,-0.1],[0.1,-0.1],[0.,0.1]]` |
 
-**Modes de génération :**
+**Generation modes:**
 
-- **`regular`** : polygone régulier (tous les côtés égaux). Défini par `nb_vertices` et `radius` (rayon du cercle circonscrit).
-- **`full`** : polygone quelconque à partir d'une liste de sommets explicites. Le rayon n'est pas utilisé.
-- **`bevel`** : polygone avec chanfreinage automatique des angles pour éviter les singularités de contact.
+- **`regular`**: regular polygon (all sides equal). Defined by `nb_vertices` and `radius` (radius of the circumscribed circle).
+- **`full`**: arbitrary polygon from an explicit list of vertices. The radius is not used.
+- **`bevel`**: polygon with automatic beveling of corners to avoid contact singularities.
 
 ---
 
-### rigidOvoidPolygon — Ovoïde rigide 2D
+### rigidOvoidPolygon — 2D Rigid Ovoid
 
-Corps ovoïde (ellipse polygonale) rigide 2D. Approximation polygonale d'une ellipse.
+2D rigid ovoid body (polygonal ellipse). Polygonal approximation of an ellipse.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `ra` | Demi-axe principal (m). | `0.15` |
-| `rb` | Demi-axe secondaire (m). | `0.08` |
-| `nb_vertices` | Nombre de sommets de l'approximation polygonale. | `20` |
+| `ra` | Main half-axis (m). | `0.15` |
+| `rb` | Secondary half-axis (m). | `0.08` |
+| `nb_vertices` | Number of vertices of the polygonal approximation. | `20` |
 
 ---
 
-### rigidDiscreteDisk — Disque discret rigide 2D
+### rigidDiscreteDisk — 2D Rigid Discrete Disk
 
-Corps circulaire rigide 2D à cinématique discrète. Même géométrie qu'un `rigidDisk`, mais avec un contacteur de type `xKSID` (disque discret). Utilisé dans certains modèles discrets avancés.
+2D rigid circular body with discrete kinematics. Same geometry as a `rigidDisk`, but with a `xKSID`-type contactor (discrete disk). Used in some advanced discrete models.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `r` (rayon) | Rayon du disque (m). | `0.1` |
+| `r` (radius) | Disk radius (m). | `0.1` |
 
 ---
 
-### rigidCluster — Cluster de disques rigides 2D
+### rigidCluster — 2D Rigid Disk Cluster
 
-Corps rigide 2D composé de plusieurs disques liés rigidement. Permet de créer des formes non convexes complexes.
+2D rigid body composed of several disks rigidly linked together. Allows the creation of complex non-convex shapes.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `r` | Rayon de chaque disque dans le cluster (m). | `0.05` |
-| `nb_vertices` (nb_disk) | Nombre de disques dans le cluster. | `4` |
+| `r` | Radius of each disk in the cluster (m). | `0.05` |
+| `nb_vertices` (nb_disk) | Number of disks in the cluster. | `4` |
 
-> Le paramètre est nommé `nb_disk` dans le script pylmgc90 généré (pas `nb_vertices`).
+> The parameter is named `nb_disk` in the generated pylmgc90 script (not `nb_vertices`).
 
 ---
 
-### roughWall — Mur rugueux 2D
+### roughWall — 2D Rough Wall
 
-Paroi 2D rugueuse composée de disques alignés. Utilisé pour les parois confinantes avec rugosité géométrique.
+2D rough wall made up of aligned disks. Used for confining walls with geometric roughness.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `l` | Longueur totale du mur (m). | `2.0` |
-| `r` | Rayon des disques constituant la rugosité (m). | `0.05` |
-| `nb_vertex` | Nombre de disques le long du mur. Défaut : `10`. | `20` |
+| `l` | Total length of the wall (m). | `2.0` |
+| `r` | Radius of the disks forming the roughness (m). | `0.05` |
+| `nb_vertex` | Number of disks along the wall. Default: `10`. | `20` |
 
 ---
 
-### fineWall — Mur fin 2D
+### fineWall — 2D Fine Wall
 
-Paroi 2D fine composée de disques très petits. Mêmes paramètres que `roughWall` mais avec une rugosité plus fine.
+2D fine wall made up of very small disks. Same parameters as `roughWall` but with finer roughness.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `l` | Longueur totale du mur (m). | `2.0` |
-| `r` | Rayon des disques (m). Typiquement très petit (0,001 à 0,01). | `0.005` |
-| `nb_vertex` | Nombre de disques. Défaut : `10`. | `50` |
+| `l` | Total length of the wall (m). | `2.0` |
+| `r` | Radius of the disks (m). Typically very small (0.001 to 0.01). | `0.005` |
+| `nb_vertex` | Number of disks. Default: `10`. | `50` |
 
 ---
 
-### smoothWall — Mur lisse 2D
+### smoothWall — 2D Smooth Wall
 
-Paroi 2D lisse définie par une demi-largeur et une hauteur. Contacteur `CLxxx` (surface continue).
+2D smooth wall defined by a half-length and a height. `CLxxx` contactor (continuous surface).
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `l` | Demi-longueur du mur (m) — la longueur totale est `2 × l`. | `1.0` |
-| `h` | Demi-hauteur (épaisseur) du mur (m). | `0.01` |
-| `nb_polyg` | Nombre de segments polygonaux. Défaut : `10`. | `20` |
+| `l` | Half-length of the wall (m) — the total length is `2 × l`. | `1.0` |
+| `h` | Half-height (thickness) of the wall (m). | `0.01` |
+| `nb_polyg` | Number of polygonal segments. Default: `10`. | `20` |
 
 ---
 
-### granuloRoughWall — Mur granulaire rugueux 2D
+### granuloRoughWall — 2D Granular Rough Wall
 
-Paroi 2D avec rugosité aléatoire générée par distribution granulométrique de disques.
+2D wall with random roughness generated by a granulometric distribution of disks.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `l` | Longueur totale du mur (m). | `2.0` |
-| `rmin` | Rayon minimal des disques (m). | `0.01` |
-| `rmax` | Rayon maximal des disques (m). | `0.05` |
-| `nb_vertex` | Nombre de disques. Défaut : `10`. | `30` |
+| `l` | Total length of the wall (m). | `2.0` |
+| `rmin` | Minimum radius of the disks (m). | `0.01` |
+| `rmax` | Maximum radius of the disks (m). | `0.05` |
+| `nb_vertex` | Number of disks. Default: `10`. | `30` |
 
 ---
 
-## Types d'avatars 3D
+## 3D Avatar Types
 
-### rigidSphere — Sphère rigide 3D
+### rigidSphere — 3D Rigid Sphere
 
-Corps sphérique rigide 3D. Équivalent 3D du `rigidDisk`.
+3D rigid spherical body. 3D equivalent of `rigidDisk`.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `r` (rayon) | Rayon de la sphère (m). | `0.1` |
+| `r` (radius) | Sphere radius (m). | `0.1` |
 
 ---
 
-### rigidPlan — Plan rigide 3D
+### rigidPlan — 3D Rigid Plane
 
-Surface plane rigide 3D. Défini par trois vecteurs directeurs formant un repère local.
+3D rigid flat surface. Defined by three direction vectors forming a local frame.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `axe1` | Vecteur du premier axe du plan (direction X locale). | `[1.0, 0.0, 0.0]` |
-| `axe2` | Vecteur du deuxième axe du plan (direction Y locale). | `[0.0, 1.0, 0.0]` |
-| `axe3` | Normale au plan (direction Z locale). | `[0.0, 0.0, 1.0]` |
+| `axe1` | Vector of the plane's first axis (local X direction). | `[1.0, 0.0, 0.0]` |
+| `axe2` | Vector of the plane's second axis (local Y direction). | `[0.0, 1.0, 0.0]` |
+| `axe3` | Normal to the plane (local Z direction). | `[0.0, 0.0, 1.0]` |
 
-> Les trois vecteurs doivent former une base orthonormée directe.
+> The three vectors must form a direct orthonormal basis.
 
 ---
 
-### rigidCylinder — Cylindre rigide 3D
+### rigidCylinder — 3D Rigid Cylinder
 
-Corps cylindrique rigide 3D.
+3D rigid cylindrical body.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `r` (rayon) | Rayon du cylindre (m). | `0.1` |
-| `h` | Hauteur (longueur axiale) du cylindre (m). Défaut : `1.0` si absent. | `0.5` |
+| `r` (radius) | Cylinder radius (m). | `0.1` |
+| `h` | Height (axial length) of the cylinder (m). Default: `1.0` if absent. | `0.5` |
 
 ---
 
-### rigidPolyhedron — Polyèdre rigide 3D
+### rigidPolyhedron — 3D Rigid Polyhedron
 
-Corps polyédrique rigide 3D. Deux modes de génération disponibles selon `generation_type`.
+3D rigid polyhedral body. Two generation modes available depending on `generation_type`.
 
-| Paramètre | Description | Valeurs |
+| Parameter | Description | Values |
 |-----------|-------------|---------|
-| `generation_type` | Mode de génération. | `regular` · `vertices` |
-| `nb_vertices` | Nombre de sommets (pour `regular`). | `8` (cube), `12` (icosaèdre)… |
-| `radius` | Rayon du polyèdre régulier (m) — pour `regular`. | `0.1` |
-| `vertices` | Liste explicite de sommets 3D `[[x,y,z],…]` — pour `vertices`. | `[[−1,−1,−1],[1,−1,−1],…]` |
-| `faces` | Connectivité des faces `[[i,j,k],…]` (dans `wall_params`) — pour `vertices`. | `[[0,1,2],[2,3,0],…]` |
+| `generation_type` | Generation mode. | `regular` · `vertices` |
+| `nb_vertices` | Number of vertices (for `regular`). | `8` (cube), `12` (icosahedron)… |
+| `radius` | Radius of the regular polyhedron (m) — for `regular`. | `0.1` |
+| `vertices` | Explicit list of 3D vertices `[[x,y,z],…]` — for `vertices`. | `[[−1,−1,−1],[1,−1,−1],…]` |
+| `faces` | Face connectivity `[[i,j,k],…]` (in `wall_params`) — for `vertices`. | `[[0,1,2],[2,3,0],…]` |
 
-**Modes de génération :**
+**Generation modes:**
 
-- **`regular`** : polyèdre régulier (similaire à une sphère polygonale). Défini par `nb_vertices` et `radius`.
-- **`vertices`** : polyèdre quelconque défini par une liste explicite de sommets et la connectivité des faces.
+- **`regular`**: regular polyhedron (similar to a polygonal sphere). Defined by `nb_vertices` and `radius`.
+- **`vertices`**: arbitrary polyhedron defined by an explicit list of vertices and face connectivity.
 
 ---
 
-### roughWall3D — Mur rugueux 3D
+### roughWall3D — 3D Rough Wall
 
-Paroi 3D rugueuse composée de sphères alignées sur une surface rectangulaire.
+3D rough wall made up of spheres aligned on a rectangular surface.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `lx` | Dimension du mur en X (m). | `2.0` |
-| `ly` | Dimension du mur en Y (m). | `2.0` |
-| `r` | Rayon des sphères de rugosité (m). | `0.05` |
+| `lx` | Wall dimension in X (m). | `2.0` |
+| `ly` | Wall dimension in Y (m). | `2.0` |
+| `r` | Radius of the roughness spheres (m). | `0.05` |
 
 ---
 
-### granuloRoughWall3D — Mur granulaire rugueux 3D
+### granuloRoughWall3D — 3D Granular Rough Wall
 
-Paroi 3D rugueuse avec sphères de tailles aléatoires.
+3D rough wall with randomly sized spheres.
 
-| Paramètre | Description | Exemple |
+| Parameter | Description | Example |
 |-----------|-------------|---------|
-| `lx` | Dimension en X (m). | `2.0` |
-| `ly` | Dimension en Y (m). | `2.0` |
-| `rmin` | Rayon minimal des sphères (m). | `0.01` |
-| `rmax` | Rayon maximal des sphères (m). | `0.05` |
+| `lx` | Dimension in X (m). | `2.0` |
+| `ly` | Dimension in Y (m). | `2.0` |
+| `rmin` | Minimum radius of the spheres (m). | `0.01` |
+| `rmax` | Maximum radius of the spheres (m). | `0.05` |
 
 ---
 
 
-## Remarques générales
+## General Notes
 
-**Expressions Python dans les champs numériques :** tous les champs numériques (centre, rayon, dimensions) acceptent des expressions Python évaluées via `SafeEvaluator`. Exemples : `avatar[0].radius * 2`, `thickness + 0.1`, `math.sqrt(2) * r_base`.
+**Python expressions in numeric fields:** all numeric fields (center, radius, dimensions) accept Python expressions evaluated via `SafeEvaluator`. Examples: `avatar[0].radius * 2`, `thickness + 0.1`, `math.sqrt(2) * r_base`.
 
-**Matériau RIGID :** les avatars rigides doivent utiliser un matériau de type `RIGID`. Un matériau élastique peut techniquement être assigné, mais n'a pas d'effet mécanique sur un corps rigide.
+**RIGID material:** rigid avatars must use a material of type `RIGID`. An elastic material can technically be assigned, but has no mechanical effect on a rigid body.
 
-**Modèle Rxx :** les avatars rigides utilisent un modèle avec élément `Rxx2D` (2D) ou `Rxx3D` (3D). Ces éléments n'ont aucune option numérique.
+**Rxx model:** rigid avatars use a model with the `Rxx2D` (2D) or `Rxx3D` (3D) element. These elements have no numerical options.
 
-**Avatars non utilisés :** les avatars dont le matériau ou le modèle a été supprimé restent dans la liste mais génèrent une erreur à la création du script. Une validation est effectuée avant la génération.
+**Unused avatars:** avatars whose material or model has been deleted remain in the list but generate an error when the script is created. Validation is performed before generation.

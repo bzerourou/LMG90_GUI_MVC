@@ -1,5 +1,6 @@
-# Visualisation 
-On plus de l'outil de visualisation intégré avec LMGC90 qui n'est d'autre que la fonction du préprocesseur `pre.visuAvatars()`, LMGC90_GUI permet de visualiser vos avatars dans un espace 3D complètement indépendant du solveur, simplement il est dans sa version *bétâ* donc il est très gourmand en ressources.
+# Visualization
+
+In addition to the visualization tool built into LMGC90, which is none other than the preprocessor function `pre.visuAvatars()`, LMGC90_GUI allows you to visualize your avatars in a 3D space completely independent of the solver. However, it is currently in its *beta* version and is therefore very resource-intensive.
 
 
 ![](captures/visual.JPG)

@@ -1,196 +1,196 @@
-# Bibliothèque — Avatars préconfigurés
+# Library — Preconfigured Avatars
 
-L'onglet **Bibliothèque** (`📚`) met à disposition un catalogue d'avatars préconfigurés, organisés par catégorie. Il permet d'insérer rapidement des formes courantes dans le projet sans avoir à saisir manuellement les paramètres géométriques.
+The **Library** tab (`📚`) provides a catalog of preconfigured avatars, organized by category. It allows you to quickly insert common shapes into the project without having to manually enter the geometric parameters.
 
-Cet onglet se **rafraîchit automatiquement** à chaque changement de dimension dans l'onglet Modèle : les templates disponibles s'adaptent à la dimension courante du projet (2D ou 3D).
+This tab **refreshes automatically** every time the dimension changes in the Model tab: the available templates adapt to the project's current dimension (2D or 3D).
 
-![Vue générale de l'onglet Bibliothèque](captures/templates.JPG)
+![General view of the Library tab](captures/templates.JPG)
 
 ---
 
-## Organisation de l'interface
+## Interface Organization
 
-L'onglet est divisé en deux panneaux :
+The tab is divided into two panels:
 
-| Panneau | Description |
+| Panel | Description |
 |---------|-------------|
-| **Gauche — Arbre des templates** | Arborescence des avatars disponibles, organisés par catégorie. Cliquer sur une entrée pour afficher ses propriétés à droite. |
-| **Droite — Propriétés** | Affiche le nom, le type d'avatar, la description et les paramètres par défaut du template sélectionné. Permet également de configurer le centre, le matériau, le modèle et la couleur avant insertion. |
+| **Left — Template tree** | Tree structure of available avatars, organized by category. Click on an entry to display its properties on the right. |
+| **Right — Properties** | Displays the name, avatar type, description, and default parameters of the selected template. Also allows you to configure the center, material, model, and color before insertion. |
 
 ---
 
-## Templates disponibles
+## Available Templates
 
-Les templates sont organisés par catégorie. La liste change selon que la dimension du projet est **2D** ou **3D**.
+Templates are organized by category. The list changes depending on whether the project's dimension is **2D** or **3D**.
 
-### Templates 2D
+### 2D Templates
 
-#### Particules simples
+#### Simple Particles
 
-| Template | Type pylmgc90 | Paramètres par défaut | Description |
+| Template | pylmgc90 Type | Default Parameters | Description |
 |----------|--------------|----------------------|-------------|
-| **Petit Disque** | `rigidDisk` | `radius = 0.05 m` | Disque rigide de petit rayon, typique des simulations granulaires fines. |
-| **Disque Moyen** | `rigidDisk` | `radius = 0.10 m` | Disque rigide de rayon intermédiaire. |
-| **Grand Disque** | `rigidDisk` | `radius = 0.20 m` | Disque rigide de grand rayon, pour les particules de taille importante. |
+| **Small Disk** | `rigidDisk` | `radius = 0.05 m` | Rigid disk with a small radius, typical of fine granular simulations. |
+| **Medium Disk** | `rigidDisk` | `radius = 0.10 m` | Rigid disk with an intermediate radius. |
+| **Large Disk** | `rigidDisk` | `radius = 0.20 m` | Rigid disk with a large radius, for sizable particles. |
 
-#### Formes allongées
+#### Elongated Shapes
 
-| Template | Type pylmgc90 | Paramètres par défaut | Description |
+| Template | pylmgc90 Type | Default Parameters | Description |
 |----------|--------------|----------------------|-------------|
-| **Cylindre Horizontal** | `rigidJonc` | `axe1 = 2.0 m`, `axe2 = 0.1 m` | Jonc elliptique allongé horizontalement, rapport d'aspect 2:1. |
-| **Cylindre Vertical** | `rigidJonc` | `axe1 = 2.0 m`, `axe2 = 0.1 m` | Jonc elliptique allongé verticalement. |
+| **Horizontal Cylinder** | `rigidJonc` | `axe1 = 2.0 m`, `axe2 = 0.1 m` | Elliptical jonc elongated horizontally, aspect ratio 2:1. |
+| **Vertical Cylinder** | `rigidJonc` | `axe1 = 2.0 m`, `axe2 = 0.1 m` | Elliptical jonc elongated vertically. |
 
-> `axe1` est le demi-axe long, `axe2` le demi-axe court (mêmes paramètres que `rigidJonc` dans l'onglet Avatar).
+> `axe1` is the long half-axis, `axe2` the short half-axis (same parameters as `rigidJonc` in the Avatar tab).
 
-#### Polygones réguliers
+#### Regular Polygons
 
-| Template | Type pylmgc90 | Paramètres par défaut | Description |
+| Template | pylmgc90 Type | Default Parameters | Description |
 |----------|--------------|----------------------|-------------|
-| **Triangle** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=3`, `radius=0.1 m` | Triangle équilatéral inscrit dans un cercle de rayon 0,1 m. |
-| **Carré** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=4`, `radius=0.1 m` | Carré régulier inscrit dans un cercle de rayon 0,1 m. |
-| **Pentagone** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=5`, `radius=0.1 m` | Pentagone régulier. |
-| **Hexagone** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=6`, `radius=0.1 m` | Hexagone régulier — forme très utilisée en DEM pour les assemblages compacts. |
-| **Rectangle** | `rigidPolygon` | `generation_type='full'`, sommets définis explicitement, `radius=0.15 m` | Rectangle 0,30 m × 0,10 m défini par liste de sommets. |
+| **Triangle** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=3`, `radius=0.1 m` | Equilateral triangle inscribed in a circle of radius 0.1 m. |
+| **Square** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=4`, `radius=0.1 m` | Regular square inscribed in a circle of radius 0.1 m. |
+| **Pentagon** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=5`, `radius=0.1 m` | Regular pentagon. |
+| **Hexagon** | `rigidPolygon` | `generation_type='regular'`, `nb_vertices=6`, `radius=0.1 m` | Regular hexagon — a shape widely used in DEM for compact assemblies. |
+| **Rectangle** | `rigidPolygon` | `generation_type='full'`, vertices defined explicitly, `radius=0.15 m` | Rectangle 0.30 m × 0.10 m defined by a list of vertices. |
 
-#### Murs
+#### Walls
 
-| Template | Type pylmgc90 | Paramètres par défaut | Description |
+| Template | pylmgc90 Type | Default Parameters | Description |
 |----------|--------------|----------------------|-------------|
-| **Mur Horizontal** | `fineWall` | `l=2.0 m`, `r=0.1 m`, `nb_polyg=20` | Mur horizontal fin de longueur 2 m, composé de 20 segments polygonaux. |
+| **Horizontal Wall** | `fineWall` | `l=2.0 m`, `r=0.1 m`, `nb_polyg=20` | Thin horizontal wall of length 2 m, made up of 20 polygonal segments. |
 
 ---
 
-### Templates 3D
+### 3D Templates
 
-#### Particules simples
+#### Simple Particles
 
-| Template | Type pylmgc90 | Paramètres par défaut | Description |
+| Template | pylmgc90 Type | Default Parameters | Description |
 |----------|--------------|----------------------|-------------|
-| **Petite Sphère** | `rigidSphere` | `radius = 0.05 m` | Sphère rigide de petit rayon. |
-| **Sphère Moyenne** | `rigidSphere` | `radius = 0.10 m` | Sphère rigide de rayon intermédiaire. |
-| **Grande Sphère** | `rigidSphere` | `radius = 0.20 m` | Sphère rigide de grand rayon. |
+| **Small Sphere** | `rigidSphere` | `radius = 0.05 m` | Rigid sphere with a small radius. |
+| **Medium Sphere** | `rigidSphere` | `radius = 0.10 m` | Rigid sphere with an intermediate radius. |
+| **Large Sphere** | `rigidSphere` | `radius = 0.20 m` | Rigid sphere with a large radius. |
 
-#### Formes 3D
+#### 3D Shapes
 
-| Template | Type pylmgc90 | Paramètres par défaut | Description |
+| Template | pylmgc90 Type | Default Parameters | Description |
 |----------|--------------|----------------------|-------------|
-| **Cylindre 3D** | `rigidCylinder` | `radius=0.05 m`, `h=0.2 m` | Cylindre droit de rayon 0,05 m et de hauteur 0,2 m. |
-| **Plan Sol** | `rigidPlan` | `axe1=2.0 m`, `axe2=2.0 m`, `axe3=0.1 m` | Plan horizontal rigide de 2 m × 2 m, utilisé comme sol ou plafond. |
+| **3D Cylinder** | `rigidCylinder` | `radius=0.05 m`, `h=0.2 m` | Right cylinder of radius 0.05 m and height 0.2 m. |
+| **Ground Plane** | `rigidPlan` | `axe1=2.0 m`, `axe2=2.0 m`, `axe3=0.1 m` | Rigid horizontal plane of 2 m × 2 m, used as a floor or ceiling. |
 
 ---
 
-## Assemblages complexes
+## Complex Assemblies
 
-En plus des templates unitaires, la bibliothèque propose des **assemblages de plusieurs avatars** générés en une seule action. Ces assemblages créent plusieurs corps coordonnés dans le projet.
+In addition to the individual templates, the library offers **assemblies of several avatars** generated in a single action. These assemblies create several coordinated bodies in the project.
 
-### Cluster de disques 2D
+### 2D Disk Cluster
 
-Crée un corps rigide 2D de type `rigidCluster` — une agrégation de disques liés rigidement, formant une particule non convexe.
+Creates a 2D rigid body of type `rigidCluster` — an aggregation of rigidly linked disks, forming a non-convex particle.
 
-| Paramètre | Description | Valeur par défaut |
+| Parameter | Description | Default Value |
 |-----------|-------------|-------------------|
-| Centre | Position du centre de référence du cluster. | `[0.0, 0.0]` |
-| Matériau | Matériau de type `RIGID`. | — |
-| Modèle | Modèle avec élément `Rxx2D`. | — |
-| Rayon principal | Rayon de chaque disque composant le cluster (m). | `0.1 m` |
-| Nombre de disques (`nb_disk`) | Nombre de disques dans le cluster. | `5` |
+| Center | Position of the cluster's reference center. | `[0.0, 0.0]` |
+| Material | Material of type `RIGID`. | — |
+| Model | Model with element `Rxx2D`. | — |
+| Main radius | Radius of each disk making up the cluster (m). | `0.1 m` |
+| Number of disks (`nb_disk`) | Number of disks in the cluster. | `5` |
 
 ---
 
-### Haltère 2D _(dumbbell)_
+### 2D Dumbbell
 
-Crée un avatar vide (`emptyAvatar`) composé de trois contacteurs : deux disques (`DISKx`) aux extrémités et un jonc (`JONCx`) au centre, formant une forme en haltère.
+Creates an empty avatar (`emptyAvatar`) composed of three contactors: two disks (`DISKx`) at the ends and a jonc (`JONCx`) in the center, forming a dumbbell shape.
 
-| Paramètre | Description | Valeur par défaut |
+| Parameter | Description | Default Value |
 |-----------|-------------|-------------------|
-| Centre | Position du centre de l'haltère. | `[0.0, 0.0]` |
-| Longueur totale | Distance entre les centres des deux disques (m). | `0.3 m` |
-| Rayon des disques | Rayon des deux extrémités (m). | `0.05 m` |
+| Center | Position of the dumbbell's center. | `[0.0, 0.0]` |
+| Total length | Distance between the centers of the two disks (m). | `0.3 m` |
+| Disk radius | Radius of the two end pieces (m). | `0.05 m` |
 
-**Contacteurs générés automatiquement :**
+**Automatically Generated Contactors:**
 
-| Contacteur | Forme | Paramètres |
+| Contactor | Shape | Parameters |
 |------------|-------|------------|
-| Disque gauche | `DISKx` | `byrd = rayon`, positionné à `−longueur/2` |
-| Disque droit | `DISKx` | `byrd = rayon`, positionné à `+longueur/2` |
-| Corps central | `JONCx` | `axe1 = longueur`, `axe2 = rayon × 0.3` |
+| Left disk | `DISKx` | `byrd = radius`, positioned at `−length/2` |
+| Right disk | `DISKx` | `byrd = radius`, positioned at `+length/2` |
+| Central body | `JONCx` | `axe1 = length`, `axe2 = radius × 0.3` |
 
 ---
 
-### Boîte rectangulaire 2D _(box container)_
+### 2D Rectangular Box (Box Container)
 
-Crée un conteneur rectangulaire ouvert en haut, composé de **3 murs lisses** (`smoothWall`) : un mur inférieur et deux murs latéraux.
+Creates a rectangular container open at the top, composed of **3 smooth walls** (`smoothWall`): a bottom wall and two side walls.
 
-| Paramètre | Description | Valeur par défaut |
+| Parameter | Description | Default Value |
 |-----------|-------------|-------------------|
-| Largeur totale | Dimension horizontale intérieure de la boîte (m). | — |
-| Hauteur | Dimension verticale de la boîte (m). | — |
-| Épaisseur des murs | Épaisseur de chaque paroi (m). | — |
-| Centre | Position du centre de la boîte. | — |
+| Total width | Interior horizontal dimension of the box (m). | — |
+| Height | Vertical dimension of the box (m). | — |
+| Wall thickness | Thickness of each wall (m). | — |
+| Center | Position of the center of the box. | — |
 
-**Corps créés :**
+**Bodies Created:**
 
-| Corps | Type | Position |
+| Body | Type | Position |
 |-------|------|----------|
-| Mur bas | `smoothWall` | `centre_y − hauteur/2` |
-| Mur gauche | `smoothWall` | `centre_x − largeur/2` |
-| Mur droit | `smoothWall` | `centre_x + largeur/2` |
+| Bottom wall | `smoothWall` | `center_y − height/2` |
+| Left wall | `smoothWall` | `center_x − width/2` |
+| Right wall | `smoothWall` | `center_x + width/2` |
 
 ---
 
-### Trémie en V 2D _(hopper)_
+### 2D V-Hopper
 
-Crée une trémie conique composée de **2 parois inclinées** (`rigidPolygon` avec `generation_type='full'`), formant un entonnoir ouvert en haut et en bas.
+Creates a conical hopper composed of **2 inclined walls** (`rigidPolygon` with `generation_type='full'`), forming a funnel open at the top and bottom.
 
-| Paramètre | Description |
+| Parameter | Description |
 |-----------|-------------|
-| Largeur en haut | Ouverture supérieure de la trémie (m). |
-| Largeur en bas | Ouverture inférieure de la trémie (m). |
-| Hauteur | Hauteur totale de la trémie (m). |
-| Centre | Position du centre géométrique. |
+| Top width | Upper opening of the hopper (m). |
+| Bottom width | Lower opening of the hopper (m). |
+| Height | Total height of the hopper (m). |
+| Center | Position of the geometric center. |
 
-**Corps créés :** paroi gauche et paroi droite, chacune définie par 4 sommets calculés automatiquement à partir des dimensions.
-
----
-
-## Créer un avatar depuis un template
-
-1. Sélectionner un template dans l'arbre de gauche — ses propriétés s'affichent dans le panneau de droite.
-2. Configurer les champs dans le panneau droit :
-   - **Centre** : coordonnées d'insertion (x, y) en 2D ou (x, y, z) en 3D. Accepte les expressions Python.
-   - **Matériau** : sélectionner parmi les matériaux définis dans l'onglet Matériau.
-   - **Modèle** : sélectionner parmi les modèles définis dans l'onglet Modèle.
-   - **Couleur** : code couleur LMGC90 à 5 caractères.
-3. Cliquer sur **✅ Créer Avatar**.
-
-L'avatar est ajouté à la liste du projet et apparaît dans l'arbre du modèle.
-
-![Création d'un avatar depuis un template](captures/templates_pt_avatar.JPG)
+**Bodies Created:** left wall and right wall, each defined by 4 vertices calculated automatically from the dimensions.
 
 ---
 
-## Créer un nouveau template
+## Creating an Avatar from a Template
 
-Il est possible d'enregistrer un avatar existant comme nouveau template pour le réutiliser dans d'autres projets.
+1. Select a template in the tree on the left — its properties are displayed in the panel on the right.
+2. Configure the fields in the right panel:
+   - **Center**: insertion coordinates (x, y) in 2D or (x, y, z) in 3D. Accepts Python expressions.
+   - **Material**: select from the materials defined in the Material tab.
+   - **Model**: select from the models defined in the Model tab.
+   - **Color**: 5-character LMGC90 color code.
+3. Click **✅ Create Avatar**.
 
-1. Cliquer sur le bouton **Nouveau template**.
-2. La boîte de dialogue de création de template s'ouvre.
-3. Renseigner le nom et la description du template.
-4. Les paramètres géométriques de l'avatar sélectionné sont repris automatiquement.
-5. Valider pour ajouter le template à la bibliothèque.
+The avatar is added to the project's list and appears in the model tree.
 
-![Création d'un nouveau template](captures/templates_new.JPG)
+![Creating an avatar from a template](captures/templates_pt_avatar.JPG)
 
 ---
 
-## Remarques importantes
+## Creating a New Template
 
-**Dimension courante :** la liste des templates s'adapte automatiquement à la dimension du projet. Si la dimension est modifiée dans l'onglet Modèle, l'onglet Bibliothèque se rafraîchit et n'affiche que les templates compatibles (2D ou 3D).
+It is possible to save an existing avatar as a new template to reuse it in other projects.
 
-**Matériau et modèle obligatoires :** un matériau et un modèle doivent être définis dans le projet avant de pouvoir créer un avatar depuis un template. Si aucun matériau ou modèle n'est disponible, un message d'erreur s'affiche.
+1. Click the **New template** button.
+2. The template creation dialog box opens.
+3. Enter the name and description of the template.
+4. The geometric parameters of the selected avatar are picked up automatically.
+5. Confirm to add the template to the library.
 
-**Paramètres par défaut :** les templates utilisent des valeurs par défaut raisonnables. Ces valeurs doivent être ajustées selon les unités et l'échelle du modèle. En particulier, les rayons et longueurs en mètres doivent être cohérents avec la granulométrie et les dimensions de la scène.
+![Creating a new template](captures/templates_new.JPG)
 
-**Assemblages :** les assemblages complexes (boîte, trémie, haltère) créent plusieurs avatars simultanément dans le projet. Ils apparaissent tous dans l'arbre du modèle et peuvent être modifiés individuellement après leur création.
+---
 
-**Expressions Python :** le champ Centre accepte les expressions Python évaluées via `SafeEvaluator`, comme dans tous les autres onglets de l'interface : `avatar[0].x + 0.5`, `math.sqrt(2) * r`, etc.
+## Important Notes
+
+**Current dimension:** the list of templates automatically adapts to the project's dimension. If the dimension is changed in the Model tab, the Library tab refreshes and displays only the compatible templates (2D or 3D).
+
+**Material and model required:** a material and a model must be defined in the project before an avatar can be created from a template. If no material or model is available, an error message is displayed.
+
+**Default parameters:** templates use reasonable default values. These values must be adjusted according to the units and scale of the model. In particular, radii and lengths in meters must be consistent with the granulometry and dimensions of the scene.
+
+**Assemblies:** complex assemblies (box, hopper, dumbbell) create several avatars simultaneously in the project. They all appear in the model tree and can be modified individually after their creation.
+
+**Python expressions:** the Center field accepts Python expressions evaluated via `SafeEvaluator`, as in all other tabs of the interface: `avatar[0].x + 0.5`, `math.sqrt(2) * r`, etc.

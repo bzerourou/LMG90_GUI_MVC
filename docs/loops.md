@@ -1,176 +1,176 @@
-# Génération paramétrique d'avatars (boucles)
+# Parametric Avatar Generation (Loops)
 
-L'onglet **Boucles** (`Ctrl+6`) permet de créer automatiquement des séries d'avatars selon des motifs géométriques ou des expressions Python. Il propose deux mécanismes complémentaires :
+The **Loops** tab (`Ctrl+6`) allows you to automatically create series of avatars based on geometric patterns or Python expressions. It offers two complementary mechanisms:
 
-- **Boucles géométriques** : positionnement automatique d'un avatar modèle selon un motif (Cercle, Grille, Ligne, Spirale).
-- **Boucles `for` génériques** : génération d'avatars, matériaux, modèles, lois de contact, tables de visibilité ou opérations DOF via des expressions Python évaluées à chaque itération.
+- **Geometric loops**: automatic positioning of a model avatar according to a pattern (Circle, Grid, Line, Spiral).
+- **Generic `for` loops**: generation of avatars, materials, models, contact laws, visibility tables, or DOF operations via Python expressions evaluated at each iteration.
 
-Les boucles créées sont sauvegardées dans le projet et reconstituées lors du rechargement. Elles sont également exportées dans le script Python généré.
+The created loops are saved in the project and reconstructed when reloaded. They are also exported into the generated Python script.
 
 ![](captures/boucle_disk_ligne.JPG)
 
 ---
 
-## Partie 1 — Boucles géométriques
+## Part 1 — Geometric Loops
 
-### Principe
+### Principle
 
-Une boucle géométrique prend un **avatar modèle** déjà défini dans l'onglet Avatar, calcule une liste de positions selon le motif choisi, puis crée une copie identique de l'avatar à chaque position. Tous les attributs de l'avatar modèle sont copiés (type, matériau, modèle, rayon, couleur, etc.).
+A geometric loop takes a **model avatar** already defined in the Avatar tab, computes a list of positions according to the chosen pattern, then creates an identical copy of the avatar at each position. All the attributes of the model avatar are copied (type, material, model, radius, color, etc.).
 
-### Champs du formulaire
+### Form Fields
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| **Avatar modèle** | Index de l'avatar dont les propriétés seront copiées à chaque position. Sélectionner dans la liste déroulante des avatars existants. |
-| **Type de boucle** | Motif géométrique de placement. Voir les 4 types ci-dessous. |
-| **Nombre d'éléments** | Nombre d'avatars à créer. |
-| **Offset X** | Décalage du centre du motif en X (m). |
-| **Offset Y** | Décalage du centre du motif en Y (m). |
-| **Groupe** | Nom du groupe d'avatars dans lequel stocker les avatars générés. Laissé vide pour ne pas créer de groupe. |
+| **Model avatar** | Index of the avatar whose properties will be copied to each position. Select from the dropdown list of existing avatars. |
+| **Loop type** | Geometric placement pattern. See the 4 types below. |
+| **Number of elements** | Number of avatars to create. |
+| **Offset X** | Offset of the pattern's center along X (m). |
+| **Offset Y** | Offset of the pattern's center along Y (m). |
+| **Group** | Name of the avatar group in which to store the generated avatars. Left empty to not create a group. |
 
 ---
 
-### Types de boucles géométriques
+### Types of Geometric Loops
 
-#### Cercle
+#### Circle
 
-Répartit `count` avatars uniformément sur un cercle de rayon `radius`, centré en `(offset_x, offset_y)`.
+Distributes `count` avatars uniformly on a circle of radius `radius`, centered at `(offset_x, offset_y)`.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| **Rayon** | Rayon du cercle de placement (m). | — |
-| **Offset X / Y** | Centre du cercle. | `0.0` |
+| **Radius** | Radius of the placement circle (m). | — |
+| **Offset X / Y** | Center of the circle. | `0.0` |
 
-**Usage typique :** particules en anneau, tambour rotatif, couronne de boulons, granulométrie circulaire.
+**Typical use:** ring particles, rotating drum, bolt circle, circular granulometry.
 
 ---
 
-#### Grille
+#### Grid
 
-Répartit `count` avatars sur une grille carrée de côté, avec un espacement `step` entre éléments.
+Distributes `count` avatars on a square grid, with a spacing `step` between elements.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| **Pas (step)** | Distance entre deux avatars voisins sur la grille (m). | — |
-| **Offset X / Y** | Coin inférieur gauche de la grille. | `0.0` |
+| **Step** | Distance between two neighboring avatars on the grid (m). | — |
+| **Offset X / Y** | Bottom-left corner of the grid. | `0.0` |
 
 
-> La grille est toujours carrée. Si `count` n'est pas un carré parfait, le nombre réel d'avatars créés est `n_side²`. Exemple : `count=10` → grille 4×4 = 16 avatars.
+> The grid is always square. If `count` is not a perfect square, the actual number of avatars created is `n_side²`. Example: `count=10` → 4×4 grid = 16 avatars.
 
-**Usage typique :** empilement régulier de particules, plaque perforée, réseau carré.
+**Typical use:** regular particle stacking, perforated plate, square lattice.
 
 ---
 
-#### Ligne
+#### Line
 
-Aligne `count` avatars en ligne droite, séparés d'un pas `step`, dans la direction X ou Y.
+Aligns `count` avatars in a straight line, separated by a step `step`, in the X or Y direction.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| **Pas (step)** | Distance entre deux avatars consécutifs (m). | — |
-| **Offset X / Y** | Position du premier avatar. | `0.0` |
-| **Inverser l'axe** | Si coché, la ligne est orientée selon Y (verticale) au lieu de X (horizontale). | décoché |
+| **Step** | Distance between two consecutive avatars (m). | — |
+| **Offset X / Y** | Position of the first avatar. | `0.0` |
+| **Invert axis** | If checked, the line is oriented along Y (vertical) instead of X (horizontal). | unchecked |
 
-**Usage typique :** rangée de poteaux, file de particules, mur simple.
+**Typical use:** row of posts, line of particles, simple wall.
 
 ![](captures/rendu_boucle_disk_ligne.JPG)
 
 ---
 
-#### Spirale
+#### Spiral
 
-Dispose `count` avatars sur une spirale d'Archimède, de rayon initial `radius` qui croît d'un facteur `spiral_factor` à chaque itération.
+Arranges `count` avatars on an Archimedean spiral, with an initial radius `radius` that grows by a factor `spiral_factor` at each iteration.
 
-| Paramètre | Description | Défaut |
+| Parameter | Description | Default |
 |-----------|-------------|--------|
-| **Rayon initial** | Rayon de départ de la spirale (m). | — |
-| **Facteur de spirale** | Incrément de rayon par élément (m). | — |
-| **Offset X / Y** | Centre de la spirale. | `0.0` |
+| **Initial radius** | Starting radius of the spiral (m). | — |
+| **Spiral factor** | Radius increment per element (m). | — |
+| **Offset X / Y** | Center of the spiral. | `0.0` |
 
-**Usage typique :** mélangeurs, dépôts en spirale, arrangements décoratifs.
-
----
-
-### Gestion des boucles géométriques
-
-#### Créer une boucle
-
-Remplir le formulaire et cliquer sur **✅ Générer la boucle**. Les avatars sont créés immédiatement dans le projet.
-
-#### Modifier une boucle
-
-Sélectionner une boucle dans la liste, modifier les paramètres et cliquer sur **💾 Mettre à jour**. Les anciens avatars sont supprimés et recréés avec les nouveaux paramètres.
-
-#### Supprimer une boucle
-
-Sélectionner une boucle dans la liste et cliquer sur **🗑️ Supprimer**. Tous les avatars générés par cette boucle sont supprimés automatiquement.
-
-> **Suppression en cascade :** la suppression d'une boucle supprime **tous** les avatars qu'elle a générés (indices enregistrés dans `loop.generated_indices`), dans l'ordre inverse pour ne pas décaler les autres indices.
+**Typical use:** mixers, spiral deposits, decorative arrangements.
 
 ---
 
-## Partie 2 — Boucles `for` génériques
+### Managing Geometric Loops
 
-### Principe
+#### Creating a Loop
 
-Les boucles `for` génériques permettent de créer des séries d'éléments en faisant varier une **variable de boucle** sur un intervalle défini par des expressions Python. Le **type d'élément** à créer est choisi parmi : avatar, matériau, modèle, loi de contact, table de visibilité, ou opération DOF.
+Fill in the form and click **✅ Generate the loop**. The avatars are created immediately in the project.
+
+#### Editing a Loop
+
+Select a loop in the list, modify the parameters, and click **💾 Update**. The old avatars are deleted and recreated with the new parameters.
+
+#### Deleting a Loop
+
+Select a loop in the list and click **🗑️ Delete**. All avatars generated by this loop are automatically deleted.
+
+> **Cascading deletion:** deleting a loop deletes **all** the avatars it generated (indices recorded in `loop.generated_indices`), in reverse order so as not to shift the other indices.
+
+---
+
+## Part 2 — Generic `for` Loops
+
+### Principle
+
+Generic `for` loops allow you to create series of elements by varying a **loop variable** over an interval defined by Python expressions. The **element type** to create is chosen among: avatar, material, model, contact law, visibility table, or DOF operation.
 
 ![](captures/for_generique.JPG)
 
-À chaque itération, le **template de configuration** est évalué avec la variable de boucle injectée dans le contexte d'évaluation.
+At each iteration, the **configuration template** is evaluated with the loop variable injected into the evaluation context.
 
-### Champs du formulaire
+### Form Fields
 
-| Champ | Description | Exemple |
+| Field | Description | Example |
 |-------|-------------|---------|
-| **Variable de boucle** | Nom de la variable Python disponible dans le template. | `i`, `k`, `n` |
-| **Début** | Expression Python pour la valeur de départ. | `0`, `1`, `n_start` |
-| **Fin** | Expression Python pour la valeur de fin (exclue). | `10`, `count`, `n_start + 5` |
-| **Pas** | Expression Python pour l'incrément. | `1`, `2`, `-1` |
-| **Type d'élément** | Type de l'objet à créer à chaque itération. | voir tableau ci-dessous |
-| **Template** | Configuration de l'élément, avec la variable de boucle utilisable dans les valeurs. | voir sections par type |
-| **Groupe** | Nom du groupe d'avatars (avatars uniquement). | `ma_ligne` |
+| **Loop variable** | Name of the Python variable available in the template. | `i`, `k`, `n` |
+| **Start** | Python expression for the starting value. | `0`, `1`, `n_start` |
+| **End** | Python expression for the ending value (excluded). | `10`, `count`, `n_start + 5` |
+| **Step** | Python expression for the increment. | `1`, `2`, `-1` |
+| **Element type** | Type of the object to create at each iteration. | see table below |
+| **Template** | Configuration of the element, with the loop variable usable in the values. | see sections by type |
+| **Group** | Name of the avatar group (avatars only). | `ma_ligne` |
 
-### Contexte d'évaluation disponible
+### Available Evaluation Context
 
-Les expressions dans le template et les bornes de la boucle ont accès aux éléments suivants :
+The expressions in the template and the loop bounds have access to the following elements:
 
-| Symbole | Description |
+| Symbol | Description |
 |---------|-------------|
-| `i` (ou la variable de boucle) | Valeur courante de l'itération |
-| `math` | Module `math` Python complet |
-| `sqrt`, `pi`, `e` | Raccourcis math |
-| `abs`, `min`, `max`, `sum`, `len` | Fonctions Python standard |
-| `str`, `int`, `float` | Conversions de type |
-| Variables dynamiques | Toutes les variables définies dans le menu **Outils → Variables dynamiques** |
+| `i` (or the loop variable) | Current value of the iteration |
+| `math` | Full Python `math` module |
+| `sqrt`, `pi`, `e` | Math shortcuts |
+| `abs`, `min`, `max`, `sum`, `len` | Standard Python functions |
+| `str`, `int`, `float` | Type conversions |
+| Dynamic variables | All variables defined in the **Tools → Dynamic Variables** menu |
 
 ---
 
-### Types d'éléments disponibles
+### Available Element Types
 
-#### Type `avatar` — Création d'avatars
+#### `avatar` Type — Avatar Creation
 
-Crée un avatar à chaque itération. Tous les paramètres de l'onglet Avatar sont disponibles dans le template.
+Creates an avatar at each iteration. All the parameters of the Avatar tab are available in the template.
 
-**Paramètres du template :**
+**Template Parameters:**
 
-| Clé | Description | Exemple |
+| Key | Description | Example |
 |-----|-------------|---------|
-| `avatar_type` | Type pylmgc90 de l'avatar. | `"rigidDisk"` |
-| `center` | Expression Python retournant une liste `[x, y]` ou `[x, y, z]`. La variable de boucle peut être utilisée. | `[i * 0.1, 0.0]` |
-| `material_name` | Nom du matériau (chaîne). | `"TDURx"` |
-| `model_name` | Nom du modèle (chaîne). | `"rigid"` |
-| `color` | Code couleur LMGC90 (5 caractères). | `"BLUEx"` |
-| `radius` | Expression Python pour le rayon (m). | `"0.05 + i * 0.01"` |
-| `axis` | Dict `{axe1: expr, axe2: expr}` pour les joncs / plans. | `{"axe1": "1.0", "axe2": "0.1"}` |
-| `nb_vertices` | Expression pour le nombre de sommets (polygones). | `"6"` |
-| `generation_type` | `"regular"`, `"full"` ou `"bevel"`. | `"regular"` |
-| `vertices` | Expression Python retournant la liste des sommets. | `"[[-0.1,-0.1],[0.1,-0.1],[0.1,0.1],[-0.1,0.1]]"` |
-| `wall_params` | Dict des paramètres de mur. | `{"l": "2.0", "r": "0.05"}` |
-| `contactors` | Liste de contacteurs (format identique à l'onglet Avatar vide). | |
-| `is_hollow` | Booléen — crée un disque creux. | `false` |
+| `avatar_type` | pylmgc90 type of the avatar. | `"rigidDisk"` |
+| `center` | Python expression returning a list `[x, y]` or `[x, y, z]`. The loop variable can be used. | `[i * 0.1, 0.0]` |
+| `material_name` | Name of the material (string). | `"TDURx"` |
+| `model_name` | Name of the model (string). | `"rigid"` |
+| `color` | LMGC90 color code (5 characters). | `"BLUEx"` |
+| `radius` | Python expression for the radius (m). | `"0.05 + i * 0.01"` |
+| `axis` | Dict `{axe1: expr, axe2: expr}` for joncs / planes. | `{"axe1": "1.0", "axe2": "0.1"}` |
+| `nb_vertices` | Expression for the number of vertices (polygons). | `"6"` |
+| `generation_type` | `"regular"`, `"full"`, or `"bevel"`. | `"regular"` |
+| `vertices` | Python expression returning the list of vertices. | `"[[-0.1,-0.1],[0.1,-0.1],[0.1,0.1],[-0.1,0.1]]"` |
+| `wall_params` | Dict of wall parameters. | `{"l": "2.0", "r": "0.05"}` |
+| `contactors` | List of contactors (same format as the Empty Avatar tab). | |
+| `is_hollow` | Boolean — creates a hollow disk. | `false` |
 
-**Script généré :**
+**Generated Script:**
 ```python
 for i in range(0, 10, 1):
     center = [i * 0.1, 0.0]
@@ -185,24 +185,24 @@ for i in range(0, 10, 1):
     bodies_list.append(body)
 ```
 
-**Usage typique :** ligne de disques avec rayons croissants, grille d'avatars hétérogènes, série de corps avec des paramètres qui varient.
+**Typical use:** line of disks with increasing radii, grid of heterogeneous avatars, series of bodies with varying parameters.
 
 ---
 
-#### Type `material` — Création de matériaux
+#### `material` Type — Material Creation
 
-Crée un matériau à chaque itération. Utile pour générer une famille de matériaux avec des propriétés graduées.
+Creates a material at each iteration. Useful for generating a family of materials with graded properties.
 
-**Paramètres du template :**
+**Template Parameters:**
 
-| Clé | Description | Exemple |
+| Key | Description | Example |
 |-----|-------------|---------|
-| `name` | Expression Python pour le nom (chaîne, 5 car. max). | `"str('mat') + str(i)"` |
-| `material_type` | Type de matériau LMGC90. | `"RIGID"` |
-| `density` | Expression Python pour la densité (kg/m³). | `"2800 + i * 100"` |
-| `properties` | Dict de propriétés supplémentaires. | `{"young": "1e9 + i * 1e8"}` |
+| `name` | Python expression for the name (string, 5 chars max). | `"str('mat') + str(i)"` |
+| `material_type` | LMGC90 material type. | `"RIGID"` |
+| `density` | Python expression for the density (kg/m³). | `"2800 + i * 100"` |
+| `properties` | Dict of additional properties. | `{"young": "1e9 + i * 1e8"}` |
 
-**Script généré :**
+**Generated Script:**
 ```python
 for i in range(0, 5, 1):
     mat_name = str('mat') + str(i)
@@ -217,35 +217,35 @@ for i in range(0, 5, 1):
 
 ---
 
-#### Type `model` — Création de modèles
+#### `model` Type — Model Creation
 
-Crée un modèle éléments finis à chaque itération.
+Creates a finite element model at each iteration.
 
-**Paramètres du template :**
+**Template Parameters:**
 
-| Clé | Description | Exemple |
+| Key | Description | Example |
 |-----|-------------|---------|
-| `name` | Expression Python pour le nom. | `"'mod' + str(i)"` |
-| `physics` | Physique. | `"MECAx"` |
-| `element` | Élément fini. | `"Rxx2D"` |
-| `dimension` | Dimension (2 ou 3). | `2` |
-| `options` | Dict des options numériques. | `{}` |
+| `name` | Python expression for the name. | `"'mod' + str(i)"` |
+| `physics` | Physics. | `"MECAx"` |
+| `element` | Finite element. | `"Rxx2D"` |
+| `dimension` | Dimension (2 or 3). | `2` |
+| `options` | Dict of numerical options. | `{}` |
 
 ---
 
-#### Type `contact_law` — Création de lois de contact
+#### `contact_law` Type — Contact Law Creation
 
-Crée une loi de contact à chaque itération. Utile pour générer des lois avec des coefficients de friction différents.
+Creates a contact law at each iteration. Useful for generating laws with different friction coefficients.
 
-**Paramètres du template :**
+**Template Parameters:**
 
-| Clé | Description | Exemple |
+| Key | Description | Example |
 |-----|-------------|---------|
-| `name` | Expression Python pour le nom. | `"'law' + str(i)"` |
-| `law_type` | Type de loi (`IQS_CLB`, etc.). | `"IQS_CLB"` |
-| `friction` | Expression Python pour le coefficient de friction. | `"0.1 + i * 0.05"` |
+| `name` | Python expression for the name. | `"'law' + str(i)"` |
+| `law_type` | Law type (`IQS_CLB`, etc.). | `"IQS_CLB"` |
+| `friction` | Python expression for the friction coefficient. | `"0.1 + i * 0.05"` |
 
-**Script généré :**
+**Generated Script:**
 ```python
 for i in range(0, 5, 1):
     law_name = 'law' + str(i)
@@ -259,39 +259,39 @@ for i in range(0, 5, 1):
 
 ---
 
-#### Type `visibility` — Création de tables de visibilité
+#### `visibility` Type — Visibility Table Creation
 
-Crée une règle de visibilité (table de détection de contact) à chaque itération.
+Creates a visibility rule (contact detection table) at each iteration.
 
-**Paramètres du template :**
+**Template Parameters:**
 
-| Clé | Description | Exemple |
+| Key | Description | Example |
 |-----|-------------|---------|
-| `candidate_body` | Corps candidat (`RBDY2`, `RBDY3`). | `"RBDY2"` |
-| `candidate_contactor` | Contacteur candidat (`DISKx`, etc.). | `"DISKx"` |
-| `candidate_color` | Expression pour la couleur candidat. | `"'BLUEx'"` |
-| `antagonist_body` | Corps antagoniste. | `"RBDY2"` |
-| `antagonist_contactor` | Contacteur antagoniste. | `"DISKx"` |
-| `antagonist_color` | Expression pour la couleur antagoniste. | `"'REDxx'"` |
-| `behavior_name` | Nom de la loi de contact associée. | `"'law' + str(i)"` |
-| `alert` | Distance d'alerte (m). | `"0.05 + i * 0.01"` |
+| `candidate_body` | Candidate body (`RBDY2`, `RBDY3`). | `"RBDY2"` |
+| `candidate_contactor` | Candidate contactor (`DISKx`, etc.). | `"DISKx"` |
+| `candidate_color` | Expression for the candidate color. | `"'BLUEx'"` |
+| `antagonist_body` | Antagonist body. | `"RBDY2"` |
+| `antagonist_contactor` | Antagonist contactor. | `"DISKx"` |
+| `antagonist_color` | Expression for the antagonist color. | `"'REDxx'"` |
+| `behavior_name` | Name of the associated contact law. | `"'law' + str(i)"` |
+| `alert` | Alert distance (m). | `"0.05 + i * 0.01"` |
 
 ---
 
-#### Type `dof` — Opérations DOF
+#### `dof` Type — DOF Operations
 
-Applique une condition aux limites (degré de liberté imposé) à un ou plusieurs avatars à chaque itération.
+Applies a boundary condition (imposed degree of freedom) to one or more avatars at each iteration.
 
-**Paramètres du template :**
+**Template Parameters:**
 
-| Clé | Description | Exemple |
+| Key | Description | Example |
 |-----|-------------|---------|
-| `operation_type` | Type d'opération pylmgc90. | `"imposeDrivenDof"` |
-| `target_type` | Toujours `"avatar"`. | `"avatar"` |
-| `target_value` | Expression Python pour l'index de l'avatar cible. | `"i"`, `"i + 10"` |
-| `parameters` | Dict des kwargs pylmgc90. | `{"component": "[1,2]", "dofty": "\"vlocy\""}` |
+| `operation_type` | pylmgc90 operation type. | `"imposeDrivenDof"` |
+| `target_type` | Always `"avatar"`. | `"avatar"` |
+| `target_value` | Python expression for the index of the target avatar. | `"i"`, `"i + 10"` |
+| `parameters` | Dict of pylmgc90 kwargs. | `{"component": "[1,2]", "dofty": "\"vlocy\""}` |
 
-**Script généré :**
+**Generated Script:**
 ```python
 for i in range(0, 5, 1):
     bodies_list[i].imposeDrivenDof(component=[1,2], dofty="vlocy")
@@ -299,45 +299,45 @@ for i in range(0, 5, 1):
 
 ---
 
-### Gestion des boucles `for`
+### Managing `for` Loops
 
-Les boucles `for` sont listées séparément des boucles géométriques. Les mêmes opérations sont disponibles : créer, modifier (régénère les éléments), supprimer (supprime les éléments générés).
-
----
-
-## Groupes d'avatars
-
-Les deux types de boucles peuvent stocker les avatars générés dans un **groupe nommé**. Un groupe est une liste d'indices d'avatars accessible dans tout le projet sous le nom donné.
-
-Les groupes permettent :
-- d'appliquer une condition DOF à tous les avatars d'un groupe d'un seul coup
-- de cibler un ensemble d'avatars dans les tables de visibilité
-- de distinguer plusieurs populations d'avatars pour l'extraction de données (chipy `GetBodyVector`)
-
-> Si le champ Groupe est laissé vide, aucun groupe n'est créé et les avatars sont simplement ajoutés à la liste globale.
+`for` loops are listed separately from geometric loops. The same operations are available: create, edit (regenerates the elements), delete (removes the generated elements).
 
 ---
 
-## Récapitulatif des paramètres par type de boucle géométrique
+## Avatar Groups
 
-| Type | Paramètres requis | Paramètre optionnel | Formule |
+Both types of loops can store the generated avatars in a **named group**. A group is a list of avatar indices accessible throughout the project under the given name.
+
+Groups allow you to:
+- apply a DOF condition to all the avatars of a group at once
+- target a set of avatars in visibility tables
+- distinguish multiple avatar populations for data extraction (chipy `GetBodyVector`)
+
+> If the Group field is left empty, no group is created and the avatars are simply added to the global list.
+
+---
+
+## Summary of Parameters by Geometric Loop Type
+
+| Type | Required Parameters | Optional Parameter | Formula |
 |------|-------------------|---------------------|---------|
-| **Cercle** | `count`, `radius` | `offset_x`, `offset_y` | `x = offset_x + radius × cos(2πi/count)` |
-| **Grille** | `count`, `step` | `offset_x`, `offset_y` | `x = offset_x + (i % n_side) × step` |
-| **Ligne** | `count`, `step` | `offset_x`, `offset_y`, `invert_axis` | `x = offset_x + i × step` (ou Y si inversé) |
-| **Spirale** | `count`, `radius`, `spiral_factor` | `offset_x`, `offset_y` | `r = radius + i × spiral_factor` |
+| **Circle** | `count`, `radius` | `offset_x`, `offset_y` | `x = offset_x + radius × cos(2πi/count)` |
+| **Grid** | `count`, `step` | `offset_x`, `offset_y` | `x = offset_x + (i % n_side) × step` |
+| **Line** | `count`, `step` | `offset_x`, `offset_y`, `invert_axis` | `x = offset_x + i × step` (or Y if inverted) |
+| **Spiral** | `count`, `radius`, `spiral_factor` | `offset_x`, `offset_y` | `r = radius + i × spiral_factor` |
 
 
 ---
 
-## Remarques importantes
+## Important Notes
 
-**Avatar modèle non supprimable :** un avatar utilisé comme modèle par une boucle géométrique ne peut pas être supprimé tant que la boucle existe. Un message d'avertissement est affiché.
+**Non-deletable model avatar:** an avatar used as a model by a geometric loop cannot be deleted as long as the loop exists. A warning message is displayed.
 
-**Mise à jour en cascade :** modifier une boucle (géométrique ou `for`) supprime et recrée tous ses avatars. Si d'autres éléments du projet référencent ces avatars (conditions DOF, tables de visibilité), ils peuvent être invalidés.
+**Cascading update:** editing a loop (geometric or `for`) deletes and recreates all its avatars. If other elements of the project reference these avatars (DOF conditions, visibility tables), they may be invalidated.
 
-**Expressions Python :** dans les boucles `for`, les expressions sont évaluées via `SafeEvaluator`. Les expressions malformées génèrent un message d'erreur sans bloquer le projet. Les variables dynamiques définies dans **Outils → Variables dynamiques** (`Ctrl+V`) sont accessibles dans toutes les expressions.
+**Python expressions:** in `for` loops, expressions are evaluated via `SafeEvaluator`. Malformed expressions generate an error message without blocking the project. Dynamic variables defined in **Tools → Dynamic Variables** (`Ctrl+V`) are accessible in all expressions.
 
-**Dimension 3D :** les boucles géométriques génèrent des centres 2D `[x, y]` ou 3D `[x, y, z]` selon la dimension du projet. Les avatars 3D (sphères, polyèdres) peuvent être générés en boucle `for` avec des centres explicitement 3D dans le template.
+**3D dimension:** geometric loops generate 2D `[x, y]` or 3D `[x, y, z]` centers depending on the project's dimension. 3D avatars (spheres, polyhedra) can be generated in a `for` loop with explicitly 3D centers in the template.
 
-**Nombre d'éléments et performance :** créer plus de quelques milliers d'avatars via une boucle peut ralentir l'interface. Pour les grands assemblages (> 5 000 avatars), utiliser le générateur de granulométrie ou les assistants dédiés.
+**Number of elements and performance:** creating more than a few thousand avatars via a loop can slow down the interface. For large assemblies (> 5,000 avatars), use the granulometry generator or the dedicated wizards.

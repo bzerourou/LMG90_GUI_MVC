@@ -1,73 +1,73 @@
-# Introduction à l'interface graphique de LMGC90_GUI
+# Introduction to the LMGC90_GUI Graphical Interface
 
-LMGC90_GUI est une interface graphique moderne conçue pour faciliter la création de modèles numériques avec le module **pre** (pré-processeur) de **LMGC90**.
+LMGC90_GUI is a modern graphical interface designed to facilitate the creation of numerical models with the **pre** (pre-processor) module of **LMGC90**.
 
-Il est également possible de lancer vos calculs directement depuis LMGC90_GUI via le module **chipy**.
+It is also possible to launch your computations directly from LMGC90_GUI via the **chipy** module.
 
-L'interface est organisée de manière claire et ergonomique pour accompagner l'utilisateur du début à la fin du processus de modélisation : création des éléments, conditions aux limites, post-traitement, génération des fichiers et enfin lancement des calculs.
+The interface is organized clearly and ergonomically to guide the user from start to finish of the modeling process: creating elements, boundary conditions, post-processing, file generation, and finally launching computations.
 
-La vidéo suivante présente une vue d'ensemble des différentes parties de l'interface.
+The following video presents an overview of the different parts of the interface.
 
 [![Introduction LMGC90_GUI](https://img.youtube.com/vi/2lVIGg3VboA/0.jpg)](https://www.youtube.com/watch?v=WSS62MTns1w)
 
 
-## Fenêtre principale
+## Main Window
 
-![Vue globale de l'interface](captures/interface_sections.jpg)
+![Global view of the interface](captures/interface_sections.jpg)
 
-L'interface est divisée en **Six zones principales** :
+The interface is divided into **six main areas**:
 
 1. **Menu**
-2. **Barre d'outils** (en haut)
-3. **Arbre du modèle** (à gauche)
-4. **Onglets de création** (centre haut)
-5. **Zone de rendu** (centre bas)
-6. **Barre d'état** (en bas)
+2. **Toolbar** (top)
+3. **Model tree** (left)
+4. **Creation tabs** (top center)
+5. **Rendering area** (bottom center)
+6. **Status bar** (bottom)
 
 ---
 
-### 1. Menu et Barre d'outils
+### 1. Menu and Toolbar
 
 #### Menu
-##### Fichier
+##### File
 
-| Action | Raccourci | Description |
+| Action | Shortcut | Description |
 |--------|-----------|-------------|
-| **Nouveau** | `Ctrl+N` | Crée un nouveau projet. Une boîte de dialogue s'ouvre pour saisir le nom du projet. |
-| **Ouvrir** | `Ctrl+O` | Ouvre un projet existant. Une boîte de dialogue permet de naviguer jusqu'au fichier `.json` du projet. |
-| **Sauvegarder** | `Ctrl+S` | Sauvegarde le projet courant à son emplacement actuel. |
-| **Sauvegarder sous…** | `Ctrl+Shift+S` | Sauvegarde le projet sous un nouveau nom ou dans un nouvel emplacement. |
-| **Quitter** | `Ctrl+Q` | Ferme l'application. |
+| **New** | `Ctrl+N` | Creates a new project. A dialog box opens to enter the project name. |
+| **Open** | `Ctrl+O` | Opens an existing project. A dialog box allows you to navigate to the project's `.json` file. |
+| **Save** | `Ctrl+S` | Saves the current project to its current location. |
+| **Save as…** | `Ctrl+Shift+S` | Saves the project under a new name or in a new location. |
+| **Quit** | `Ctrl+Q` | Closes the application. |
  
-**Nouveau projet**
+**New project**
 
-Cliquez sur le bouton **Nouveau** de la barre d'outils, utilisez le menu **Fichier → Nouveau**, ou appuyez sur `Ctrl+N`. Une boîte de dialogue s'ouvre pour renseigner le nom du projet
+Click the **New** button in the toolbar, use the **File → New** menu, or press `Ctrl+N`. A dialog box opens to enter the project name.
 
   ![](captures/nouveau_projet.JPG)
 
-**Ouvrir un projet**
+**Open a project**
  
-Cliquez sur le bouton **Ouvrir** de la barre d'outils, utilisez le menu **Fichier → Ouvrir**, ou appuyez sur `Ctrl+O`. Il vous suffira ensuite de spécifier le chemin et le nom de votre projet
+Click the **Open** button in the toolbar, use the **File → Open** menu, or press `Ctrl+O`. You will then simply need to specify the path and name of your project.
 
   ![](captures/ouvrir_projet.JPG)
 
-**Sauvegarder**
-  Sert à sauvegarder vos projets dans votre disque dur, cliquez sur le bouton **sauvegarder** de la barre d'outils, ou de cliquez sur le menu **Fichier-> Sauvegarder**, ou avec le raccourci clavier `Ctrl+S`,
+**Save**
+  Used to save your projects to your hard drive. Click the **Save** button in the toolbar, use the **File → Save** menu, or use the keyboard shortcut `Ctrl+S`.
 
 ---
 
-##### Assistants
+##### Wizards
  
-Les assistants guident l'utilisateur étape par étape dans les tâches les plus courantes. Ils peuvent être utilisés autant de fois que nécessaire au cours d'un même projet.
+Wizards guide the user step by step through the most common tasks. They can be used as many times as needed within the same project.
  
-| Assistant | Raccourci | Description |
+| Wizard | Shortcut | Description |
 |-----------|-----------|-------------|
-| **Configuration de projet** | `Ctrl+Shift+N` | Guide pas à pas la création et la configuration initiale d'un nouveau projet (matériau, modèle, avatar de référence, loi de contact). |
-| **Granulométrie pylmgc90** | `Ctrl+Shift+G` | Génère une distribution granulométrique avec dépôt gravitaire via les routines pylmgc90. Recommandé pour les assemblages de moins de 8 000 avatars. Au-delà, le rafraîchissement de l'interface peut être lent. |
-| **Granulométrie numpy** _(bêta)_ | — | Génère et dépose des avatars à partir de numpy, sans passer par les routines pylmgc90. Recommandé pour les assemblages de plus de 5 000 avatars. |
-| **Déformable** | `Ctrl+Shift+D` | Guide la création ou l'importation d'éléments déformables (maillages rectangles, disques, sphères, cylindres ou fichiers externes `.msh` / `.geo`). |
-| **Maçonnerie** | `Ctrl+Shift+M` | Spécialisé dans la création d'empilements de briques 2D et 3D (`brick2D` / `brick3D`) selon différents appareillages (standard, running bond, paneresse simple, paneresse double, etc.). |
-| **Factory** | `Ctrl+Shift+F` | Spécialisé dans la Factrory d'avatars 2D/3D, les faire apparaitre visuellement ou dans le calcul. |
+| **Project configuration** | `Ctrl+Shift+N` | Guides step by step through the creation and initial configuration of a new project (material, model, reference avatar, contact law). |
+| **Granulometry pylmgc90** | `Ctrl+Shift+G` | Generates a granulometric distribution with gravitational deposit via pylmgc90 routines. Recommended for assemblies of fewer than 8,000 avatars. Beyond that, the interface refresh may become slow. |
+| **Granulometry numpy** _(beta)_ | — | Generates and deposits avatars using numpy, without going through pylmgc90 routines. Recommended for assemblies of more than 5,000 avatars. |
+| **Deformable** | `Ctrl+Shift+D` | Guides the creation or import of deformable elements (rectangular meshes, disks, spheres, cylinders, or external `.msh` / `.geo` files). |
+| **Masonry** | `Ctrl+Shift+M` | Specialized in creating 2D and 3D brick stacks (`brick2D` / `brick3D`) according to different bonding patterns (standard, running bond, single stretcher bond, double stretcher bond, etc.). |
+| **Factory** | `Ctrl+Shift+F` | Specialized in the 2D/3D avatar Factory, making them appear visually or in the computation. |
 
   ![](captures/assistant_projet.JPG)
 
@@ -79,197 +79,197 @@ Les assistants guident l'utilisateur étape par étape dans les tâches les plus
 
   ![](captures/assistant_maçon_page1.JPG)
 
-> **Remarque :** les assistants peuvent être relancés à tout moment pendant la session. Chaque exécution ajoute les éléments générés à la suite du projet existant, sans effacer ce qui a été créé auparavant. 
-La duplication des éléments qui portent le même nom entraîne des erreurs, pensez à nommer différemment vos éléments.
+> **Note:** wizards can be relaunched at any time during the session. Each run adds the generated elements to the existing project, without erasing what was previously created.
+Duplicating elements with the same name causes errors, so be sure to name your elements differently.
 
 ---
 
-##### Outils
+##### Tools
  
-| Action | Raccourci | Description |
+| Action | Shortcut | Description |
 |--------|-----------|-------------|
-| **Générer DATBOX** | — | Génère les fichiers `.dat` utilisés par LMGC90 pour le calcul (DATBOX/). |
-| **Générer Script Python** | — | Génère le script Python de pré-traitement (`pre.py`) reproduisant l'intégralité du modèle construit dans l'interface. |
-| **Convertir script lmgc90** | `Ctrl+Shift+C` | Une boite de dialogue qui scanne un script python pylmgc90 et le convertie vers un fichier .lmgc90  [version bêta](#convertir)|
-| **Variables dynamiques** | `Ctrl+V` | Ouvre une boîte de dialogue permettant de définir des variables réutilisables dans les champs numériques de l'interface (rayon, espacement, offset, etc.). C'est également une fenêtre d'inspection des propriétés des objets LMGC90 présents en mémoire. Voir la page [Variables dynamiques](dynam_variables.md). |
-| **Préférences** | `Ctrl+,` | Ouvre la boîte de dialogue de configuration de l'application. Voir section [Préférences](#5-préférences). |
+| **Generate DATBOX** | — | Generates the `.dat` files used by LMGC90 for the computation (DATBOX/). |
+| **Generate Python Script** | — | Generates the pre-processing Python script (`pre.py`) reproducing the entire model built in the interface. |
+| **Convert lmgc90 script** | `Ctrl+Shift+C` | A dialog box that scans a pylmgc90 python script and converts it into an .lmgc90 file [beta version](#convert)|
+| **Dynamic variables** | `Ctrl+V` | Opens a dialog box allowing you to define reusable variables in the interface's numeric fields (radius, spacing, offset, etc.). It is also an inspection window for the properties of LMGC90 objects present in memory. See the [Dynamic Variables](dynam_variables.md) page. |
+| **Preferences** | `Ctrl+,` | Opens the application configuration dialog box. See the [Preferences](#5-preferences) section. |
 
 ---
   
-##### Calcul
+##### Computation
  
-| Action | Raccourci | Description |
+| Action | Shortcut | Description |
 |--------|-----------|-------------|
-| **Paramètres de calcul** | `Ctrl+F5` | Ouvre la boîte de dialogue de configuration des routines chipy : physique, détecteurs de contact, extractions, pilotage, inspection. |
-| **Lancer calcul** | `F5` | Lance le calcul chipy directement depuis l'interface, dans un processus séparé pour ne pas bloquer l'interface. |
-| **Générer Script Calcul** | — | Génère le script Python de calcul (`chipy.py`) depuis la configuration des routines. |
-| **Voir logs LMGC90** | `F6` | Affiche en temps réel les sorties console du calcul en cours. |
-| **Journal de l'application** | `F7` | Affiche le journal interne de LMGC90_GUI : erreurs non gérées, avertissements Python, appels pylmgc90 échoués. Utile pour diagnostiquer les problèmes qui ne génèrent pas de message visible dans l'interface. |
+| **Computation settings** | `Ctrl+F5` | Opens the configuration dialog box for chipy routines: physics, contact detectors, extractions, control, inspection. |
+| **Run computation** | `F5` | Launches the chipy computation directly from the interface, in a separate process so as not to block the interface. |
+| **Generate Computation Script** | — | Generates the computation Python script (`chipy.py`) from the routine configuration. |
+| **View LMGC90 logs** | `F6` | Displays the console output of the running computation in real time. |
+| **Application log** | `F7` | Displays the internal log of LMGC90_GUI: unhandled errors, Python warnings, failed pylmgc90 calls. Useful for diagnosing problems that do not produce a visible message in the interface. |
   
 ![](captures/journal_app.JPG)
 
 ---
 
-##### Onglets
+##### Tabs
  
-| Action | Raccourci | Description |
+| Action | Shortcut | Description |
 |--------|-----------|-------------|
-| **Ouvrir** | — | Ouvre un onglet spécifique parmi la liste complète. Voir section [Onglets de création](#3-onglets-de-création-zone-centrale-supérieure). |
-| **Fermer les autres** | — | Ferme tous les onglets ouverts sauf l'onglet actif. |
-| **Fermer tous (sauf essentiels)** | — | Ferme tous les onglets non essentiels. |
-| **Onglets par défaut** | `Ctrl+Alt+D` | Restaure la disposition d'onglets par défaut. |
+| **Open** | — | Opens a specific tab from the complete list. See the [Creation tabs](#3-creation-tabs-upper-central-area) section. |
+| **Close others** | — | Closes all open tabs except the active tab. |
+| **Close all (except essential)** | — | Closes all non-essential tabs. |
+| **Default tabs** | `Ctrl+Alt+D` | Restores the default tab layout. |
  
 ---
  
-##### Aide
+##### Help
  
 | Action | Description |
 |--------|-------------|
-| **À propos** | Affiche les informations sur la version de LMGC90_GUI et les dépendances. |
-| **Aide en ligne** | Ouvre la documentation en ligne dans le navigateur par défaut. |
+| **About** | Displays information about the LMGC90_GUI version and dependencies. |
+| **Online help** | Opens the online documentation in the default browser. |
  
 ---
  
-#### Barre d'outils
+#### Toolbar
  
-La barre d'outils regroupe les actions les plus fréquentes pour un accès rapide :
+The toolbar groups together the most frequently used actions for quick access:
  
-| Bouton | Équivalent menu |
+| Button | Menu equivalent |
 |--------|----------------|
-| Nouveau projet | Fichier → Nouveau |
-| Ouvrir projet | Fichier → Ouvrir |
-| Sauvegarder projet | Fichier → Sauvegarder |
-| Générer Script Python | Outils → Générer Script Python |
-| Générer DATBOX | Outils → Générer DATBOX _(depuis v0.2.6)_ |
+| New project | File → New |
+| Open project | File → Open |
+| Save project | File → Save |
+| Generate Python Script | Tools → Generate Python Script |
+| Generate DATBOX | Tools → Generate DATBOX _(since v0.2.6)_ |
  
 ---
 
-### 2. Arbre du modèle (à gauche)
+### 2. Model Tree (left)
  
-Zone fixe affichant l'**arborescence complète du modèle en cours**. Elle se met à jour automatiquement après chaque création, modification ou suppression d'élément.
+A fixed area displaying the **complete tree structure of the current model**. It updates automatically after each creation, modification, or deletion of an element.
  
-#### Sections affichées
+#### Sections displayed
  
-| Section | Contenu |
+| Section | Content |
 |---------|---------|
-| **Matériaux** | Liste de tous les matériaux définis dans le projet. |
-| **Modèles** | Liste de tous les modèles éléments finis (physique, élément, dimension). |
-| **Avatars** | Liste de tous les corps du projet : rigides, vides, déformables. |
-| **Groupes d'avatars** | Groupes créés par les boucles, la granulométrie ou l'assistant de maçonnerie. |
-| **Lois de contact** | Lois de comportement de contact définies (frottement, cohésion, rigidité). |
-| **Tables de visibilité** | Règles de visibilité chipy pour les avatars pendant le calcul. |
-| **PostPro** | Commandes de post-traitement configurées. |
+| **Materials** | List of all materials defined in the project. |
+| **Models** | List of all finite element models (physics, element, dimension). |
+| **Avatars** | List of all bodies in the project: rigid, empty, deformable. |
+| **Avatar groups** | Groups created by loops, granulometry, or the masonry wizard. |
+| **Contact laws** | Defined contact behavior laws (friction, cohesion, stiffness). |
+| **Visibility tables** | chipy visibility rules for avatars during the computation. |
+| **PostPro** | Configured post-processing commands. |
  
-#### Fonctionnalités
+#### Features
  
-- **Clic sur un élément** : ouvre l'onglet correspondant en mode édition et charge l'élément dans le formulaire.
-- **Clic droit** : menu contextuel avec les actions Modifier, Supprimer et Informations selon l'élément sélectionné.
-- **Vue hiérarchique** : les groupes d'avatars sont développables pour afficher les avatars membres.
+- **Click on an element**: opens the corresponding tab in edit mode and loads the element into the form.
+- **Right-click**: context menu with Edit, Delete, and Information actions depending on the selected element.
+- **Hierarchical view**: avatar groups can be expanded to display the member avatars.
 
 ---
 
-### 3. Onglets de création (zone centrale supérieure)
+### 3. Creation Tabs (upper central area)
  
-Zone principale de travail. Chaque onglet est dédié à une étape de modélisation. Pour ouvrir un onglet, utilisez le menu **Onglets → Ouvrir** et choisissez l'onglet souhaité.
+The main working area. Each tab is dedicated to a modeling step. To open a tab, use the **Tabs → Open** menu and choose the desired tab.
 
 ![](captures/onglets.jpg)
 
-| Onglet | Raccourci | Description |
+| Tab | Shortcut | Description |
 |--------|-----------|-------------|
-| **Matériau** | `Ctrl+1` | Création et gestion des matériaux (RIGID, ELAS, ELAS_PLAS, THERMO_ELAS, PORO_ELAS, etc.). |
-| **Modèle** | `Ctrl+2` | Définition des modèles physiques et éléments finis (MECAx, THERx, POROx, MULTI). |
-| **Avatar** | `Ctrl+3` | Création de corps rigides standards : disque, jonc, polygone, mur rugueux, sphère, cylindre, polyèdre, etc. |
-| **Avatar vide** | `Ctrl+4` | Création d'avatars à contacteurs personnalisés, ou ajout de contacteurs sur un corps déformable existant. |
-| **Bibliothèques** | `Ctrl+5` | Avatars préconfigurés (formes complexes, assemblages courants) prêts à être insérés dans le projet. |
-| **Boucles** | `Ctrl+6` | Génération paramétrique de séries d'avatars : cercle, grille, ligne, spirale ou placement manuel. |
-| **Granulométrie** | `Ctrl+7` | Génération de dépôts avec distribution statistique des rayons et dépôt gravitaire. |
-| **DOF** | `Ctrl+8` | Conditions aux limites : translations imposées, rotations bloquées, vitesses imposées, couplages de degrés de liberté. |
-| **Contact** | `Ctrl+9` | Définition des lois de comportement de contact (frottement Coulomb, cohésion, rigidité normale et tangentielle). |
-| **Visibilité** | — | Création de tables de visibilité chipy pour afficher ou masquer des avatars pendant le calcul. |
-| **Postpro** | — | Configuration des commandes de post-traitement : bilan énergétique, suivi de corps, extraction de champs. |
-| **Visualisation 3D** | — | Affichage interactif des avatars du modèle avec modes de navigation, sélection et mesure. |
+| **Material** | `Ctrl+1` | Creation and management of materials (RIGID, ELAS, ELAS_PLAS, THERMO_ELAS, PORO_ELAS, etc.). |
+| **Model** | `Ctrl+2` | Definition of physical models and finite elements (MECAx, THERx, POROx, MULTI). |
+| **Avatar** | `Ctrl+3` | Creation of standard rigid bodies: disk, jonc, polygon, rough wall, sphere, cylinder, polyhedron, etc. |
+| **Empty avatar** | `Ctrl+4` | Creation of avatars with custom contactors, or addition of contactors to an existing deformable body. |
+| **Libraries** | `Ctrl+5` | Preconfigured avatars (complex shapes, common assemblies) ready to be inserted into the project. |
+| **Loops** | `Ctrl+6` | Parametric generation of series of avatars: circle, grid, line, spiral, or manual placement. |
+| **Granulometry** | `Ctrl+7` | Generation of deposits with statistical distribution of radii and gravitational deposit. |
+| **DOF** | `Ctrl+8` | Boundary conditions: imposed translations, blocked rotations, imposed velocities, degree-of-freedom couplings. |
+| **Contact** | `Ctrl+9` | Definition of contact behavior laws (Coulomb friction, cohesion, normal and tangential stiffness). |
+| **Visibility** | — | Creation of chipy visibility tables to show or hide avatars during the computation. |
+| **Postpro** | — | Configuration of post-processing commands: energy balance, body tracking, field extraction. |
+| **3D Visualization** | — | Interactive display of the model's avatars with navigation, selection, and measurement modes. |
  
-> **Raccourcis clavier :** les touches `Ctrl+1` à `Ctrl+9` ouvrent directement les neuf premiers onglets de la liste.
+> **Keyboard shortcuts:** the keys `Ctrl+1` through `Ctrl+9` directly open the first nine tabs in the list.
  
 ---
 
-### 4. Zone de rendu (zone centrale inférieure)
+### 4. Rendering Area (lower central area)
  
-Zone dédiée à la visualisation et aux sorties du calcul.
+An area dedicated to visualization and computation outputs.
  
-#### Boutons disponibles
+#### Available buttons
  
-| Bouton | Description |
+| Button | Description |
 |--------|-------------|
-| **LMGC90 Visualisation** | Lance la visualisation intégrée pylmgc90 via `pre.visuAvatars()`. Ouvre une fenêtre externe indépendante. |
-| **ParaView** | Ouvre automatiquement les fichiers de sortie du calcul dans ParaView (par défaut `rigids.pvd`). Nécessite que ParaView soit installé sur la machine et qu'un calcul ait déjà été effectué. |
+| **LMGC90 Visualization** | Launches the integrated pylmgc90 visualization via `pre.visuAvatars()`. Opens an independent external window. |
+| **ParaView** | Automatically opens the computation's output files in ParaView (by default `rigids.pvd`). Requires ParaView to be installed on the machine and a computation to have already been performed. |
  
-#### Modes interactifs du viewer 3D
+#### Interactive 3D viewer modes
  
 | Mode | Description |
 |------|-------------|
-| **🖱️ Navigation** | Mode par défaut : rotation (clic gauche + glisser), zoom (molette), panoramique (clic droit + glisser). |
-| **👆 Sélection** | Clic sur un avatar pour le mettre en évidence (surlignage jaune) et afficher ses informations dans la barre d'état. |
-| **📏 Règle** | Mesure de distance : cliquer sur un premier point (A) puis un second point (B) pour afficher la distance en mètres. |
+| **🖱️ Navigation** | Default mode: rotation (left-click + drag), zoom (scroll wheel), pan (right-click + drag). |
+| **👆 Selection** | Click on an avatar to highlight it (yellow highlight) and display its information in the status bar. |
+| **📏 Ruler** | Distance measurement: click on a first point (A) then a second point (B) to display the distance in meters. |
  
-Les vues rapides **XY**, **XZ**, **YZ** et **Iso** sont accessibles depuis la barre d'outils du viewer.
+The quick views **XY**, **XZ**, **YZ**, and **Iso** are accessible from the viewer's toolbar.
  
 ---
 
 
-### 5. Préférences
+### 5. Preferences
 
-Accessible via **Outils → Préférences** ou le raccourci `Ctrl+,`. La boîte de dialogue de préférences regroupe les paramètres de configuration de l'application.
+Accessible via **Tools → Preferences** or the shortcut `Ctrl+,`. The preferences dialog box brings together the application's configuration settings.
 
 ![](captures/preferences.JPG)
 
-| Paramètre | Description |
+| Setting | Description |
 |-----------|-------------|
-| **Dossier des projets** | Chemin par défaut utilisé lors de l'ouverture et de la sauvegarde des projets. Cliquer sur **Parcourir** pour le modifier. |
-| **Système d'unités** | Choix entre SI (mètre, kilogramme, seconde) et CGS (centimètre, gramme, seconde). _(Non encore implémenté dans cette version.)_ |
-| **Sauvegarde automatique** | Options pour activer la sauvegarde automatique à intervalles réguliers et à la fermeture de l'application. |
-| **Historique des projets récents** | Nombre maximum de projets conservés dans la liste **Fichier → Projets récents**. |
-| **Affichage des avatars** | Active ou désactive l'affichage des avatars dans l'arbre du modèle et dans le tableau de l'onglet Avatar. Désactiver cette option améliore les performances sur les projets comportant un grand nombre d'avatars. 
+| **Projects folder** | Default path used when opening and saving projects. Click **Browse** to change it. |
+| **Unit system** | Choice between SI (meter, kilogram, second) and CGS (centimeter, gram, second). _(Not yet implemented in this version.)_ |
+| **Automatic save** | Options to enable automatic saving at regular intervals and when closing the application. |
+| **Recent projects history** | Maximum number of projects kept in the **File → Recent projects** list. |
+| **Avatar display** | Enables or disables the display of avatars in the model tree and in the Avatar tab table. Disabling this option improves performance on projects with a large number of avatars. |
 
-### Convertir 
+### Convert 
 
-LMGC90_GUI inclut un convertisseur bétâ (script python) vers un .lmgc (JSON).
-Il vous suffit seulement de donner le chemin de votre script puis le nom de votre fichier et de cliquer sur le bouton "Convertir".
+LMGC90_GUI includes a beta converter (python script) to .lmgc (JSON).
+You simply need to provide the path to your script, then the name of your output file, and click the "Convert" button.
 
 ![](captures/convert.JPG)
 
-> **Remarque** : traduit selon la complexité de votre script.
+> **Note**: translation quality depends on the complexity of your script.
 
 
 ---
 
-## Résumé des raccourcis clavier
+## Keyboard Shortcuts Summary
  
-| Raccourci | Action |
+| Shortcut | Action |
 |-----------|--------|
-| `Ctrl+N` | Nouveau projet |
-| `Ctrl+O` | Ouvrir un projet |
-| `Ctrl+S` | Sauvegarder |
-| `Ctrl+Shift+S` | Sauvegarder sous… |
-| `Ctrl+Q` | Quitter |
-| `Ctrl+Shift+N` | Assistant de configuration de projet |
-| `Ctrl+Shift+G` | Assistant de granulométrie pylmgc90 |
-| `Ctrl+Shift+D` | Assistant de déformable |
-| `Ctrl+Shift+M` | Assistant de maçonnerie |
-| `Ctrl+V` | Variables dynamiques |
-| `Ctrl+,` | Préférences |
-| `Ctrl+F5` | Paramètres de calcul |
-| `F5` | Lancer le calcul |
-| `F6` | Voir les logs LMGC90 |
-| `F7` | Journal de l'application |
-| `Ctrl+Alt+D` | Onglets par défaut |
-| `Ctrl+1` … `Ctrl+9` | Ouvrir l'onglet correspondant |
+| `Ctrl+N` | New project |
+| `Ctrl+O` | Open a project |
+| `Ctrl+S` | Save |
+| `Ctrl+Shift+S` | Save as… |
+| `Ctrl+Q` | Quit |
+| `Ctrl+Shift+N` | Project configuration wizard |
+| `Ctrl+Shift+G` | Granulometry pylmgc90 wizard |
+| `Ctrl+Shift+D` | Deformable wizard |
+| `Ctrl+Shift+M` | Masonry wizard |
+| `Ctrl+V` | Dynamic variables |
+| `Ctrl+,` | Preferences |
+| `Ctrl+F5` | Computation settings |
+| `F5` | Run computation |
+| `F6` | View LMGC90 logs |
+| `F7` | Application log |
+| `Ctrl+Alt+D` | Default tabs |
+| `Ctrl+1` … `Ctrl+9` | Open the corresponding tab |
  
 ---
-### 6. Barre d'état
+### 6. Status Bar
  
-Bande horizontale en bas de la fenêtre affichant des messages contextuels sur les opérations en cours : création d'un avatar, génération d'un script, résultat d'une mesure dans le viewer 3D, erreur de validation, etc.
+A horizontal strip at the bottom of the window displaying contextual messages about ongoing operations: creation of an avatar, generation of a script, measurement result in the 3D viewer, validation error, etc.
 
 ---
  
-LMGC90_GUI est conçue pour être **intuitive** et **entièrement visuelle**, tout en conservant une compatibilité totale avec les scripts Python traditionnels de LMGC90.
+LMGC90_GUI is designed to be **intuitive** and **fully visual**, while maintaining full compatibility with traditional LMGC90 Python scripts.

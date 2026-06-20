@@ -1,16 +1,16 @@
-# Tables de visibilité
+# Visibility Tables
 
-L'onglet **Visibilité** (`Ctrl+9`) permet de définir les **tables de visibilité** (`see_table`) de pylmgc90 : chaque règle déclare quels contacteurs peuvent se détecter mutuellement et avec quelle loi de contact. C'est une étape **obligatoire** avant de générer la DATBOX — sans table de visibilité, aucune interaction de contact n'est calculée.
+The **Visibility** tab (`Ctrl+9`) allows you to define pylmgc90's **visibility tables** (`see_table`): each rule declares which contactors can detect each other and with which contact law. This is a **mandatory** step before generating the DATBOX — without a visibility table, no contact interaction is computed.
 
 ![](captures/table_visibilite.JPG)
 
 ---
 
-## Principe de fonctionnement
+## Operating Principle
 
-Une **table de visibilité** (`see_table`) est le mécanisme par lequel pylmgc90 sait quels corps doivent être testés pour la détection de contact. Elle met en relation un **corps candidat** (peut être pénétré) et un **corps antagoniste** (jamais pénétré), en précisant pour chaque paire la couleur des contacteurs impliqués et la loi de contact à appliquer.
+A **visibility table** (`see_table`) is the mechanism by which pylmgc90 knows which bodies must be tested for contact detection. It links a **candidate body** (which can be penetrated) and an **antagonist body** (never penetrated), specifying for each pair the color of the contactors involved and the contact law to apply.
 
-**Appel pylmgc90 généré :**
+**Generated pylmgc90 call:**
 
 ```python
 see_0 = pre.see_table(
@@ -26,207 +26,205 @@ see_0 = pre.see_table(
 sees.addSeeTable(see_0)
 ```
 
-La structure `VisibilityRule` dans le projet stocke exactement ces 8 paramètres.
+The `VisibilityRule` structure in the project stores exactly these 8 parameters.
 
 ---
 
-## Interface de l'onglet
+## Tab Interface
 
-L'onglet est divisé en deux zones :
+The tab is divided into two areas:
 
-- **Liste des règles** (en haut) : tableau de toutes les tables de visibilité définies dans le projet, avec corps candidat, contacteur, couleurs, corps antagoniste, loi et distance d'alerte. Double-clic pour éditer.
-- **Formulaire de création / modification** (en bas) : 8 champs correspondant aux paramètres de `pre.see_table`.
+- **List of rules** (top): a table of all visibility tables defined in the project, with candidate body, contactor, colors, antagonist body, law, and alert distance. Double-click to edit.
+- **Creation / editing form** (bottom): 8 fields corresponding to the parameters of `pre.see_table`.
 
 ---
 
-## Champs du formulaire
+## Form Fields
 
-### Corps candidat
+### Candidate Body
 
-| Champ | Description | Valeurs courantes |
+| Field | Description | Common Values |
 |-------|-------------|-------------------|
-| **Corps candidat** (`CorpsCandidat`) | Type du corps portant le contacteur candidat. | `RBDY2` (corps rigide 2D), `RBDY3` (corps rigide 3D), `MAILx` (corps déformable EF) |
-| **Contacteur candidat** (`candidat`) | Forme du contacteur sur le corps candidat. Doit correspondre au shape déclaré dans l'onglet Avatar vide. | Voir tableau des contacteurs ci-dessous |
-| **Couleur candidat** (`colorCandidat`) | Code couleur LMGC90 à 5 caractères du contacteur candidat. **Doit correspondre exactement** à la couleur du contacteur déclaré sur le corps. | `BLUEx`, `REDxx`, `VERTx`, `GRAYx`… |
+| **Candidate body** (`CorpsCandidat`) | Type of the body carrying the candidate contactor. | `RBDY2` (2D rigid body), `RBDY3` (3D rigid body), `MAILx` (FE deformable body) |
+| **Candidate contactor** (`candidat`) | Shape of the contactor on the candidate body. Must match the shape declared in the Empty Avatar tab. | See the contactor table below |
+| **Candidate color** (`colorCandidat`) | 5-character LMGC90 color code of the candidate contactor. **Must match exactly** the color of the contactor declared on the body. | `BLUEx`, `REDxx`, `VERTx`, `GRAYx`… |
 
-### Corps antagoniste
+### Antagonist Body
 
-| Champ | Description | Valeurs courantes |
+| Field | Description | Common Values |
 |-------|-------------|-------------------|
-| **Corps antagoniste** (`CorpsAntagoniste`) | Type du corps portant le contacteur antagoniste. | `RBDY2`, `RBDY3`, `MAILx` |
-| **Contacteur antagoniste** (`antagoniste`) | Forme du contacteur antagoniste. | Voir tableau des contacteurs |
-| **Couleur antagoniste** (`colorAntagoniste`) | Couleur du contacteur antagoniste. **Doit correspondre** à la couleur du contacteur déclaré sur le corps antagoniste. | `BLUEx`, `REDxx`… |
+| **Antagonist body** (`CorpsAntagoniste`) | Type of the body carrying the antagonist contactor. | `RBDY2`, `RBDY3`, `MAILx` |
+| **Antagonist contactor** (`antagoniste`) | Shape of the antagonist contactor. | See the contactor table |
+| **Antagonist color** (`colorAntagoniste`) | Color of the antagonist contactor. **Must match** the color of the contactor declared on the antagonist body. | `BLUEx`, `REDxx`… |
 
-### Loi et alerte
+### Law and Alert
 
-| Champ | Description | Défaut |
+| Field | Description | Default |
 |-------|-------------|--------|
-| **Comportement** (`behav`) | Nom de la loi de contact à appliquer pour cette paire. Sélectionner dans la liste déroulante des lois définies dans l'onglet Contact. La loi doit exister avant de créer la règle. | _(première loi disponible)_ |
-| **Distance d'alerte** (`alert`) | Distance de détection (m). Deux contacteurs distants de moins de `alert` sont considérés comme potentiellement en contact et sont testés. Plage : 0,001 à 10,0 m. | `0.1 m` |
+| **Behavior** (`behav`) | Name of the contact law to apply for this pair. Select from the dropdown list of laws defined in the Contact tab. The law must exist before creating the rule. | _(first available law)_ |
+| **Alert distance** (`alert`) | Detection distance (m). Two contactors less than `alert` apart are considered potentially in contact and are tested. Range: 0.001 to 10.0 m. | `0.1 m` |
 
 ---
 
-## Types de corps disponibles
+## Available Body Types
 
 | Type | Description | Usage |
 |------|-------------|-------|
-| `RBDY2` | Corps rigide 2D (`rigidDisk`, `rigidJonc`, `rigidPolygon`…) | Simulations 2D — particules, maçonnerie, mécanismes |
-| `RBDY3` | Corps rigide 3D (`rigidSphere`, `rigidPolyhedron`…) | Simulations 3D — sphères, polyèdres |
-| `MAILx` | Corps déformable EF (`MESH_DEFORMABLE`) | Interactions rigide/déformable ou déformable/déformable |
+| `RBDY2` | 2D rigid body (`rigidDisk`, `rigidJonc`, `rigidPolygon`…) | 2D simulations — particles, masonry, mechanisms |
+| `RBDY3` | 3D rigid body (`rigidSphere`, `rigidPolyhedron`…) | 3D simulations — spheres, polyhedra |
+| `MAILx` | FE deformable body (`MESH_DEFORMABLE`) | Rigid/deformable or deformable/deformable interactions |
 
 ---
 
-## Types de contacteurs disponibles
+## Available Contactor Types
 
-### Contacteurs 2D (pour `RBDY2`)
+### 2D Contactors (for `RBDY2`)
 
-| Contacteur | Description | Paramètre pylmgc90 |
+| Contactor | Description | pylmgc90 Parameter |
 |------------|-------------|---------------------|
-| `DISKx` | Disque circulaire | `r` (rayon) |
-| `xKSID` | Disque orienté (anti-disque) | `r` |
-| `JONCx` | Jonc elliptique / capsule | `axe1`, `axe2` |
-| `POLYG` | Polygone convexe 2D | `nb_vertices`, `vertices` |
-| `CLxxx` | Ligne de contact (maçonnerie) | longueur déterminée par la brique |
-| `PT2Dx` | Point de contact 2D | — |
+| `DISKx` | Circular disk | `r` (radius) |
+| `xKSID` | Oriented disk (anti-disk) | `r` |
+| `JONCx` | Elliptical jonc / capsule | `axe1`, `axe2` |
+| `POLYG` | 2D convex polygon | `nb_vertices`, `vertices` |
+| `CLxxx` | Contact line (masonry) | length determined by the brick |
+| `PT2Dx` | 2D contact point | — |
 
-### Contacteurs 3D (pour `RBDY3`)
+### 3D Contactors (for `RBDY3`)
 
-| Contacteur | Description | Paramètre pylmgc90 |
+| Contactor | Description | pylmgc90 Parameter |
 |------------|-------------|---------------------|
-| `SPHER` | Sphère | `r` (rayon) |
-| `PLANx` | Plan semi-infini | vecteur normal |
-| `CYLND` | Cylindre | `r`, longueur |
-| `DNLYC` | Demi-cylindre | `r`, longueur |
-| `POLYR` | Polyèdre convexe 3D | `vertices` |
-| `PT3Dx` | Point de contact 3D | — |
+| `SPHER` | Sphere | `r` (radius) |
+| `PLANx` | Semi-infinite plane | normal vector |
+| `CYLND` | Cylinder | `r`, length |
+| `DNLYC` | Half-cylinder | `r`, length |
+| `POLYR` | 3D convex polyhedron | `vertices` |
+| `PT3Dx` | 3D contact point | — |
 
-### Contacteurs pour corps déformables (pour `MAILx`)
+### Contactors for Deformable Bodies (for `MAILx`)
 
-| Contacteur | Description |
+| Contactor | Description |
 |------------|-------------|
-| `CLxxx` | Ligne de contact sur arête EF (2D) |
-| `ALpxx` | Ligne de polygone (interface EF 2D) |
+| `CLxxx` | Contact line on an FE edge (2D) |
+| `ALpxx` | Polygon line (2D FE interface) |
 
 ---
 
-## Couleurs et correspondance
+## Colors and Matching
 
-La couleur (`colorCandidat`, `colorAntagoniste`) est le **critère de filtrage** principal. Seuls les contacteurs portant exactement la couleur déclarée dans la table de visibilité sont testés pour le contact. Cela permet de créer des règles sélectives :
+The color (`colorCandidat`, `colorAntagoniste`) is the main **filtering criterion**. Only contactors carrying exactly the color declared in the visibility table are tested for contact. This allows you to create selective rules:
 
-- Faire interagir uniquement les particules bleues entre elles : `colorCandidat='BLUEx'`, `colorAntagoniste='BLUEx'`
-- Faire interagir des particules rouges avec un mur gris : `colorCandidat='REDxx'`, `colorAntagoniste='GRAYx'`
-- Contact entre disques et plan fixe : `RBDY2/DISKx/BLUEx` ↔ `RBDY3/PLANx/GRAYx`
+- Make only blue particles interact with each other: `colorCandidat='BLUEx'`, `colorAntagoniste='BLUEx'`
+- Make red particles interact with a gray wall: `colorCandidat='REDxx'`, `colorAntagoniste='GRAYx'`
+- Contact between disks and a fixed plane: `RBDY2/DISKx/BLUEx` ↔ `RBDY3/PLANx/GRAYx`
 
-> **Erreur courante :** si aucune interaction n'est détectée pendant le calcul, vérifier que les couleurs dans la table de visibilité correspondent **exactement** (5 caractères, sensibles à la casse) aux couleurs déclarées sur les contacteurs des avatars.
+> **Common error:** if no interaction is detected during the computation, check that the colors in the visibility table match **exactly** (5 characters, case-sensitive) the colors declared on the avatars' contactors.
 
 ---
 
-## Distance d'alerte (`alert`)
+## Alert Distance (`alert`)
 
-La distance `alert` détermine la zone de recherche de contact. Deux contacteurs sont mis en liste candidate pour le calcul si la distance entre eux est inférieure à `alert`.
+The `alert` distance determines the contact search zone. Two contactors are placed on the candidate list for the computation if the distance between them is less than `alert`.
 
-| Situation | Valeur recommandée |
+| Situation | Recommended Value |
 |-----------|-------------------|
-| Particules granulaires (r ≈ 0,05 à 0,15 m) | `0.1` à `0.3 m` |
-| Maçonnerie (briques standard) | `0.02` à `0.05 m` |
-| Grandes structures | 5 à 10 % du rayon maximal |
-| Corps déformables EF | Taille caractéristique d'un élément |
+| Granular particles (r ≈ 0.05 to 0.15 m) | `0.1` to `0.3 m` |
+| Masonry (standard bricks) | `0.02` to `0.05 m` |
+| Large structures | 5 to 10% of the maximum radius |
+| FE deformable bodies | Characteristic size of an element |
 
-> **Trop petite :** certains contacts réels ne sont pas détectés → interpénétration non gérée (très minim ).  
-> **Trop grande :** trop de paires candidates → calcul ralenti inutilement.
-
----
-
-## Gestion des règles
-
-### Créer une règle
-
-Remplir le formulaire et cliquer sur **✅ Créer**. La règle sera créée  :
-1. Vérifie que la loi de contact référencée existe dans `_pylmgc_laws`.
-2. Crée l'objet `see_table` pylmgc90 via `LMGC90Bridge.create_visibility_rule()`.
-3. L'ajoute au conteneur `_visibility_container` (collection `sees`).
-4. Sauvegarde dans `state.visibility_rules`.
-5. Émet le signal `rule_created` → `_refresh_all()`.
-
-### Modifier une règle
-
-Double-cliquer dans la liste ou sélectionner et cliquer sur **✏️ Modifier**. Après confirmation, `update_visibility_rule()` :
-1. Reconstruit **entièrement** le conteneur `_visibility_container` (limitation pylmgc90 — pas de modification in-place d'une see_table existante).
-2. Réinsère toutes les règles avec les nouvelles valeurs.
-3. Émet le signal `rule_updated` → `_refresh_all()`.
-
-### Supprimer une règle
-
-Sélectionner et cliquer sur **🗑️ Supprimer**. La règle est retirée de `state.visibility_rules` via `remove_visibility_rule()`. Le signal `rule_deleted` est émis.
-
-> **Mise à jour en cascade :** renommer une loi de contact dans l'onglet Contact met à jour automatiquement le champ `behavior_name` de toutes les règles de visibilité qui y font référence.
+> **Too small:** some real contacts are not detected → unhandled interpenetration (very minor).  
+> **Too large:** too many candidate pairs → computation slowed down unnecessarily.
 
 ---
 
-## Règles courantes par type de simulation
+## Managing Rules
 
-### Granulométrie 2D — disques rigides
+### Creating a Rule
+
+Fill in the form and click **✅ Create**. The rule will be created as follows:
+1. Checks that the referenced contact law exists in `_pylmgc_laws`.
+2. Creates the pylmgc90 `see_table` object via `LMGC90Bridge.create_visibility_rule()`.
+3. Adds it to the `_visibility_container` (the `sees` collection).
+4. Saves it in `state.visibility_rules`.
+5. Emits the `rule_created` signal → `_refresh_all()`.
+
+### Editing a Rule
+
+Double-click in the list, or select it and click **✏️ Edit**. After confirmation, `update_visibility_rule()`:
+1. **Fully** rebuilds the `_visibility_container` (pylmgc90 limitation — no in-place modification of an existing see_table).
+2. Reinserts all the rules with the new values.
+3. Emits the `rule_updated` signal → `_refresh_all()`.
+
+### Deleting a Rule
+
+Select it and click **🗑️ Delete**. The rule is removed from `state.visibility_rules` via `remove_visibility_rule()`. The `rule_deleted` signal is emitted.
+
+> **Cascading update:** renaming a contact law in the Contact tab automatically updates the `behavior_name` field of all visibility rules that reference it.
+
+---
+
+## Common Rules by Simulation Type
+
+### 2D Granulometry — Rigid Disks
 
 ```
-CorpsCandidat    : RBDY2   candidat    : DISKx   colorCandidat    : BLUEx
-CorpsAntagoniste : RBDY2   antagoniste : DISKx   colorAntagoniste : BLUEx
+CandidateBody    : RBDY2   candidate    : DISKx   candidateColor    : BLUEx
+AntagonistBody   : RBDY2   antagonist   : DISKx   antagonistColor   : BLUEx
 behav : IQS_CLB   alert : 0.1
 ```
 
-### Maçonnerie 2D — briques rigides
+### 2D Masonry — Rigid Bricks
 
 ```
-CorpsCandidat    : RBDY2   candidat    : CLxxx   colorCandidat    : BLUEx
-CorpsAntagoniste : RBDY2   antagoniste : CLxxx   colorAntagoniste : BLUEx
+CandidateBody    : RBDY2   candidate    : CLxxx   candidateColor    : BLUEx
+AntagonistBody   : RBDY2   antagonist   : CLxxx   antagonistColor   : BLUEx
 behav : IQS_CLB   alert : 0.02
 ```
 
-### Granulométrie 3D — sphères rigides
+### 3D Granulometry — Rigid Spheres
 
 ```
-CorpsCandidat    : RBDY3   candidat    : SPHER   colorCandidat    : BLUEx
-CorpsAntagoniste : RBDY3   antagoniste : SPHER   colorAntagoniste : BLUEx
+CandidateBody    : RBDY3   candidate    : SPHER   candidateColor    : BLUEx
+AntagonistBody   : RBDY3   antagonist   : SPHER   antagonistColor   : BLUEx
 behav : IQS_CLB   alert : 0.1
 ```
 
-### Rigide / déformable — disque sur maillage EF
+### Rigid / Deformable — Disk on an FE Mesh
 
 ```
-CorpsCandidat    : RBDY2   candidat    : DISKx   colorCandidat    : BLUEx
-CorpsAntagoniste : MAILx   antagoniste : CLxxx   colorAntagoniste : VERTx
+CandidateBody    : RBDY2   candidate    : DISKx   candidateColor    : BLUEx
+AntagonistBody   : MAILx   antagonist   : CLxxx   antagonistColor   : VERTx
 behav : GAP_SGR_CLB   alert : 0.05
 ```
 
-### Corps de types différents — disques et joncs
+### Different Body Types — Disks and Joncs
 
 ```
-CorpsCandidat    : RBDY2   candidat    : DISKx   colorCandidat    : BLUEx
-CorpsAntagoniste : RBDY2   antagoniste : JONCx   colorAntagoniste : REDxx
+CandidateBody    : RBDY2   candidate    : DISKx   candidateColor    : BLUEx
+AntagonistBody   : RBDY2   antagonist   : JONCx   antagonistColor   : REDxx
 behav : IQS_CLB   alert : 0.15
 ```
 ---
 
-## Lien avec l'assistant de projet
+## Connection with the Project Wizard
 
-L'**Assistant de projet** (`Ctrl+Shift+N`) propose une page **Visibilité** qui pré-remplit automatiquement la table de visibilité en fonction des choix effectués aux étapes précédentes :
+The **Project Wizard** (`Ctrl+Shift+N`) offers a **Visibility** page that automatically pre-fills the visibility table based on the choices made in the previous steps:
 
-- **Corps** : `RBDY2` (2D) ou `RBDY3` (3D) selon la dimension du projet.
-- **Contacteur** : `DISKx` (2D) ou `SPHER` (3D).
-- **Couleurs** : synchronisées automatiquement avec la couleur de l'avatar créé à l'étape Avatar.
-- **Loi** : la loi créée à l'étape Contact.
+- **Body**: `RBDY2` (2D) or `RBDY3` (3D) depending on the project's dimension.
+- **Contactor**: `DISKx` (2D) or `SPHER` (3D).
+- **Colors**: automatically synchronized with the color of the avatar created at the Avatar step.
+- **Law**: the law created at the Contact step.
 
-Pour des configurations plus complexes (plusieurs types de contacteurs, plusieurs lois), utiliser directement l'onglet Visibilité après la fin de l'assistant.
+For more complex configurations (multiple contactor types, multiple laws), use the Visibility tab directly after finishing the wizard.
 
 ---
 
-## Remarques importantes
+## Important Notes
 
-**La loi doit exister avant la règle :** `add_visibility_rule()` vérifie que la loi référencée est présente dans `_pylmgc_laws`. Si la loi est supprimée de l'onglet Contact après la création de la règle, la règle devient invalide et la génération du script échouera. L'onglet Contact avertit si l'on tente de supprimer une loi utilisée par une règle de visibilité.
+**The law must exist before the rule:** `add_visibility_rule()` checks that the referenced law is present in `_pylmgc_laws`. If the law is deleted from the Contact tab after the rule is created, the rule becomes invalid and script generation will fail. The Contact tab warns if you attempt to delete a law used by a visibility rule.
 
-**Reconstruction complète lors de la modification :** pylmgc90 ne permet pas de modifier une `see_table` existante. La moindre modification d'une règle entraîne la reconstruction complète du conteneur `sees` avec toutes les règles. Ce comportement est transparent pour l'utilisateur mais peut être lent si le projet contient de nombreuses règles.
+**Full reconstruction upon editing:** pylmgc90 does not allow modifying an existing `see_table`. The slightest modification to a rule triggers a full reconstruction of the `sees` container with all the rules. This behavior is transparent to the user but can be slow if the project contains many rules.
 
-**Multiplicité des règles :** un projet peut avoir autant de règles de visibilité que nécessaire. Pour un assemblage avec plusieurs populations de particules de couleurs différentes (ex. bleu, rouge, vert), créer une règle par paire de couleurs qui doit interagir. Des populations de couleurs différentes sans règle commune ne se voient pas.
+**Multiplicity of rules:** a project can have as many visibility rules as needed. For an assembly with several populations of particles of different colors (e.g. blue, red, green), create one rule per pair of colors that must interact. Populations of different colors with no common rule will not see each other.
 
-**Détecteur de contact vs table de visibilité :** la table de visibilité déclare *qui* peut interagir. L'onglet Calcul (`Ctrl+8`) configure les *détecteurs de contact* (`DKDKx`, `SPSPx`…) qui déterminent *comment* le contact est résolu. Les deux doivent être cohérents — si une règle déclare `DISKx/DISKx`, le détecteur `DKDKx` doit être activé dans l'onglet Calcul.
-
-
+**Contact detector vs. visibility table:** the visibility table declares *who* can interact. The Computation tab (`Ctrl+8`) configures the *contact detectors* (`DKDKx`, `SPSPx`…) that determine *how* the contact is resolved. The two must be consistent — if a rule declares `DISKx/DISKx`, the `DKDKx` detector must be enabled in the Computation tab.

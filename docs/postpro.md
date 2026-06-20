@@ -1,27 +1,27 @@
-# Post-traitement (PostPro)
+# Post-Processing (PostPro)
 
-L'onglet **Post-Pro**  définit les **commandes de post-traitement** qui seront incluses dans la DATBOX et exécutées par LMGC90 pendant le calcul. Chaque commande demande à LMGC90 d'écrire des fichiers de sortie à une fréquence donnée, permettant ensuite l'analyse et la visualisation des résultats.
+The **Post-Pro** tab defines the **post-processing commands** that will be included in the DATBOX and executed by LMGC90 during the computation. Each command asks LMGC90 to write output files at a given frequency, allowing the results to subsequently be analyzed and visualized.
 
 ![](captures/postpro.JPG)
 
 ---
 
-## Principe de fonctionnement
+## Operating Principle
 
-Une **commande PostPro** (`PostProCommand`) associe un **nom de commande** pylmgc90 à une **fréquence d'écriture** (`step`) et, optionnellement, à une **cible** (avatar unique ou groupe). L'appel pylmgc90 correspondant est :
+A **PostPro command** (`PostProCommand`) associates a pylmgc90 **command name** with a **write frequency** (`step`) and, optionally, a **target** (single avatar or group). The corresponding pylmgc90 call is:
 
 ```python
-# Sans cible (commande globale) :
+# Without a target (global command):
 posts.addCommand(pre.postpro_command(name='SOLVER INFORMATIONS', step=1))
 
-# Avec cible avatar :
+# With an avatar target:
 posts.addCommand(pre.postpro_command(
     name='BODY TRACKING',
     step=10,
     rigid_set=[bodies[3]]
 ))
 
-# Avec cible groupe :
+# With a group target:
 posts.addCommand(pre.postpro_command(
     name='TORQUE EVOLUTION',
     step=5,
@@ -29,89 +29,89 @@ posts.addCommand(pre.postpro_command(
 ))
 ```
 
-La structure `PostProCommand` dans le projet stocke trois champs : `name`, `step` et optionnellement `target_type` / `target_value`.
+The `PostProCommand` structure in the project stores three fields: `name`, `step`, and optionally `target_type` / `target_value`.
 
 ---
 
-## Interface de l'onglet
+## Tab Interface
 
-L'onglet est organisé en deux zones :
+The tab is organized into two areas:
 
-- **Liste des commandes** (en haut) : tableau de toutes les commandes enregistrées. Chaque ligne affiche le nom de la commande, la fréquence (`step=N`) et la cible (`Global`, `Avatar #N` ou `Groupe: nom`). Double-clic pour éditer.
-- **Formulaire de création / modification** (en bas) : trois champs simples.
+- **List of commands** (top): a table of all recorded commands. Each row displays the command name, the frequency (`step=N`), and the target (`Global`, `Avatar #N`, or `Group: name`). Double-click to edit.
+- **Creation / editing form** (bottom): three simple fields.
 
 ---
 
-## Champs du formulaire
+## Form Fields
 
-| Champ | Description | Valeur par défaut |
+| Field | Description | Default Value |
 |-------|-------------|-------------------|
-| **Commande** | Nom de la commande de post-traitement pylmgc90. Sélectionner dans la liste déroulante. | `SOLVER INFORMATIONS` |
-| **Fréquence (step)** | Écriture tous les `step` pas de calcul. `step=1` = écriture à chaque pas, `step=100` = tous les 100 pas. | `1` |
-| **Cible** | `Global` (toute la simulation), `Avatar` (index numérique) ou `Groupe` (nom de groupe). | `Global` |
+| **Command** | Name of the pylmgc90 post-processing command. Select from the dropdown list. | `SOLVER INFORMATIONS` |
+| **Frequency (step)** | Writes every `step` computation steps. `step=1` = writes at every step, `step=100` = every 100 steps. | `1` |
+| **Target** | `Global` (entire simulation), `Avatar` (numeric index), or `Group` (group name). | `Global` |
 
 ---
 
-## Commandes disponibles
+## Available Commands
 
-### Qualité numérique — pas de cible requise
+### Numerical Quality — No Target Required
 
-Ces commandes sont **globales** et ne nécessitent pas de `rigid_set`. Elles s'appliquent à l'ensemble de la simulation.
+These commands are **global** and do not require a `rigid_set`. They apply to the entire simulation.
 
-| Commande | Description | Fichiers de sortie |
+| Command | Description | Output Files |
 |----------|-------------|-------------------|
-| **`SOLVER INFORMATIONS`** | Informations du solveur de contact à chaque pas : nombre d'itérations, résidu, temps de calcul. Indispensable pour vérifier la **convergence** du schéma de contact. | `OUTBOX/solver_informations.dat` |
-| **`VIOLATION EVOLUTION`** | Évolution de la violation (interpénétration résiduelle) moyenne et maximale entre corps. Mesure l'**erreur** numérique de non-pénétration. | `OUTBOX/violation_evolution.dat` |
-| **`KINETIC ENERGY`** | Énergie cinétique totale du système à chaque pas. Utile pour suivre la dissipation d'énergie et détecter les instabilités. | `OUTBOX/kinetic_energy.dat` |
-| **`CONTACT ENERGY`** | Énergie dissipée par les contacts (frottement + restitution). | `OUTBOX/contact_energy.dat` |
-| **`STRAIN ENERGY`** | Énergie de déformation stockée dans le système. Pour les corps déformables EF. | `OUTBOX/strain_energy.dat` |
-etc,
+| **`SOLVER INFORMATIONS`** | Contact solver information at each step: number of iterations, residual, computation time. Essential for checking the **convergence** of the contact scheme. | `OUTBOX/solver_informations.dat` |
+| **`VIOLATION EVOLUTION`** | Average and maximum violation (residual interpenetration) evolution between bodies. Measures the numerical **error** of non-penetration. | `OUTBOX/violation_evolution.dat` |
+| **`KINETIC ENERGY`** | Total kinetic energy of the system at each step. Useful for tracking energy dissipation and detecting instabilities. | `OUTBOX/kinetic_energy.dat` |
+| **`CONTACT ENERGY`** | Energy dissipated by contacts (friction + restitution). | `OUTBOX/contact_energy.dat` |
+| **`STRAIN ENERGY`** | Strain energy stored in the system. For deformable FE bodies. | `OUTBOX/strain_energy.dat` |
+etc.,
 ---
 
-### Suivi de corps — cible requise (`rigid_set`)
+### Body Tracking — Target Required (`rigid_set`)
 
-Ces commandes écrivent des informations sur un **corps spécifique** ou un **groupe d'avatars**. Une cible (`target_type` + `target_value`) est obligatoire.
+These commands write information about a **specific body** or a **group of avatars**. A target (`target_type` + `target_value`) is mandatory.
 
-| Commande | Description | Données extraites | Fichiers de sortie |
+| Command | Description | Extracted Data | Output Files |
 |----------|-------------|-------------------|--------------------|
-| **`BODY TRACKING`** | Suivi complet de la position, vitesse et accélération d'un corps au cours du temps. La commande la plus utilisée pour analyser la trajectoire d'un avatar. | Position (x, y, z), vitesse (vx, vy, vz), accélération, angle et vitesse angulaire | `OUTBOX/body_tracking.dat` |
-| **`TORQUE EVOLUTION`** | Évolution du moment (couple) appliqué sur le corps ou le groupe. | Composantes du couple selon X, Y, Z | `OUTBOX/torque_evolution.dat` |
-| **`MOMENTUM EVOLUTION`** | Évolution de la quantité de mouvement du corps ou du groupe. | Quantité de mouvement (px, py, pz) | `OUTBOX/momentum_evolution.dat` |
+| **`BODY TRACKING`** | Complete tracking of the position, velocity, and acceleration of a body over time. The most commonly used command for analyzing an avatar's trajectory. | Position (x, y, z), velocity (vx, vy, vz), acceleration, angle, and angular velocity | `OUTBOX/body_tracking.dat` |
+| **`TORQUE EVOLUTION`** | Evolution of the torque applied to the body or group. | Torque components along X, Y, Z | `OUTBOX/torque_evolution.dat` |
+| **`MOMENTUM EVOLUTION`** | Evolution of the momentum of the body or group. | Momentum (px, py, pz) | `OUTBOX/momentum_evolution.dat` |
 
 ---
 
-### Commandes additionnelles
+### Additional Commands
 
-| Commande | Description |
+| Command | Description |
 |----------|-------------|
-| **`WORK EVOLUTION`** | Travail des forces extérieures appliquées au cours du temps. |
-| **`DISSIPATED ENERGY`** | Énergie dissipée totale (contact + amortissement). |
+| **`WORK EVOLUTION`** | Work done by the external forces applied over time. |
+| **`DISSIPATED ENERGY`** | Total dissipated energy (contact + damping). |
 
 ---
 
-## Cible des commandes
+## Command Target
 
-### Global _(pas de `rigid_set`)_
+### Global _(no `rigid_set`)_
 
-La commande s'applique à l'ensemble du système. Utiliser pour `SOLVER INFORMATIONS`, `VIOLATION EVOLUTION`, `KINETIC ENERGY`.
+The command applies to the entire system. Use for `SOLVER INFORMATIONS`, `VIOLATION EVOLUTION`, `KINETIC ENERGY`.
 
 ```python
 pre.postpro_command(name='SOLVER INFORMATIONS', step=1)
 ```
 
-### Avatar (index unique)
+### Avatar (single index)
 
-La commande surveille un corps spécifique identifié par son index dans la liste des avatars (0-based).
+The command monitors a specific body identified by its index in the avatar list (0-based).
 
 ```python
 pre.postpro_command(name='BODY TRACKING', step=10, rigid_set=[bodies[3]])
 ```
 
-Dans l'interface : sélectionner **Avatar** comme type de cible, puis saisir l'index (ex : `3`).
+In the interface: select **Avatar** as the target type, then enter the index (e.g.: `3`).
 
-### Groupe (ensemble d'avatars)
+### Group (set of avatars)
 
-La commande surveille tous les corps d'un groupe nommé (boucle, granulométrie, maçonnerie…).
+The command monitors all the bodies of a named group (loop, granulometry, masonry…).
 
 ```python
 pre.postpro_command(
@@ -121,74 +121,74 @@ pre.postpro_command(
 )
 ```
 
-Dans l'interface : sélectionner **Groupe** comme type de cible, puis choisir le groupe dans la liste déroulante.
+In the interface: select **Group** as the target type, then choose the group from the dropdown list.
 
-> Tous les groupes définis dans le projet (boucles, granulométrie, maçonnerie) apparaissent automatiquement dans la liste.
+> All groups defined in the project (loops, granulometry, masonry) automatically appear in the list.
 
 ---
 
-## Fréquence d'écriture (`step`)
+## Write Frequency (`step`)
 
-Le paramètre `step` contrôle la fréquence d'écriture des fichiers de résultats.
+The `step` parameter controls the write frequency of the results files.
 
-| Valeur `step` | Comportement | Usage |
+| `step` Value | Behavior | Use |
 |---------------|-------------|-------|
-| `1` | Écriture à chaque pas de calcul | Analyse fine, débogage, petits modèles |
-| `10` | Écriture tous les 10 pas | Bon compromis précision / taille fichier |
-| `100` | Écriture tous les 100 pas | Grandes simulations longues durées |
-| `step_total / 1000` | ~1000 points dans le fichier | Règle empirique pour des courbes lisses |
+| `1` | Writes at every computation step | Detailed analysis, debugging, small models |
+| `10` | Writes every 10 steps | Good accuracy / file size compromise |
+| `100` | Writes every 100 steps | Large, long-duration simulations |
+| `step_total / 1000` | ~1000 points in the file | Rule of thumb for smooth curves |
 
-> **Impact sur les performances :** un `step=1` avec `BODY TRACKING` sur un grand groupe peut générer des fichiers de plusieurs gigaoctets et ralentir le calcul. Adapter la fréquence à la durée et à la précision requise.
-
----
-
-## Gestion des commandes
-
-### Créer une commande
-
-Remplir le formulaire et cliquer sur **✅ Ajouter la Commande**. La commande est créée via `add_postpro_command()` qui :
-
-1. Résout la cible (`rigid_set`) en listes d'objets pylmgc90.
-2. Crée l'objet `pre.postpro_command(name, step, rigid_set)`.
-3. L'ajoute au conteneur `_postpro_container` via `addCommand()`.
-4. Sauvegarde dans `state.postpro_commands`.
-5. Émet le signal `command_added` → `_refresh_all()`.
-
-### Modifier une commande
-
-Double-cliquer dans la liste pour charger les valeurs dans le formulaire. Modifier et cliquer sur **💾 Mettre à jour**. `update_postpro_command()` reconstruit l'ensemble du conteneur postpro (même comportement que pour les visibilités — limitation pylmgc90).
-
-### Supprimer une commande
-
-Sélectionner et cliquer sur **🗑️ Supprimer**. La commande est retirée de `state.postpro_commands` via `remove_postpro_command()`. Le signal `command_deleted` est émis.
+> **Performance impact:** a `step=1` with `BODY TRACKING` on a large group can generate files several gigabytes in size and slow down the computation. Adapt the frequency to the required duration and accuracy.
 
 ---
 
-## Visualisation dans l'arbre du modèle
+## Managing Commands
 
-Les commandes postpro sont affichées dans l'arbre du modèle (panneau gauche) sous le nœud **Post-Processing**, avec pour chaque commande :
+### Creating a Command
 
-- Son nom (ex. `BODY TRACKING`)
-- Sa fréquence (`step=10`)
-- Sa cible (`Global`, `Avatar #3` ou `Groupe: granulo_box2d`)
+Fill in the form and click **✅ Add the Command**. The command is created via `add_postpro_command()`, which:
 
-Double-cliquer sur une commande dans l'arbre ouvre directement l'onglet PostPro en mode édition (`load_for_edit(postpro)`).
+1. Resolves the target (`rigid_set`) into lists of pylmgc90 objects.
+2. Creates the `pre.postpro_command(name, step, rigid_set)` object.
+3. Adds it to the `_postpro_container` via `addCommand()`.
+4. Saves it in `state.postpro_commands`.
+5. Emits the `command_added` signal → `_refresh_all()`.
+
+### Editing a Command
+
+Double-click in the list to load the values into the form. Edit them and click **💾 Update**. `update_postpro_command()` rebuilds the entire postpro container (same behavior as for visibility tables — a pylmgc90 limitation).
+
+### Deleting a Command
+
+Select it and click **🗑️ Delete**. The command is removed from `state.postpro_commands` via `remove_postpro_command()`. The `command_deleted` signal is emitted.
 
 ---
 
-## Script Python généré
+## Display in the Model Tree
+
+PostPro commands are displayed in the model tree (left panel) under the **Post-Processing** node, with for each command:
+
+- Its name (e.g. `BODY TRACKING`)
+- Its frequency (`step=10`)
+- Its target (`Global`, `Avatar #3`, or `Group: granulo_box2d`)
+
+Double-clicking on a command in the tree directly opens the PostPro tab in edit mode (`load_for_edit(postpro)`).
+
+---
+
+## Generated Python Script
 
 ```python
-# Post-traitement
+# Post-processing
 
-# Commande globale
+# Global command
 post_cmd_0 = pre.postpro_command(
     name='SOLVER INFORMATIONS',
     step=1
 )
 posts.addCommand(post_cmd_0)
 
-# Commande avec cible avatar
+# Command with an avatar target
 post_cmd_1 = pre.postpro_command(
     name='BODY TRACKING',
     step=10,
@@ -196,7 +196,7 @@ post_cmd_1 = pre.postpro_command(
 )
 posts.addCommand(post_cmd_1)
 
-# Commande avec cible groupe
+# Command with a group target
 post_cmd_2 = pre.postpro_command(
     name='TORQUE EVOLUTION',
     step=5,
@@ -205,73 +205,73 @@ post_cmd_2 = pre.postpro_command(
 posts.addCommand(post_cmd_2)
 ```
 
-Le conteneur `posts` est passé à `pre.writeDatbox(post=posts, ...)` lors de la génération de la DATBOX.
+The `posts` container is passed to `pre.writeDatbox(post=posts, ...)` when generating the DATBOX.
 
 ---
 
-## Lecture des résultats
+## Reading the Results
 
-Les fichiers de sortie sont écrits dans le répertoire `OUTBOX/` du projet LMGC90 pendant le calcul. Chaque fichier est un fichier texte (colonnes séparées par des espaces) dont le format dépend de la commande :
+The output files are written to the LMGC90 project's `OUTBOX/` directory during the computation. Each file is a text file (space-separated columns) whose format depends on the command:
 
-| Commande | Format typique | Colonnes |
+| Command | Typical Format | Columns |
 |----------|---------------|---------|
-| `BODY TRACKING` | Texte, N colonnes | `t`, `x`, `y`, `z`, `vx`, `vy`, `vz`, `theta`, `omega` |
-| `SOLVER INFORMATIONS` | Texte | `t`, `iter`, `residual`, `cpu_time` |
-| `VIOLATION EVOLUTION` | Texte | `t`, `mean_violation`, `max_violation` |
-| `KINETIC ENERGY` | Texte | `t`, `Ec` |
-| `TORQUE EVOLUTION` | Texte | `t`, `Mx`, `My`, `Mz` |
+| `BODY TRACKING` | Text, N columns | `t`, `x`, `y`, `z`, `vx`, `vy`, `vz`, `theta`, `omega` |
+| `SOLVER INFORMATIONS` | Text | `t`, `iter`, `residual`, `cpu_time` |
+| `VIOLATION EVOLUTION` | Text | `t`, `mean_violation`, `max_violation` |
+| `KINETIC ENERGY` | Text | `t`, `Ec` |
+| `TORQUE EVOLUTION` | Text | `t`, `Mx`, `My`, `Mz` |
 
-Ces fichiers peuvent être lus et tracés directement avec Python (numpy, matplotlib) ou avec l'outil de visualisation intégré de LMGC90.
+These files can be read and plotted directly with Python (numpy, matplotlib) or with LMGC90's built-in visualization tool.
 
 ---
 
-## Exemple d'utilisation — bielle-manivelle
+## Usage Example — Slider-Crank
 
-Pour une simulation de bielle-manivelle, configurer les commandes suivantes :
+For a slider-crank simulation, configure the following commands:
 
-| # | Commande | Step | Cible | Objectif |
+| # | Command | Step | Target | Objective |
 |---|----------|------|-------|---------|
-| 0 | `SOLVER INFORMATIONS` | `1` | Global | Vérifier la convergence |
-| 1 | `VIOLATION EVOLUTION` | `1` | Global | Contrôler l'interpénétration |
-| 2 | `BODY TRACKING` | `10` | Avatar #0 (manivelle) | Trajectoire angulaire |
-| 3 | `BODY TRACKING` | `10` | Avatar #2 (coulisseau) | Déplacement linéaire |
-| 4 | `KINETIC ENERGY` | `1` | Global | Bilan énergétique |
+| 0 | `SOLVER INFORMATIONS` | `1` | Global | Check convergence |
+| 1 | `VIOLATION EVOLUTION` | `1` | Global | Monitor interpenetration |
+| 2 | `BODY TRACKING` | `10` | Avatar #0 (crank) | Angular trajectory |
+| 3 | `BODY TRACKING` | `10` | Avatar #2 (slider) | Linear displacement |
+| 4 | `KINETIC ENERGY` | `1` | Global | Energy balance |
 
-![Exemple onglet PostPro](captures/postpro.JPG)
+![PostPro tab example](captures/postpro.JPG)
 
 ---
 
 
-## Remarques importantes
+## Important Notes
 
-**Reconstruction lors de la modification :** comme pour les tables de visibilité, toute modification d'une commande entraîne la reconstruction complète du conteneur `_postpro_container`. Ceci est transparent pour l'utilisateur.
+**Reconstruction upon editing:** as with visibility tables, any modification to a command triggers a full reconstruction of the `_postpro_container`. This is transparent to the user.
 
-**Les fichiers de sortie ne sont écrits que pendant le calcul.** La génération de la DATBOX et du script Python n'écrit pas de résultats — le calcul doit être lancé depuis l'onglet Calcul (`F5`) pour que les fichiers `OUTBOX/` soient créés.
+**Output files are only written during the computation.** Generating the DATBOX and the Python script does not write any results — the computation must be launched from the Computation tab (`F5`) for the `OUTBOX/` files to be created.
 
-**Step et durée de simulation :** s'assurer que `step` est inférieur au nombre total de pas de calcul. Une commande avec `step=100` dans une simulation de 50 pas ne produira aucune sortie.
+**Step and simulation duration:** make sure `step` is smaller than the total number of computation steps. A command with `step=100` in a 50-step simulation will produce no output.
 
-**Cohérence des indices d'avatars :** les indices dans `target_value` référencent la position dans `state.avatars` au moment de la création. Si des avatars sont supprimés ou réordonnés après la création d'une commande, les indices peuvent devenir incorrects. Préférer les groupes nommés pour les commandes sur plusieurs corps.
-
-
+**Consistency of avatar indices:** the indices in `target_value` reference the position in `state.avatars` at the time of creation. If avatars are deleted or reordered after a command is created, the indices may become incorrect. Prefer named groups for commands covering multiple bodies.
 
 
 
-# Post-traitement
 
-Définition des sorties pour LMGC90 qui vont à extraire et analyser vos calculs.
 
-## Commandes disponibles
-### 1.Vérifier la qualité numérique 
-- SOLVER INFORMATIONS : pour s'assurer la convergence
-- VIOLATION EVOLUTION : mesure "l'erreur" d'interpénétration moyenne
-- TORQUE EVOLUTION (sur avatar/groupe) : 
-- BODY TRACKING (suivi de corps)
+# Post-Processing
+
+Definition of the outputs for LMGC90 used to extract and analyze your computations.
+
+## Available Commands
+### 1. Checking Numerical Quality 
+- SOLVER INFORMATIONS: to ensure convergence
+- VIOLATION EVOLUTION: measures the average interpenetration "error"
+- TORQUE EVOLUTION (on an avatar/group): 
+- BODY TRACKING (body tracking)
 - KINETIC ENERGY, etc.
 
-## Fonctionnalités
--  step : étape 
--  rigid_set : avatar ou groupr d'avatars
+## Features
+-  step: step 
+-  rigid_set: avatar or group of avatars
 
-## Exemple : 
-Pour rajouter une commande du postpro, il faut se rendre dans l'onglet "PostPro", puis de choisir la commande voulue dans mon cas "BODY TRACKING", puis de renseigner l'étape, et de cliquer sur le bouton **"Ajouter la Commande"** 
+## Example: 
+To add a postpro command, go to the "PostPro" tab, then choose the desired command — in this case "BODY TRACKING" — then enter the step, and click the **"Add the Command"** button 
 ![](captures/postpro.JPG)

@@ -1,127 +1,127 @@
-# Conditions aux limites (DOFs)
+# Boundary Conditions (DOFs)
 
-L'onglet **DOF** (`Ctrl+5`) permet d'appliquer des conditions aux limites mécaniques, thermiques ou initiales sur les avatars du projet. Chaque opération est enregistrée dans `state.operations`, appliquée immédiatement sur les objets pylmgc90 et exportée dans le script Python généré.
+The **DOF** tab (`Ctrl+5`) allows you to apply mechanical, thermal, or initial boundary conditions to the avatars of the project. Each operation is recorded in `state.operations`, applied immediately to the pylmgc90 objects, and exported in the generated Python script.
 
 ---
 
-## Principe de fonctionnement
+## Operating Principle
 
-Une **opération DOF** (`DOFOperation`) est composée de :
+A **DOF operation** (`DOFOperation`) is made up of:
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| `operation_type` | Nature de l'opération : `translate`, `rotate`, `imposeDrivenDof`, `imposeInitValue` |
-| `target_type` | Cible : `'avatar'` (index unique) ou `'group'` (nom de groupe) |
-| `target_value` | Index de l'avatar (int) ou nom du groupe (str) |
-| `parameters` | Dictionnaire de paramètres passé directement à la méthode pylmgc90 |
+| `operation_type` | Nature of the operation: `translate`, `rotate`, `imposeDrivenDof`, `imposeInitValue` |
+| `target_type` | Target: `'avatar'` (single index) or `'group'` (group name) |
+| `target_value` | Avatar index (int) or group name (str) |
+| `parameters` | Dictionary of parameters passed directly to the pylmgc90 method |
 
 ---
 
-## Interface de l'onglet
+## Tab Interface
 
-L'onglet est organisé en deux zones :
+The tab is organized into two areas:
 
-- **Liste des opérations** (en haut) : tableau de toutes les opérations enregistrées avec leur type, cible et paramètres principaux. Double-clic pour éditer. Clic droit pour accéder au menu contextuel.
-- **Formulaire de création / modification** (en bas) : champs qui s'adaptent dynamiquement au type d'opération choisi.
+- **Operations list** (top): a table of all recorded operations with their type, target, and main parameters. Double-click to edit. Right-click to access the context menu.
+- **Creation / editing form** (bottom): fields that adapt dynamically to the chosen operation type.
 
-### Sélection de la cible
+### Target Selection
 
-| Champ | Description |
+| Field | Description |
 |-------|-------------|
-| **Type de cible** | `Avatar` (index numérique) ou `Groupe` (nom de groupe). |
-| **Cible** | Si Avatar : index de l'avatar dans la liste (0-based). Si Groupe : liste déroulante de tous les groupes définis dans le projet (boucles, granulométrie, maçonnerie, etc.). |
+| **Target type** | `Avatar` (numeric index) or `Group` (group name). |
+| **Target** | If Avatar: index of the avatar in the list (0-based). If Group: dropdown list of all groups defined in the project (loops, granulometry, masonry, etc.). |
 
-> Tous les groupes créés dans les onglets Boucles, Granulométrie et Maçonnerie apparaissent automatiquement dans la liste des groupes disponibles.
-
----
-
-## Les quatre opérations
+> All groups created in the Loops, Granulometry, and Masonry tabs automatically appear in the list of available groups.
 
 ---
 
-### 1. `translate` — Déplacement rigide
+## The Four Operations
 
-Déplace tous les nœuds de l'avatar d'un vecteur de translation. Opération purement géométrique — n'impose pas de condition cinématique pour la simulation.
+---
 
-**Signature pylmgc90 :**
+### 1. `translate` — Rigid Displacement
+
+Moves all the nodes of the avatar by a translation vector. A purely geometric operation — it does not impose a kinematic condition for the simulation.
+
+**pylmgc90 signature:**
 ```python
 avatar.translate(dx=0., dy=0., dz=0.)
 ```
 
-**Paramètres :**
+**Parameters:**
 
-| Paramètre | Type | Défaut | Description |
+| Parameter | Type | Default | Description |
 |-----------|------|--------|-------------|
-| `dx` | float | `0.0` | Translation selon l'axe X (m) |
-| `dy` | float | `0.0` | Translation selon l'axe Y (m) |
-| `dz` | float | `0.0` | Translation selon l'axe Z (m) — 3D uniquement |
+| `dx` | float | `0.0` | Translation along the X axis (m) |
+| `dy` | float | `0.0` | Translation along the Y axis (m) |
+| `dz` | float | `0.0` | Translation along the Z axis (m) — 3D only |
 
-**Exemple :**
+**Example:**
 ```python
 bodies[0].translate(dx=0.5, dy=0.0)
 ```
 
-> La position de l'avatar dans `state.avatars` est resynchronisée automatiquement après la translation (`_sync_avatar_position`). Cela met à jour l'affichage dans l'arbre du modèle et le viewer 3D.
+> The avatar's position in `state.avatars` is automatically resynchronized after the translation (`_sync_avatar_position`). This updates the display in the model tree and the 3D viewer.
 
 ---
 
-### 2. `rotate` — Rotation rigide
+### 2. `rotate` — Rigid Rotation
 
-Applique une rotation à l'avatar autour d'un centre donné. Deux modes de description sont disponibles : angles d'Euler ou axe-angle.
+Applies a rotation to the avatar about a given center. Two description modes are available: Euler angles or axis-angle.
 
-**Signature pylmgc90 :**
+**pylmgc90 signature:**
 ```python
 avatar.rotate(
-    description='Euler',   # ou 'axis'
-    phi=0., theta=0., psi=0.,   # angles d'Euler (rad) — mode Euler
-    alpha=0.,                    # angle (rad) — mode axis
-    axis=[0., 0., 1.],           # axe de rotation — mode axis
-    center=[0., 0., 0.]          # centre de rotation (m)
+    description='Euler',   # or 'axis'
+    phi=0., theta=0., psi=0.,   # Euler angles (rad) — Euler mode
+    alpha=0.,                    # angle (rad) — axis mode
+    axis=[0., 0., 1.],           # rotation axis — axis mode
+    center=[0., 0., 0.]          # center of rotation (m)
 )
 ```
 
-**Paramètres communs :**
+**Common parameters:**
 
-| Paramètre | Type | Défaut | Description |
+| Parameter | Type | Default | Description |
 |-----------|------|--------|-------------|
-| `description` | str | `'Euler'` | Mode : `'Euler'` ou `'axis'` |
-| `center` | list[3] | `[0., 0., 0.]` | Centre de rotation en coordonnées absolues (m) |
+| `description` | str | `'Euler'` | Mode: `'Euler'` or `'axis'` |
+| `center` | list[3] | `[0., 0., 0.]` | Center of rotation in absolute coordinates (m) |
 
-**Paramètres mode `'Euler'` :**
+**`'Euler'` mode parameters:**
 
-| Paramètre | Type | Défaut | Description |
+| Parameter | Type | Default | Description |
 |-----------|------|--------|-------------|
-| `phi` | float | `0.0` | 1ᵉʳ angle d'Euler — rotation autour de Z (rad) |
-| `theta` | float | `0.0` | 2ᵉ angle d'Euler — rotation autour de X (rad) |
-| `psi` | float | `0.0` | 3ᵉ angle d'Euler — rotation autour de Z (rad) |
+| `phi` | float | `0.0` | 1st Euler angle — rotation about Z (rad) |
+| `theta` | float | `0.0` | 2nd Euler angle — rotation about X (rad) |
+| `psi` | float | `0.0` | 3rd Euler angle — rotation about Z (rad) |
 
-Les trois rotations sont appliquées successivement : d'abord `phi` autour de Z, puis `theta` autour de X, puis `psi` autour de Z.
+The three rotations are applied successively: first `phi` about Z, then `theta` about X, then `psi` about Z.
 
-**Paramètres mode `'axis'` :**
+**`'axis'` mode parameters:**
 
-| Paramètre | Type | Défaut | Description |
+| Parameter | Type | Default | Description |
 |-----------|------|--------|-------------|
-| `alpha` | float | `0.0` | Angle de rotation (rad) |
-| `axis` | list[3] | `[0., 0., 1.]` | Vecteur directeur de l'axe de rotation |
+| `alpha` | float | `0.0` | Rotation angle (rad) |
+| `axis` | list[3] | `[0., 0., 1.]` | Direction vector of the rotation axis |
 
-**Exemples :**
+**Examples:**
 ```python
-# Rotation de 90° autour de Z centré à l'origine (mode axis)
+# 90° rotation about Z centered at the origin (axis mode)
 bodies[0].rotate(description='axis', alpha=1.5708, axis=[0., 0., 1.], center=[0., 0., 0.])
 
-# Rotation d'Euler de 45° dans le plan XY
+# 45° Euler rotation in the XY plane
 bodies[2].rotate(description='Euler', phi=0.7854, theta=0., psi=0., center=[1.0, 0.5, 0.])
 ```
 
-> **Conseil :** pour les murs maçonnés, la rotation `'axis'` avec `axis=[0,0,1]` permet de créer des angles de bâtiment. L'angle est saisi en degrés dans l'interface et converti en radians automatiquement.
+> **Tip:** for masonry walls, `'axis'` rotation with `axis=[0,0,1]` allows you to create building corners. The angle is entered in degrees in the interface and automatically converted to radians.
 
 ---
 
-### 3. `imposeDrivenDof` — DDL piloté
+### 3. `imposeDrivenDof` — Driven DOF
 
-Impose un degré de liberté **piloté** sur les nœuds d'un groupe de l'avatar. La valeur imposée peut être constante, sinusoïdale avec rampe, ou définie par un fichier d'évolution temporelle.
+Imposes a **driven** degree of freedom on the nodes of a group of the avatar. The imposed value can be constant, sinusoidal with a ramp, or defined by a time-evolution file.
 
-**Signature pylmgc90 :**
+**pylmgc90 signature:**
 ```python
 avatar.imposeDrivenDof(
     group='all',
@@ -138,79 +138,79 @@ avatar.imposeDrivenDof(
 )
 ```
 
-**Paramètres :**
+**Parameters:**
 
-| Paramètre | Type | Défaut | Description |
+| Parameter | Type | Default | Description |
 |-----------|------|--------|-------------|
-| `group` | str | `'all'` | Groupe de nœuds de l'avatar. `'all'` = tous les nœuds. Pour les corps déformables : `'down'`, `'up'`, `'left'`, `'right'`, `'front'`, `'rear'`. |
-| `component` | int ou list | `1` | Composante(s) du DDL. Voir tableau ci-dessous. |
-| `description` | str | `'predefined'` | Mode temporel : `'predefined'` (formule analytique) ou `'evolution'` (fichier). |
-| `dofty` | str | `'vlocy'` | Type de DDL. Voir tableau ci-dessous. |
-| `ct` | float | `0.0` | Valeur constante. |
-| `amp` | float | `0.0` | Amplitude du cosinus. |
-| `omega` | float | `0.0` | Pulsation angulaire (rad/s). |
-| `phi` | float | `0.0` | Phase du cosinus (rad). |
-| `rampi` | float | `1.0` | Valeur initiale de la rampe multiplicatrice. |
-| `ramp` | float | `0.0` | Pente de la rampe (s⁻¹). |
-| `evolutionFile` | str | `''` | Chemin vers un fichier d'évolution temporelle (`*.evol`). Utilisé si `description='evolution'`. |
+| `group` | str | `'all'` | Node group of the avatar. `'all'` = all nodes. For deformable bodies: `'down'`, `'up'`, `'left'`, `'right'`, `'front'`, `'rear'`. |
+| `component` | int or list | `1` | DOF component(s). See table below. |
+| `description` | str | `'predefined'` | Time mode: `'predefined'` (analytical formula) or `'evolution'` (file). |
+| `dofty` | str | `'vlocy'` | DOF type. See table below. |
+| `ct` | float | `0.0` | Constant value. |
+| `amp` | float | `0.0` | Cosine amplitude. |
+| `omega` | float | `0.0` | Angular frequency (rad/s). |
+| `phi` | float | `0.0` | Cosine phase (rad). |
+| `rampi` | float | `1.0` | Initial value of the multiplicative ramp. |
+| `ramp` | float | `0.0` | Ramp slope (s⁻¹). |
+| `evolutionFile` | str | `''` | Path to a time-evolution file (`*.evol`). Used if `description='evolution'`. |
 
-#### Composantes (`component`)
+#### Components (`component`)
 
-| Valeur | Signification |
+| Value | Meaning |
 |--------|--------------|
-| `1` | Translation selon X (ou DDL 1) |
-| `2` | Translation selon Y (ou DDL 2) |
-| `3` | Translation selon Z (ou DDL 3) — 3D uniquement |
-| `[1, 2]` | X et Y simultanément (bloque le plan horizontal) |
-| `[1, 2, 3]` | Blocage complet 3D |
+| `1` | Translation along X (or DOF 1) |
+| `2` | Translation along Y (or DOF 2) |
+| `3` | Translation along Z (or DOF 3) — 3D only |
+| `[1, 2]` | X and Y simultaneously (locks the horizontal plane) |
+| `[1, 2, 3]` | Full 3D locking |
 
-#### Types de DDL (`dofty`)
+#### DOF Types (`dofty`)
 
-| Physique | `dofty` | Description |
+| Physics | `dofty` | Description |
 |----------|---------|-------------|
-| **MECAx** | `'vlocy'` | Vitesse imposée (m/s) |
-| **MECAx** | `'force'` | Force imposée (N) |
-| **THERx** | `'temp'` | Température imposée (K ou °C selon convention) |
-| **THERx** | `'flux'` | Flux thermique imposé (W/m²) |
-| **POROx** | `'vlocy'` | Vitesse de filtration (m/s) |
-| **POROx** | `'force'` | Pression imposée |
-| **MULTI** | `'prim_'` | Variable primale (pression, température…) |
-| **MULTI** | `'dual_'` | Variable duale (flux, force…) |
+| **MECAx** | `'vlocy'` | Imposed velocity (m/s) |
+| **MECAx** | `'force'` | Imposed force (N) |
+| **THERx** | `'temp'` | Imposed temperature (K or °C depending on convention) |
+| **THERx** | `'flux'` | Imposed thermal flux (W/m²) |
+| **POROx** | `'vlocy'` | Filtration velocity (m/s) |
+| **POROx** | `'force'` | Imposed pressure |
+| **MULTI** | `'prim_'` | Primal variable (pressure, temperature…) |
+| **MULTI** | `'dual_'` | Dual variable (flux, force…) |
 
-#### Formule générale (mode `'predefined'`)
+#### General Formula (`'predefined'` mode)
 
-La valeur imposée à l'instant `t` est :
+The value imposed at time `t` is:
 
 ```
 f(t) = [ct + amp × cos(ω × t + φ)] × clamp(rampi + ramp × t)
 ```
 
-où `clamp(x) = sign(x) × min(|x|, 1)` — la rampe est bornée à 1 pour éviter les amplifications non physiques.
+where `clamp(x) = sign(x) × min(|x|, 1)` — the ramp is bounded to 1 to avoid non-physical amplifications.
 
-| Scénario | Paramètres | Comportement |
+| Scenario | Parameters | Behavior |
 |----------|------------|--------------|
-| Bloqué (vitesse nulle) | `ct=0`, `dofty='vlocy'` | Nœuds fixes pendant toute la simulation |
-| Déplacement constant | `ct=v0`, `dofty='vlocy'` | Vitesse constante `v0` m/s |
-| Oscillation sinusoïdale | `amp=A`, `omega=ω`, `phi=φ` | v(t) = A × cos(ωt + φ) |
-| Démarrage progressif | `ct=v0`, `rampi=0`, `ramp=1/t_rampe` | Montée linéaire de 0 à `v0` sur `t_rampe` secondes |
-| Évolution quelconque | `description='evolution'`, `evolutionFile='monfichier.evol'` | Valeur interpolée depuis le fichier |
+| Locked (zero velocity) | `ct=0`, `dofty='vlocy'` | Fixed nodes throughout the simulation |
+| Constant displacement | `ct=v0`, `dofty='vlocy'` | Constant velocity `v0` m/s |
+| Sinusoidal oscillation | `amp=A`, `omega=ω`, `phi=φ` | v(t) = A × cos(ωt + φ) |
+| Gradual startup | `ct=v0`, `rampi=0`, `ramp=1/t_ramp` | Linear rise from 0 to `v0` over `t_ramp` seconds |
+| Arbitrary evolution | `description='evolution'`, `evolutionFile='myfile.evol'` | Value interpolated from the file |
 
-#### Exemples
+#### Examples
 
 ```python
-# Bloquer la base d'un maillage EF (vitesse nulle en X et Y)
+# Lock the base of an FE mesh (zero velocity in X and Y)
 mesh.imposeDrivenDof(group='down', component=[1, 2], dofty='vlocy', ct=0.)
 
-# Imposer un déplacement vertical constant de 0.001 m/s
+# Impose a constant vertical displacement of 0.001 m/s
 bodies[3].imposeDrivenDof(group='all', component=2, dofty='vlocy', ct=0.001)
 
-# Oscillation sinusoïdale en X, fréquence 5 Hz, amplitude 0.01 m/s
+# Sinusoidal oscillation in X, frequency 5 Hz, amplitude 0.01 m/s
 bodies[5].imposeDrivenDof(
     group='all', component=1, dofty='vlocy',
     ct=0., amp=0.01, omega=31.416, phi=0.
 )
 
-# Chargement thermique depuis fichier d'évolution
+# Thermal loading from an evolution file
 mesh.imposeDrivenDof(
     group='up', component=1, dofty='temp',
     description='evolution', evolutionFile='temperature.evol'
@@ -219,11 +219,11 @@ mesh.imposeDrivenDof(
 
 ---
 
-### 4. `imposeInitValue` — Valeur initiale
+### 4. `imposeInitValue` — Initial Value
 
-Impose une **condition initiale** (position ou vitesse) sur les nœuds d'un groupe, uniquement à l'instant `t = 0`. N'impose aucune contrainte pendant le calcul.
+Imposes an **initial condition** (position or velocity) on the nodes of a group, only at time `t = 0`. Does not impose any constraint during the computation.
 
-**Signature pylmgc90 :**
+**pylmgc90 signature:**
 ```python
 avatar.imposeInitValue(
     group='all',
@@ -232,53 +232,53 @@ avatar.imposeInitValue(
 )
 ```
 
-**Paramètres :**
+**Parameters:**
 
-| Paramètre | Type | Défaut | Description |
+| Parameter | Type | Default | Description |
 |-----------|------|--------|-------------|
-| `group` | str | `'all'` | Groupe de nœuds. |
-| `component` | int ou list | `1` | Composante(s) du DDL (même convention que `imposeDrivenDof`). |
-| `value` | float | `0.0` | Valeur initiale à imposer (m/s, m, K selon le type). |
+| `group` | str | `'all'` | Node group. |
+| `component` | int or list | `1` | DOF component(s) (same convention as `imposeDrivenDof`). |
+| `value` | float | `0.0` | Initial value to impose (m/s, m, K depending on the type). |
 
 
-> **Différence avec `imposeDrivenDof` :** `imposeInitValue` n'est actif qu'à `t = 0`. L'avatar est libre de se déplacer ensuite. `imposeDrivenDof` maintient la contrainte tout au long de la simulation.
-
----
-
-## Gestion des opérations
-
-### Créer une opération
-
-Remplir le formulaire et cliquer sur **✅ Appliquer**. L'opération est appliquée immédiatement sur les objets pylmgc90 et sauvegardée dans `state.operations`. Le signal `operation_applied` est émis, déclenchant un rafraîchissement complet de l'interface et du viewer 3D.
-
-### Modifier une opération
-
-Double-cliquer sur une opération dans la liste ou sélectionner et cliquer sur **✏️ Modifier**. Le formulaire est chargé avec les valeurs de l'opération. Modifier et cliquer sur **💾 Enregistrer** pour mettre à jour (`update_dof_operation`). L'opération est réappliquée.
-
-### Supprimer une opération
-
-Sélectionner et cliquer sur **🗑️ Supprimer**. L'opération est retirée de `state.operations` (`remove_dof_operation`). Le signal `operation_deleted` est émis.
-
-> **Attention :** la suppression d'une opération n'annule pas son effet sur les avatars (les translations et rotations déjà appliquées restent en place). Pour annuler une translation, créer une translation inverse.
+> **Difference from `imposeDrivenDof`:** `imposeInitValue` is only active at `t = 0`. The avatar is then free to move afterward. `imposeDrivenDof` maintains the constraint throughout the simulation.
 
 ---
 
-## Support des groupes
+## Managing Operations
 
-La liste déroulante de groupes inclut automatiquement tous les groupes définis dans le projet :
+### Creating an Operation
 
-| Source | Exemples de noms |
+Fill in the form and click **✅ Apply**. The operation is applied immediately to the pylmgc90 objects and saved in `state.operations`. The `operation_applied` signal is emitted, triggering a full refresh of the interface and the 3D viewer.
+
+### Editing an Operation
+
+Double-click on an operation in the list, or select it and click **✏️ Edit**. The form is loaded with the operation's values. Modify it and click **💾 Save** to update it (`update_dof_operation`). The operation is reapplied.
+
+### Deleting an Operation
+
+Select it and click **🗑️ Delete**. The operation is removed from `state.operations` (`remove_dof_operation`). The `operation_deleted` signal is emitted.
+
+> **Warning:** deleting an operation does not undo its effect on the avatars (translations and rotations already applied remain in place). To undo a translation, create an inverse translation.
+
+---
+
+## Group Support
+
+The group dropdown list automatically includes all groups defined in the project:
+
+| Source | Example Names |
 |--------|----------------|
-| Boucles géométriques | `ma_ligne`, `anneau_particules` |
-| Boucles `for` | nom saisi dans le formulaire de la boucle |
-| Granulométrie | `granulo_box2d`, `granulo_couette2d` |
-| Maçonnerie | `mur_briques`, `mur_facade` |
-| Groupes DOF maillage EF | `down`, `up`, `left`, `right`, `front`, `rear` |
+| Geometric loops | `ma_ligne`, `anneau_particules` |
+| `for` loops | name entered in the loop form |
+| Granulometry | `granulo_box2d`, `granulo_couette2d` |
+| Masonry | `mur_briques`, `mur_facade` |
+| FE mesh DOF groups | `down`, `up`, `left`, `right`, `front`, `rear` |
 
-Appliquer une opération à un groupe exécute la même opération sur chaque avatar du groupe :
+Applying an operation to a group executes the same operation on every avatar in the group:
 
 ```python
-# Exemple script généré pour un groupe :
+# Example generated script for a group:
 for av in group_granulo_box2d:
     av.imposeDrivenDof(group='all', component=1, dofty='vlocy', ct=0.0)
 ```
@@ -286,34 +286,31 @@ for av in group_granulo_box2d:
 ---
 
 
-## Exemple — Bielle-manivelle (`slider_crank.lmgc90`)
+## Example — Slider-Crank (`slider_crank.lmgc90`)
 
-L'exemple fourni dans les exemples du projet illustre l'application de quatre conditions aux limites sur les avatars du mécanisme bielle-manivelle :
+The example provided among the project examples illustrates the application of four boundary conditions to the avatars of the slider-crank mechanism:
 
-![Exemple slider_crank](captures/exemple_slider_crank.JPG)
+![Slider_crank example](captures/exemple_slider_crank.JPG)
 
-| Opération | Type | Cible | Paramètres typiques |
+| Operation | Type | Target | Typical Parameters |
 |-----------|------|-------|---------------------|
-| Rotation de la manivelle | `imposeDrivenDof` | Avatar manivelle | `component=3, dofty='vlocy', ct=ω` |
-| Blocage du coulisseau | `imposeDrivenDof` | Avatar coulisseau | `component=2, dofty='vlocy', ct=0.` |
-| Pivot bielle-manivelle | `imposeInitValue` | Avatar bielle | `component=[1,2], value=0.` |
-| Position initiale | `translate` | Avatar manivelle | `dx=x0, dy=y0` |
+| Crank rotation | `imposeDrivenDof` | Crank avatar | `component=3, dofty='vlocy', ct=ω` |
+| Slider locking | `imposeDrivenDof` | Slider avatar | `component=2, dofty='vlocy', ct=0.` |
+| Crank-rod pivot | `imposeInitValue` | Rod avatar | `component=[1,2], value=0.` |
+| Initial position | `translate` | Crank avatar | `dx=x0, dy=y0` |
 
 ![](captures/exemple_slider_crank.JPG)
 
 ---
 
-## Remarques importantes
+## Important Notes
 
-**Ordre des opérations :** les opérations sont appliquées dans l'ordre où elles sont créées. Une translation suivie d'une rotation donne un résultat différent de la rotation suivie de la translation. L'ordre dans `state.operations` est respecté à la fois lors de l'application et dans le script généré.
+**Order of operations:** operations are applied in the order in which they are created. A translation followed by a rotation gives a different result than a rotation followed by the translation. The order in `state.operations` is respected both when applying the operations and in the generated script.
 
-**Annulation impossible :** `translate` et `rotate` modifient les coordonnées physiques des nœuds pylmgc90. Il n'existe pas de bouton Annuler — pour inverser, créer une opération opposée (translation inverse, rotation de signe opposé).
+**No undo:** `translate` and `rotate` modify the physical coordinates of the pylmgc90 nodes. There is no Undo button — to reverse an operation, create an opposite one (inverse translation, rotation of opposite sign).
 
-**`imposeDrivenDof` vs `imposeInitValue` :** utiliser `imposeDrivenDof` avec `ct=0` et `dofty='vlocy'` pour **bloquer** un DDL pendant la simulation. Utiliser `imposeInitValue` uniquement pour définir une **condition initiale** sans contrainte sur la durée.
+**`imposeDrivenDof` vs `imposeInitValue`:** use `imposeDrivenDof` with `ct=0` and `dofty='vlocy'` to **lock** a DOF throughout the simulation. Use `imposeInitValue` only to define an **initial condition** with no constraint over time.
 
-**Fichiers d'évolution :** le fichier `.evol` doit être placé dans le répertoire `DATBOX/` du projet. Il contient deux colonnes : temps (s) et valeur, séparées par des espaces ou des tabulations. Le nombre de lignes doit couvrir toute la durée de simulation.
+**Evolution files:** the `.evol` file must be placed in the project's `DATBOX/` directory. It contains two columns: time (s) and value, separated by spaces or tabs. The number of lines must cover the entire simulation duration.
 
-**Composantes pour les corps déformables :** pour les maillages EF, `component` accepte directement les entiers 1, 2, 3 (DDL de déplacement nodaux). Pour les corps rigides, `component=1` correspond à la translation en X, `component=2` en Y, `component=3` en Z. La composante de rotation est `component=4` (2D) ou 4-6 (3D) selon la physique.
-
-
-
+**Components for deformable bodies:** for FE meshes, `component` directly accepts the integers 1, 2, 3 (nodal displacement DOFs). For rigid bodies, `component=1` corresponds to translation in X, `component=2` in Y, `component=3` in Z. The rotation component is `component=4` (2D) or 4-6 (3D) depending on the physics.

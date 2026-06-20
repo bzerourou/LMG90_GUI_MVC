@@ -1,273 +1,273 @@
-# Assistant de configuration de projet
+# Project Configuration Wizard
 
-L'**Assistant de configuration de projet** guide pas à pas la création d'un projet LMGC90 complet avec tous ses éléments essentiels : matériau, modèle, avatar de test, loi de contact et table de visibilité.
+The **Project Configuration Wizard** guides you step by step through the creation of a complete LMGC90 project with all its essential elements: material, model, test avatar, contact law, and visibility table.
 
-Il est particulièrement utile pour démarrer rapidement un nouveau projet sans avoir à configurer chaque onglet séparément.
+It is particularly useful for quickly starting a new project without having to configure each tab separately.
 
-> **⏱️ Temps estimé : 2 à 3 minutes**
+> **⏱️ Estimated time: 2 to 3 minutes**
 
 ---
 
-## Lancer l'assistant
+## Launching the Wizard
 
-Trois façons d'ouvrir l'assistant :
+Three ways to open the wizard:
 
-| Méthode | Action |
+| Method | Action |
 |---------|--------|
-| Menu | **Fichier → Assistant de projet…** ou **Assistants → Configuration de projet** |
-| Barre d'outils | Bouton dédié (selon la configuration de la barre) |
-| Raccourci clavier | `Ctrl+Shift+N` |
+| Menu | **File → Project Wizard…** or **Wizards → Project Configuration** |
+| Toolbar | Dedicated button (depending on the toolbar configuration) |
+| Keyboard shortcut | `Ctrl+Shift+N` |
 
-![Ouverture de l'assistant](captures/projet_assistant.JPG)
+![Opening the wizard](captures/projet_assistant.JPG)
 
-> **Annulation possible à tout moment** : cliquer sur **❌ Annuler** à n'importe quelle étape ferme l'assistant sans modifier le projet. L'état du projet (nom, dimension, chemin) est entièrement restauré.
+> **Cancellation possible at any time**: clicking **❌ Cancel** at any step closes the wizard without modifying the project. The project state (name, dimension, path) is fully restored.
 
 ---
 
-## Vue d'ensemble des étapes
+## Overview of Steps
 
-L'assistant est composé de **9 pages** parcourues séquentiellement. Les boutons **⬅️ Retour** et **Suivant ➡️** permettent de naviguer librement entre les pages.
+The wizard consists of **9 pages** navigated sequentially. The **⬅️ Back** and **Next ➡️** buttons allow free navigation between pages.
 
-| Étape | Page | Description | Obligatoire |
+| Step | Page | Description | Mandatory |
 |-------|------|-------------|-------------|
-| 0 | Introduction | Présentation de l'assistant | — |
-| 1 | Informations du projet | Nom et description | ✅ Oui (nom requis) |
-| 2 | Dimension | 2D ou 3D | ✅ Oui |
-| 3 | Matériau | Créer ou réutiliser un matériau | ✅ Oui |
-| 4 | Modèle | Créer ou réutiliser un modèle physique | ✅ Oui |
-| 5 | Avatar | Créer un premier avatar de test | ⬜ Optionnel |
-| 6 | Loi de contact | Définir le comportement de contact | ⬜ Optionnel |
-| 7 | Table de visibilité | Définir qui interagit avec qui | ⬜ Optionnel (requiert étapes 5 et 6) |
-| 8 | Récapitulatif | Vérification avant création | — |
+| 0 | Introduction | Presentation of the wizard | — |
+| 1 | Project Information | Name and description | ✅ Yes (name required) |
+| 2 | Dimension | 2D or 3D | ✅ Yes |
+| 3 | Material | Create or reuse a material | ✅ Yes |
+| 4 | Model | Create or reuse a physical model | ✅ Yes |
+| 5 | Avatar | Create a first test avatar | ⬜ Optional |
+| 6 | Contact Law | Define the contact behavior | ⬜ Optional |
+| 7 | Visibility Table | Define who interacts with whom | ⬜ Optional (requires steps 5 and 6) |
+| 8 | Summary | Verification before creation | — |
 
 ---
 
 ## Page 0 — Introduction
 
-Page d'accueil présentant les étapes à venir. Aucune saisie requise.
+Welcome page presenting the upcoming steps. No input required.
 
-Cliquer sur **Suivant ➡️** pour commencer.
+Click **Next ➡️** to begin.
 
 ---
 
-## Page 1 — Informations du projet
+## Page 1 — Project Information
 
-![Page nom du projet](captures/projet_assistant_nom.JPG)
+![Project name page](captures/projet_assistant_nom.JPG)
 
-| Champ | Description | Contraintes |
+| Field | Description | Constraints |
 |-------|-------------|-------------|
-| **Nom du projet** | Identifiant du projet. Utilisé comme nom de fichier lors de la sauvegarde. | **Requis** — 50 caractères maximum. Le bouton Suivant est désactivé tant que ce champ est vide. |
-| **Description** | Texte libre décrivant l'objectif ou le contexte du projet. | Optionnel |
+| **Project name** | Project identifier. Used as the file name when saving. | **Required** — 50 characters maximum. The Next button is disabled as long as this field is empty. |
+| **Description** | Free text describing the purpose or context of the project. | Optional |
 
-> **Nom requis :** le champ Nom est marqué d'un astérisque (`*`) dans l'assistant — il s'agit d'un champ obligatoire. Le bouton **Suivant ➡️** reste grisé tant qu'il est vide.
+> **Name required:** the Name field is marked with an asterisk (`*`) in the wizard — it is a mandatory field. The **Next ➡️** button remains grayed out as long as it is empty.
 
 ---
 
-## Page 2 — Dimension du problème
+## Page 2 — Problem Dimension
 
-![Page dimension](captures/projet_assistant_dimension.JPG)
+![Dimension page](captures/projet_assistant_dimension.JPG)
 
-Choisir entre deux options exclusives (boutons radio) :
+Choose between two mutually exclusive options (radio buttons):
 
-| Choix | Code interne | Exemples d'usage |
+| Choice | Internal Code | Usage Examples |
 |-------|-------------|------------------|
-| **2D — Problème bidimensionnel** | `dimension = 2` | Compression biaxiale, essai œdométrique, écoulement granulaire 2D, tambour rotatif 2D |
-| **3D — Problème tridimensionnel** | `dimension = 3` | Compression triaxiale, trémie 3D, tambour cylindrique, mélangeur 3D |
+| **2D — Two-dimensional problem** | `dimension = 2` | Biaxial compression, oedometric test, 2D granular flow, 2D rotating drum |
+| **3D — Three-dimensional problem** | `dimension = 3` | Triaxial compression, 3D hopper, cylindrical drum, 3D mixer |
 
-La valeur **2D** est sélectionnée par défaut.
+The **2D** value is selected by default.
 
-> **Effet sur les étapes suivantes :** la dimension choisie ici conditionne automatiquement :
-> - La liste d'éléments proposés à l'étape Modèle (`Rxx2D` ou `Rxx3D`)
-> - Le type d'avatar proposé à l'étape Avatar (`rigidDisk` ou `rigidSphere`)
-> - Le type de corps et de contacteur dans la table de visibilité (`RBDY2/DISKx` ou `RBDY3/SPHER`)
-
----
-
-## Page 3 — Matériau
-
-![Page matériau](captures/projet_assistant_materiau.JPG)
-
-Cette page propose deux modes selon l'état du projet :
-
-### Mode A — Utiliser un matériau existant _(si le projet contient déjà des matériaux)_
-
-Une liste déroulante affiche tous les matériaux déjà définis dans l'onglet Matériau. Sélectionner l'un d'eux pour l'associer au projet sans en créer un nouveau.
-
-### Mode B — Créer un nouveau matériau _(coché automatiquement si aucun matériau n'existe)_
-
-Cocher **Créer un nouveau matériau à la place** pour afficher le formulaire de création :
-
-| Champ | Description | Valeur par défaut |
-|-------|-------------|-------------------|
-| **Nom** | Identifiant du matériau. **5 caractères maximum.** | `rockx` |
-| **Type** | Type de comportement mécanique. | `RIGID` |
-| **Densité** | Masse volumique (kg/m³). | `2500 kg/m³` |
-
-> **Conseil de l'assistant :** pour des simulations granulaires simples, utilisez le type `RIGID` avec une densité de 2 500 kg/m³ (sable/gravier typique). Les propriétés élastiques ne sont pas configurables dans l'assistant — utiliser l'onglet Matériau pour les types `ELAS`, `ELAS_PLAS`, etc.
+> **Effect on subsequent steps:** the dimension chosen here automatically determines:
+> - The list of elements offered at the Model step (`Rxx2D` or `Rxx3D`)
+> - The type of avatar offered at the Avatar step (`rigidDisk` or `rigidSphere`)
+> - The body and contactor type in the visibility table (`RBDY2/DISKx` or `RBDY3/SPHER`)
 
 ---
 
-## Page 4 — Modèle physique
+## Page 3 — Material
 
-![Page modèle](captures/projet_assistant_modele.JPG)
+![Material page](captures/projet_assistant_materiau.JPG)
 
-Même logique que la page Matériau : réutiliser un modèle existant ou en créer un nouveau.
+This page offers two modes depending on the state of the project:
 
-### Mode A — Utiliser un modèle existant
+### Mode A — Use an Existing Material _(if the project already contains materials)_
 
-Liste déroulante des modèles déjà définis dans l'onglet Modèle.
+A dropdown list displays all the materials already defined in the Material tab. Select one of them to associate it with the project without creating a new one.
 
-### Mode B — Créer un nouveau modèle
+### Mode B — Create a New Material _(automatically checked if no material exists)_
 
-| Champ | Description | Valeur par défaut |
+Check **Create a new material instead** to display the creation form:
+
+| Field | Description | Default Value |
 |-------|-------------|-------------------|
-| **Nom** | Identifiant du modèle. **5 caractères maximum.** | `rigid` |
-| **Physique** | Famille de physique. | `MECAx` (seule option dans l'assistant) |
-| **Élément** | Type d'élément fini. Adapté automatiquement à la dimension. | `Rxx2D` (2D) ou `Rxx3D` (3D) |
+| **Name** | Material identifier. **5 characters maximum.** | `rockx` |
+| **Type** | Type of mechanical behavior. | `RIGID` |
+| **Density** | Density (kg/m³). | `2500 kg/m³` |
 
-> **Conseil de l'assistant :** pour des corps rigides (DEM), utilisez `Rxx2D` en 2D ou `Rxx3D` en 3D. Ces éléments n'ont aucune option numérique et sont les plus simples à configurer. Pour des modèles éléments finis déformables, créer le modèle directement dans l'onglet Modèle après la fin de l'assistant.
+> **Wizard tip:** for simple granular simulations, use the `RIGID` type with a density of 2,500 kg/m³ (typical sand/gravel). Elastic properties are not configurable in the wizard — use the Material tab for the `ELAS`, `ELAS_PLAS`, etc. types.
 
 ---
 
-## Page 5 — Premier avatar _(optionnel)_
+## Page 4 — Physical Model
 
-![Page avatar](captures/projet_assistant_avatar.JPG)
+![Model page](captures/projet_assistant_modele.JPG)
 
-Cette page est **optionnelle**. Elle permet de créer un avatar de test positionné à l'origine (centre = `[0, 0]` en 2D ou `[0, 0, 0]` en 3D).
+Same logic as the Material page: reuse an existing model or create a new one.
 
-Cocher **Créer un avatar de test** pour afficher le formulaire :
+### Mode A — Use an Existing Model
 
-| Champ | Description | Valeur par défaut |
+Dropdown list of models already defined in the Model tab.
+
+### Mode B — Create a New Model
+
+| Field | Description | Default Value |
 |-------|-------------|-------------------|
-| **Type** | Type d'avatar. Adapté automatiquement à la dimension. | `rigidDisk` (2D) ou `rigidSphere` (3D) |
-| **Rayon** | Rayon du disque ou de la sphère (m). | `0.1 m` |
-| **Couleur** | Code couleur LMGC90 à 5 caractères. | `BLUEx` |
+| **Name** | Model identifier. **5 characters maximum.** | `rigid` |
+| **Physics** | Physics family. | `MECAx` (only option in the wizard) |
+| **Element** | Finite element type. Adapted automatically to the dimension. | `Rxx2D` (2D) or `Rxx3D` (3D) |
 
-> **Dépendance :** l'avatar utilise automatiquement le matériau et le modèle définis aux étapes précédentes. Si aucun matériau ou modèle valide n'est disponible, l'avatar ne sera pas créé même si la case est cochée.
-
-> **Position :** l'avatar est créé à l'origine du repère. Modifier sa position après création via l'onglet Avatar.
+> **Wizard tip:** for rigid bodies (DEM), use `Rxx2D` in 2D or `Rxx3D` in 3D. These elements have no numerical options and are the simplest to configure. For deformable finite element models, create the model directly in the Model tab after finishing the wizard.
 
 ---
 
-## Page 6 — Loi de contact _(optionnelle)_
+## Page 5 — First Avatar _(optional)_
 
-![Page loi de contact](captures/projet_assistant_contact.JPG)
+![Avatar page](captures/projet_assistant_avatar.JPG)
 
-Définit le comportement mécanique lors des contacts entre avatars. Cocher **Créer une loi de contact** (coché par défaut) pour afficher le formulaire :
+This page is **optional**. It allows you to create a test avatar positioned at the origin (center = `[0, 0]` in 2D or `[0, 0, 0]` in 3D).
 
-| Champ | Description | Valeur par défaut |
+Check **Create a test avatar** to display the form:
+
+| Field | Description | Default Value |
 |-------|-------------|-------------------|
-| **Nom** | Identifiant de la loi. Jusqu'à 20 caractères. | `iqsc0` |
-| **Type de loi** | Type de comportement de contact. Voir tableau ci-dessous. | `IQS_CLB` |
-| **Coefficient de friction** | Visible uniquement pour les lois avec frottement de Coulomb. | `0.3` |
+| **Type** | Avatar type. Adapted automatically to the dimension. | `rigidDisk` (2D) or `rigidSphere` (3D) |
+| **Radius** | Radius of the disk or sphere (m). | `0.1 m` |
+| **Color** | 5-character LMGC90 color code. | `BLUEx` |
 
-### Types de lois disponibles
+> **Dependency:** the avatar automatically uses the material and model defined in the previous steps. If no valid material or model is available, the avatar will not be created even if the box is checked.
 
-| Type | Nom complet | Friction | Description |
+> **Position:** the avatar is created at the origin of the coordinate system. Modify its position after creation via the Avatar tab.
+
+---
+
+## Page 6 — Contact Law _(optional)_
+
+![Contact law page](captures/projet_assistant_contact.JPG)
+
+Defines the mechanical behavior during contacts between avatars. Check **Create a contact law** (checked by default) to display the form:
+
+| Field | Description | Default Value |
+|-------|-------------|-------------------|
+| **Name** | Law identifier. Up to 20 characters. | `iqsc0` |
+| **Law type** | Type of contact behavior. See table below. | `IQS_CLB` |
+| **Friction coefficient** | Visible only for laws with Coulomb friction. | `0.3` |
+
+### Available Law Types
+
+| Type | Full Name | Friction | Description |
 |------|-------------|----------|-------------|
-| `IQS_CLB` | Contact Unilatéral Quasi-Statique + Coulomb | ✅ Oui | Loi standard rigide non-lissée. La plus courante pour les simulations DEM. |
-| `IQS_CLB_G0` | IQS_CLB avec gap nul | ✅ Oui | Variante avec gap initial nul. |
-| `COUPLED_DOF` | Degrés de liberté couplés | ❌ Non | Couplage cinématique entre corps. |
-| `IQS_DS_CLB` | Contact Discret Rigide + Coulomb | ❌ Non | Loi discrète avec rigidités normales et tangentielles. |
-| `IQS_MOHR_DS_CLB` | Mohr-Coulomb Discret | ❌ Non | Critère de Mohr-Coulomb pour les joints ou interfaces fragiles. |
-| `IQS_MAC_CZM` | Zone Cohésive | ❌ Non | Loi de zone cohésive pour la fissuration. |
-| `ELASTIC_WIRE` | Câble élastique | ❌ Non | Liaison unilatérale en traction (câble). |
-| `BRITTLE_ELASTIC_WIRE` | Câble élastique fragile | ❌ Non | Câble avec rupture fragile au-delà d'un seuil. |
-| `ELASTIC_ROD` | Barre élastique | ❌ Non | Liaison bilatérale en traction et compression (barre). |
-| `ELASTIC_REPELL_CLB` | Répulsion élastique + Coulomb | ❌ Non | Contact répulsif avec frottement. |
+| `IQS_CLB` | Quasi-Static Unilateral Contact + Coulomb | ✅ Yes | Standard non-smooth rigid law. The most common for DEM simulations. |
+| `IQS_CLB_G0` | IQS_CLB with zero gap | ✅ Yes | Variant with zero initial gap. |
+| `COUPLED_DOF` | Coupled degrees of freedom | ❌ No | Kinematic coupling between bodies. |
+| `IQS_DS_CLB` | Discrete Rigid Contact + Coulomb | ❌ No | Discrete law with normal and tangential stiffnesses. |
+| `IQS_MOHR_DS_CLB` | Discrete Mohr-Coulomb | ❌ No | Mohr-Coulomb criterion for joints or brittle interfaces. |
+| `IQS_MAC_CZM` | Cohesive Zone | ❌ No | Cohesive zone law for cracking. |
+| `ELASTIC_WIRE` | Elastic cable | ❌ No | Unilateral tension link (cable). |
+| `BRITTLE_ELASTIC_WIRE` | Brittle elastic cable | ❌ No | Cable with brittle failure beyond a threshold. |
+| `ELASTIC_ROD` | Elastic rod | ❌ No | Bilateral link in tension and compression (rod). |
+| `ELASTIC_REPELL_CLB` | Elastic repulsion + Coulomb | ❌ No | Repulsive contact with friction. |
 
-**Valeurs de friction typiques :**
+**Typical Friction Values:**
 
-| Matériau | Coefficient de friction |
+| Material | Friction Coefficient |
 |----------|------------------------|
-| Surfaces lisses | 0.1 |
-| Sable fin | 0.3 |
-| Gravier | 0.5 |
-| Béton rugueux | 0.6–0.8 |
+| Smooth surfaces | 0.1 |
+| Fine sand | 0.3 |
+| Gravel | 0.5 |
+| Rough concrete | 0.6–0.8 |
 
-> La friction n'est configurable que pour les lois `IQS_CLB` et `IQS_CLB_G0`. Pour les autres types, le champ est masqué automatiquement.
+> Friction is only configurable for the `IQS_CLB` and `IQS_CLB_G0` laws. For other types, the field is automatically hidden.
 
 ---
 
-## Page 7 — Table de visibilité _(optionnelle)_
+## Page 7 — Visibility Table _(optional)_
 
-![Page visibilité](captures/projet_assistant_visibilite.JPG)
+![Visibility page](captures/projet_assistant_visibilite.JPG)
 
-La table de visibilité définit **quels contacteurs peuvent se détecter mutuellement** et avec quelle loi de contact. Cocher **Créer une table de visibilité** (coché par défaut) pour afficher le formulaire :
+The visibility table defines **which contactors can detect each other** and with which contact law. Check **Create a visibility table** (checked by default) to display the form:
 
-| Champ | Description | Valeur par défaut |
+| Field | Description | Default Value |
 |-------|-------------|-------------------|
-| **Couleur candidat** | Couleur des contacteurs candidats (corps actif). | `BLUEx` (synchronisé avec la couleur de l'avatar si l'étape 5 est active) |
-| **Couleur antagoniste** | Couleur des contacteurs antagonistes (corps passif). | `BLUEx` |
-| **Distance d'alerte** | Distance maximale de détection de contact (m). Au-delà, deux corps ne sont pas considérés en contact potentiel. | `0.1 m` |
+| **Candidate color** | Color of the candidate contactors (active body). | `BLUEx` (synchronized with the avatar's color if step 5 is active) |
+| **Antagonist color** | Color of the antagonist contactors (passive body). | `BLUEx` |
+| **Alert distance** | Maximum contact detection distance (m). Beyond this, two bodies are not considered to be in potential contact. | `0.1 m` |
 
-**Configuration automatique selon la dimension :**
+**Automatic Configuration Based on Dimension:**
 
-| Paramètre | 2D | 3D |
+| Parameter | 2D | 3D |
 |-----------|----|----|
-| Type de corps | `RBDY2` | `RBDY3` |
-| Type de contacteur | `DISKx` | `SPHER` |
-| Loi de contact | Celle créée à l'étape 6 | Celle créée à l'étape 6 |
+| Body type | `RBDY2` | `RBDY3` |
+| Contactor type | `DISKx` | `SPHER` |
+| Contact law | The one created at step 6 | The one created at step 6 |
 
-> **Dépendance :** la table de visibilité n'est créée que si une loi de contact a été définie à l'étape précédente **et** qu'un avatar a été créé à l'étape 5. Si l'une ou l'autre de ces conditions n'est pas remplie, la table est ignorée même si la case est cochée.
+> **Dependency:** the visibility table is only created if a contact law was defined at the previous step **and** an avatar was created at step 5. If either of these conditions is not met, the table is ignored even if the box is checked.
 
-> **Synchronisation des couleurs :** si un avatar a été créé à l'étape 5, les couleurs candidat et antagoniste sont automatiquement pré-remplies avec la couleur de cet avatar.
+> **Color synchronization:** if an avatar was created at step 5, the candidate and antagonist colors are automatically pre-filled with that avatar's color.
 
 ---
 
-## Page 8 — Récapitulatif
+## Page 8 — Summary
 
-![Page récapitulatif](captures/projet_assistant_recap.JPG)
+![Summary page](captures/projet_assistant_recap.JPG)
 
-La dernière page affiche un résumé complet de tous les éléments qui seront créés. Vérifier les informations avant de valider.
+The last page displays a complete summary of all the elements that will be created. Review the information before validating.
 
-### Contenu du récapitulatif
+### Summary Content
 
-| Section | Informations affichées |
+| Section | Information Displayed |
 |---------|------------------------|
-| **Projet** | Nom du projet, dimension (2D/3D) |
-| **Matériau** | Nom, type, densité — ou matériau existant sélectionné |
-| **Modèle** | Nom, physique, élément — ou modèle existant sélectionné |
-| **Avatar** | Type, rayon — ou « Aucun avatar créé » |
-| **Loi de contact** | Nom, type, coefficient de friction — ou « Aucune loi créée » |
-| **Table de visibilité** | Corps, contacteur, couleurs, loi appliquée, distance d'alerte — ou « Aucune table créée » |
+| **Project** | Project name, dimension (2D/3D) |
+| **Material** | Name, type, density — or selected existing material |
+| **Model** | Name, physics, element — or selected existing model |
+| **Avatar** | Type, radius — or "No avatar created" |
+| **Contact Law** | Name, type, friction coefficient — or "No law created" |
+| **Visibility Table** | Body, contactor, colors, applied law, alert distance — or "No table created" |
 
-Cliquer sur **✅ Créer le Projet** pour finaliser. Tous les éléments sont créés simultanément et apparaissent immédiatement dans l'arbre du modèle et les onglets correspondants.
+Click **✅ Create the Project** to finalize. All elements are created simultaneously and immediately appear in the model tree and the corresponding tabs.
 
-> **En cas d'erreur :** si la création échoue (nom de matériau en double, paramètre invalide, etc.), une boîte d'erreur s'affiche avec le détail du problème. L'état du projet est entièrement restauré à son état avant l'ouverture de l'assistant.
+> **In case of error:** if creation fails (duplicate material name, invalid parameter, etc.), an error box is displayed with details of the problem. The project state is fully restored to what it was before the wizard was opened.
 
 ---
 
-## Après la création
+## After Creation
 
-Une fois l'assistant terminé, tous les éléments générés sont modifiables librement via leurs onglets respectifs :
+Once the wizard is finished, all generated elements can be freely modified via their respective tabs:
 
-| Élément créé | Onglet pour modifier |
+| Created Element | Tab to Edit |
 |-------------|---------------------|
-| Matériau | **Matériau** (`Ctrl+1`) — sélectionner dans la liste et cliquer sur ✏️ Modifier |
-| Modèle | **Modèle** (`Ctrl+2`) |
+| Material | **Material** (`Ctrl+1`) — select from the list and click ✏️ Edit |
+| Model | **Model** (`Ctrl+2`) |
 | Avatar | **Avatar** (`Ctrl+3`) |
-| Loi de contact | **Contact** (`Ctrl+9`) |
-| Table de visibilité | **Visibilité** |
+| Contact Law | **Contact** (`Ctrl+9`) |
+| Visibility Table | **Visibility** |
 
 ---
 
-## Récapitulatif des raccourcis
+## Shortcuts Summary
 
-| Action | Raccourci |
+| Action | Shortcut |
 |--------|-----------|
-| Ouvrir l'assistant | `Ctrl+Shift+N` |
-| Page suivante | `Entrée` ou **Suivant ➡️** |
-| Page précédente | **⬅️ Retour** |
-| Annuler | **❌ Annuler** (restaure l'état précédent) |
-| Créer le projet | **✅ Créer le Projet** (dernière page) |
+| Open the wizard | `Ctrl+Shift+N` |
+| Next page | `Enter` or **Next ➡️** |
+| Previous page | **⬅️ Back** |
+| Cancel | **❌ Cancel** (restores the previous state) |
+| Create the project | **✅ Create the Project** (last page) |
 
 ---
 
-## Conseils d'utilisation
+## Usage Tips
 
-**Commencer simple :** pour un premier projet LMGC90_GUI 2D, utiliser le type `RIGID` pour le matériau, `Rxx2D` pour le modèle, créer un disque de test et la loi `IQS_CLB` avec un frottement de 0.3. Le projet sera fonctionnel en moins de 2 minutes.
+**Start simple:** for a first 2D LMGC90_GUI project, use the `RIGID` type for the material, `Rxx2D` for the model, create a test disk, and the `IQS_CLB` law with a friction of 0.3. The project will be functional in under 2 minutes.
 
-**Réutiliser l'existant :** si un matériau ou un modèle a déjà été créé dans le projet courant, l'assistant le propose automatiquement en première option. Il n'est pas nécessaire d'en créer un nouveau à chaque fois.
+**Reuse existing elements:** if a material or model has already been created in the current project, the wizard automatically offers it as the first option. There is no need to create a new one every time.
 
-**Compléter après :** l'assistant crée des éléments de base. Pour vos configurations avancées (éléments finis déformables, lois plastiques, conditions aux limites, boucles granulaires), utiliser directement les onglets spécialisés après la fin de l'assistant.
+**Complete afterward:** the wizard creates basic elements. For your advanced configurations (deformable finite elements, plastic laws, boundary conditions, granular loops), use the specialized tabs directly after finishing the wizard.

@@ -1,28 +1,28 @@
-# LMGC90_GUI — Architecture & Guide du Contributeur
+# LMGC90_GUI — Architecture & Contributor Guide
 
-> Version 0.4.0 — Interface graphique pour le code de simulation mécanique LMGC90, l'architecture actuelle va être remplacée dans la version 0.5.0.
-
----
-
-## Table des matières
-
-1. [Vue d'ensemble](#1-vue-densemble)
-2. [Structure des fichiers](#2-structure-des-fichiers)
-3. [Couche Core (Modèle)](#3-couche-core-modèle)
-4. [Couche Controllers](#4-couche-controllers)
-5. [Couche GUI / Views](#5-couche-gui--views)
-6. [Couche Utils](#6-couche-utils)
-7. [Flux de données](#7-flux-de-données)
-8. [Systèmes clés expliqués](#8-systèmes-clés-expliqués)
-9. [Cycle de vie d'un projet](#9-cycle-de-vie-dun-projet)
-10. [Conventions et patterns](#10-conventions-et-patterns)
-11. [Guide de contribution](#11-guide-de-contribution)
+> Version 0.4.0 — Graphical interface for the LMGC90 mechanical simulation code. The current architecture will be replaced in version 0.5.0.
 
 ---
 
-## 1. Vue d'ensemble
+## Table of Contents
 
-LMGC90_GUI est une application de bureau **PyQt6** suivant le pattern **MVC** (Model-View-Controller). Elle permet de créer des simulations mécaniques LMGC90 via une interface graphique sans écrire de code Python manuellement.
+1. [Overview](#1-overview)
+2. [File Structure](#2-file-structure)
+3. [Core Layer (Model)](#3-core-layer-model)
+4. [Controllers Layer](#4-controllers-layer)
+5. [GUI / Views Layer](#5-gui--views-layer)
+6. [Utils Layer](#6-utils-layer)
+7. [Data Flow](#7-data-flow)
+8. [Key Systems Explained](#8-key-systems-explained)
+9. [Project Life Cycle](#9-project-life-cycle)
+10. [Conventions and Patterns](#10-conventions-and-patterns)
+11. [Contribution Guide](#11-contribution-guide)
+
+---
+
+## 1. Overview
+
+LMGC90_GUI is a **PyQt6** desktop application following the **MVC** (Model-View-Controller) pattern. It allows you to create LMGC90 mechanical simulations through a graphical interface without manually writing Python code.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -36,7 +36,7 @@ LMGC90_GUI est une application de bureau **PyQt6** suivant le pattern **MVC** (M
 │         │                    ▼                       ▼           │
 │         │           ┌──────────────────┐    ┌───────────────┐   │
 │         │           │  pylmgc_bridge   │───▶│  pylmgc90.pre │   │
-│         │           │  (LMGC90Bridge)  │    │  (externe)    │   │
+│         │           │  (LMGC90Bridge)  │    │  (external)    │   │
 │         │           └──────────────────┘    └───────────────┘   │
 │         │                                                         │
 │         ▼                                                         │
@@ -48,126 +48,126 @@ LMGC90_GUI est une application de bureau **PyQt6** suivant le pattern **MVC** (M
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Dépendances principales
+### Main Dependencies
 
-| Dépendance | Rôle |
+| Dependency | Role |
 |---|---|
-| `PyQt6` | Framework UI (widgets, signaux/slots, threads) |
-| `pylmgc90` | Bibliothèque LMGC90 (pré-traitement, simulation) |
-| `numpy` | Calculs vectorisés (granulométrie, positions) |
-| `pyvista` / `pyvistaqt` | Visualisation 3D des avatars |
-| `gmsh` (optionnel) | Maillage de géométries pour corps déformables |
+| `PyQt6` | UI framework (widgets, signals/slots, threads) |
+| `pylmgc90` | LMGC90 library (pre-processing, simulation) |
+| `numpy` | Vectorized computations (granulometry, positions) |
+| `pyvista` / `pyvistaqt` | 3D visualization of avatars |
+| `gmsh` (optional) | Meshing of geometries for deformable bodies |
 
 ---
 
-## 2. Structure des fichiers
+## 2. File Structure
 
 ```
 lmgc90_gui/
 │
-├── main.py                          # Point d'entrée, QApplication
+├── main.py                          # Entry point, QApplication
 │
 ├── src/
-│   ├── core/                        # Couche Modèle (MVC)
-│   │   ├── models.py                # Dataclasses : Material, Model, Avatar, ...
-│   │   ├── validators.py            # Validation des données
+│   ├── core/                        # Model Layer (MVC)
+│   │   ├── models.py                # Dataclasses: Material, Model, Avatar, ...
+│   │   ├── validators.py            # Data validation
 │   │   ├── generators.py            # LoopGenerator, GranuloGenerator
-│   │   ├── serializers.py           # Sauvegarde/chargement JSON (.lmgc90)
-│   │   ├── pylmgc_bridge.py         # Conversion modèles → objets pylmgc90
-│   │   ├── particle_factory.py      # Moteur de génération progressive
-│   │   ├── avatar_factory.py        # Templates d'avatars prédéfinis
-│   │   ├── app_logger.py            # Logger applicatif
+│   │   ├── serializers.py           # JSON save/load (.lmgc90)
+│   │   ├── pylmgc_bridge.py         # Conversion of models → pylmgc90 objects
+│   │   ├── particle_factory.py      # Progressive generation engine
+│   │   ├── avatar_factory.py        # Predefined avatar templates
+│   │   ├── app_logger.py            # Application logger
 │   │   └── workers/
-│   │       └── granulo_worker.py    # QThread pour génération granulo
+│   │       └── granulo_worker.py    # QThread for granulo generation
 │   │
 │   ├── controllers/
-│   │   └── project_controller.py    # Contrôleur central (logique métier)
+│   │   └── project_controller.py    # Central controller (business logic)
 │   │
-│   ├── views/                       # Couche Vue (MVC)
-│   │   ├── main_window.py           # Fenêtre principale (QMainWindow)
-│   │   ├── tree_view.py             # Arbre du modèle (QTreeWidget)
-│   │   └── tabs/                    # Onglets de travail
-│   │       ├── base_tab.py          # Classe de base avec safe_eval
-│   │       ├── material_tab.py      # Gestion matériaux
-│   │       ├── model_tab.py         # Gestion modèles EF
-│   │       ├── avatar_tab.py        # Gestion avatars standards
-│   │       ├── empty_avatar_tab.py  # Avatars vides (contacteurs manuels)
-│   │       ├── loop_tab.py          # Boucles de génération
-│   │       ├── granulo_tab.py       # Génération granulométrique
-│   │       ├── dof_tab.py           # Conditions aux limites DOF
-│   │       ├── contact_tab.py       # Lois de contact
-│   │       ├── visibility_tab.py    # Tables de visibilité
-│   │       ├── postpro_tab.py       # Post-traitement
-│   │       ├── viewer_tab.py        # Wrapper onglet visualisation 3D
+│   ├── views/                       # View Layer (MVC)
+│   │   ├── main_window.py           # Main window (QMainWindow)
+│   │   ├── tree_view.py             # Model tree (QTreeWidget)
+│   │   └── tabs/                    # Working tabs
+│   │       ├── base_tab.py          # Base class with safe_eval
+│   │       ├── material_tab.py      # Material management
+│   │       ├── model_tab.py         # FE model management
+│   │       ├── avatar_tab.py        # Standard avatar management
+│   │       ├── empty_avatar_tab.py  # Empty avatars (manual contactors)
+│   │       ├── loop_tab.py          # Generation loops
+│   │       ├── granulo_tab.py       # Granulometric generation
+│   │       ├── dof_tab.py           # DOF boundary conditions
+│   │       ├── contact_tab.py       # Contact laws
+│   │       ├── visibility_tab.py    # Visibility tables
+│   │       ├── postpro_tab.py       # Post-processing
+│   │       ├── viewer_tab.py        # 3D visualization tab wrapper
 │   │       └── ...
 │   │
 │   ├── gui/
-│   │   └── dialogs/                 # Dialogues et assistants
+│   │   └── dialogs/                 # Dialogs and wizards
 │   │       ├── dialogs.py           # DynamicVarsDialog, PreferencesDialog, DuplicateDialog
-│   │       ├── setup_wizard.py      # Assistant de projet
-│   │       ├── factory_wizard.py    # Assistant Particle Factory (+ FactoryTab)
-│   │       ├── granulo_wizard.py    # Assistant granulométrie
-│   │       ├── mesh_wiz_def.py      # Assistant corps déformables (FEM)
-│   │       ├── masonery_wizard.py   # Assistant maçonnerie
-│   │       ├── fast_granulo_dialg.py # Dialog génération rapide numpy
-│   │       ├── viewer_3d.py         # Widget PyVista (visualisation 3D)
-│   │       ├── chipy_routines_dialog.py # Config routines chipy
-│   │       ├── app_log_dialog.py    # Visualisation des logs
-│   │       └── convert_dialog.py    # Conversion scripts pylmgc90
+│   │       ├── setup_wizard.py      # Project wizard
+│   │       ├── factory_wizard.py    # Particle Factory wizard (+ FactoryTab)
+│   │       ├── granulo_wizard.py    # Granulometry wizard
+│   │       ├── mesh_wiz_def.py      # Deformable body wizard (FEM)
+│   │       ├── masonery_wizard.py   # Masonry wizard
+│   │       ├── fast_granulo_dialg.py # Fast numpy generation dialog
+│   │       ├── viewer_3d.py         # PyVista widget (3D visualization)
+│   │       ├── chipy_routines_dialog.py # chipy routine config
+│   │       ├── app_log_dialog.py    # Log visualization
+│   │       └── convert_dialog.py    # pylmgc90 script conversion
 │   │
 │   └── utils/
-│       ├── safe_eval.py             # Évaluateur sécurisé + proxies contexte projet
-│       ├── script_generator.py      # Génération script pre.py
-│       ├── compute_script_generator.py # Génération script chipy (command.py)
-│       ├── fast_granulo_engin.py    # Moteur granulo numpy haute perf.
-│       └── convert.py              # Convertisseur script pylmgc90 → .lmgc90
+│       ├── safe_eval.py             # Secure evaluator + project context proxies
+│       ├── script_generator.py      # pre.py script generation
+│       ├── compute_script_generator.py # chipy script generation (command.py)
+│       ├── fast_granulo_engin.py    # High-perf numpy granulo engine
+│       └── convert.py              # pylmgc90 script → .lmgc90 converter
 ```
 
 ---
 
-## 3. Couche Core (Modèle)
+## 3. Core Layer (Model)
 
-### 3.1 `models.py` — Les dataclasses
+### 3.1 `models.py` — The Dataclasses
 
-Toutes les entités du projet sont des **dataclasses Python**. Elles sont la source de vérité.
+All project entities are **Python dataclasses**. They are the source of truth.
 
 ```python
-# Hiérarchie des modèles
+# Model hierarchy
 ProjectState
-├── List[Material]          # Matériaux (RIGID, ELAS, ...)
-├── List[Model]             # Modèles EF (Rxx2D, T3xxx, ...)
-├── List[Avatar]            # Corps rigides/déformables
-├── List[ContactLaw]        # Lois de contact (IQS_CLB, ...)
-├── List[VisibilityRule]    # Tables de visibilité
-├── List[DOFOperation]      # Conditions aux limites
-├── List[Loop]              # Boucles géométriques (cercle, grille...)
-├── List[ForLoop]           # Boucles for génériques (JSON template)
-├── List[GranuloGeneration] # Dépôts granulométriques
-├── List[PostProCommand]    # Commandes post-traitement
-├── Dict[str, List[int]]    # Groupes d'avatars (nom → indices)
-├── Dict[str, Any]          # Variables dynamiques (expressions)
-├── List[dict]              # Factories (FactoryConfig sérialisés)
-└── ProjectPreferences      # Préférences utilisateur
+├── List[Material]          # Materials (RIGID, ELAS, ...)
+├── List[Model]             # FE models (Rxx2D, T3xxx, ...)
+├── List[Avatar]            # Rigid/deformable bodies
+├── List[ContactLaw]        # Contact laws (IQS_CLB, ...)
+├── List[VisibilityRule]    # Visibility tables
+├── List[DOFOperation]      # Boundary conditions
+├── List[Loop]              # Geometric loops (circle, grid...)
+├── List[ForLoop]           # Generic for loops (JSON template)
+├── List[GranuloGeneration] # Granulometric deposits
+├── List[PostProCommand]    # Post-processing commands
+├── Dict[str, List[int]]    # Avatar groups (name → indices)
+├── Dict[str, Any]          # Dynamic variables (expressions)
+├── List[dict]              # Factories (serialized FactoryConfig)
+└── ProjectPreferences      # User preferences
 ```
 
-**Chaque dataclass** expose `to_dict()` et `from_dict()` pour la sérialisation JSON. Exemple :
+**Each dataclass** exposes `to_dict()` and `from_dict()` for JSON serialization. Example:
 
 ```python
 @dataclass
 class Avatar:
-    avatar_type: AvatarType       # Enum : rigidDisk, roughWall, ...
+    avatar_type: AvatarType       # Enum: rigidDisk, roughWall, ...
     center: List[float]
     material_name: str
     model_name: str
     color: str = "BLUEx"
     origin: AvatarOrigin = AvatarOrigin.MANUAL
     radius: Optional[float] = None
-    # ... autres champs spécifiques au type
+    # ... other type-specific fields
 ```
 
-**Enums importants :**
+**Important Enums:**
 
-| Enum | Valeurs notables |
+| Enum | Notable Values |
 |---|---|
 | `AvatarType` | `RIGID_DISK`, `ROUGH_WALL`, `MESH_DEFORMABLE`, `EMPTY_AVATAR`, ... |
 | `AvatarOrigin` | `MANUAL`, `LOOP`, `GRANULO` |
@@ -179,22 +179,22 @@ class Avatar:
 
 ### 3.2 `validators.py` — Validation
 
-Chaque entité a son validateur :
+Each entity has its own validator:
 
 ```python
-MaterialValidator.validate_or_raise(material)  # Nom ≤ 5 chars, densité > 0
-ModelValidator.validate_or_raise(model)         # Élément compatible physique+dim
-AvatarValidator.validate_or_raise(avatar, model) # Paramètres selon type
-ContactLawValidator.validate_or_raise(law)      # Propriétés obligatoires
+MaterialValidator.validate_or_raise(material)  # Name ≤ 5 chars, density > 0
+ModelValidator.validate_or_raise(model)         # Element compatible with physics+dim
+AvatarValidator.validate_or_raise(avatar, model) # Parameters based on type
+ContactLawValidator.validate_or_raise(law)      # Required properties
 ```
 
-Les validateurs lèvent `ValidationError` (hérite de `Exception`) capturée par la Vue pour afficher un `QMessageBox`.
+The validators raise `ValidationError` (inherits from `Exception`), caught by the View to display a `QMessageBox`.
 
 ---
 
-### 3.3 `pylmgc_bridge.py` — Pont vers pylmgc90
+### 3.3 `pylmgc_bridge.py` — Bridge to pylmgc90
 
-`LMGC90Bridge` est une classe **statique** qui convertit les dataclasses en objets `pylmgc90.pre` :
+`LMGC90Bridge` is a **static** class that converts the dataclasses into `pylmgc90.pre` objects:
 
 ```python
 LMGC90Bridge.create_material(material)       → pre.material(...)
@@ -205,55 +205,55 @@ LMGC90Bridge.create_visibility_rule(rule, b) → pre.see_table(...)
 LMGC90Bridge.apply_dof_operation(op, body)   → body.translate(...) / body.imposeDrivenDof(...)
 ```
 
-**Cas complexes gérés :**
-- Corps déformables : `pre.buildMesh2D`, `pre.buildMeshH8`, `pre.readMesh` + `pre.buildMeshedAvatar`
-- Briques de maçonnerie : `pre.brick2D/3D` + `brick.rigidBrick(...)`
-- Avatars vides avec contacteurs : création pas-à-pas via `pre.avatar()` → `addBulk` → `addNode` → `addContactors`
+**Complex Cases Handled:**
+- Deformable bodies: `pre.buildMesh2D`, `pre.buildMeshH8`, `pre.readMesh` + `pre.buildMeshedAvatar`
+- Masonry bricks: `pre.brick2D/3D` + `brick.rigidBrick(...)`
+- Empty avatars with contactors: step-by-step creation via `pre.avatar()` → `addBulk` → `addNode` → `addContactors`
 
 ---
 
-### 3.4 `generators.py` — Génération de positions
+### 3.4 `generators.py` — Position Generation
 
 ```python
 LoopGenerator.generate_positions(loop: Loop) → List[[x, y]]
-# Dispatche vers : generate_circle / generate_grid / generate_line / generate_spiral
+# Dispatches to: generate_circle / generate_grid / generate_line / generate_spiral
 
 GranuloGenerator.generate(config) → (nb_particles, coordinates_array, radii_array)
-# Appelle pre.granulo_Random puis pre.depositInBox2D / depositInDisk2D / ...
+# Calls pre.granulo_Random then pre.depositInBox2D / depositInDisk2D / ...
 ```
 
 ---
 
 ### 3.5 `particle_factory.py` — Particle Factory
 
-Système de génération **progressive** de particules (inspiré d'EDEM) :
+A **progressive** particle generation system (inspired by EDEM):
 
-- `FactoryConfig` : dataclass complète (type, zone, planning, conteneur)
-- `ParticleFactory` : moteur (valide, assigne les indices corps, génère le code)
-- `PreCodeGenerator` : génère le bloc `pre.py` (création invisible + planning)
-- `ChipyCodeGenerator` : génère le bloc `chipy.py` (activation par vagues)
+- `FactoryConfig`: complete dataclass (type, zone, schedule, container)
+- `ParticleFactory`: engine (validates, assigns body indices, generates code)
+- `PreCodeGenerator`: generates the `pre.py` block (invisible creation + schedule)
+- `ChipyCodeGenerator`: generates the `chipy.py` block (wave activation)
 
 ---
 
 ### 3.6 `serializers.py`
 
 ```python
-ProjectSerializer.save(state, filepath)   # JSON → fichier .lmgc90
-ProjectSerializer.load(filepath)          # fichier .lmgc90 → ProjectState
+ProjectSerializer.save(state, filepath)   # JSON → .lmgc90 file
+ProjectSerializer.load(filepath)          # .lmgc90 file → ProjectState
 ```
 
-Le format `.lmgc90` est du **JSON pur**. Seuls les avatars `origin == MANUAL` sont sérialisés ; les avatars générés (boucles, granulo) sont regénérés au chargement.
+The `.lmgc90` format is **pure JSON**. Only avatars with `origin == MANUAL` are serialized; generated avatars (loops, granulo) are regenerated on loading.
 
 ---
 
-## 4. Couche Controllers
+## 4. Controllers Layer
 
-### 4.1 `project_controller.py` — Le contrôleur central
+### 4.1 `project_controller.py` — The Central Controller
 
-`ProjectController(QObject)` est le **cœur de l'application**. Il :
+`ProjectController(QObject)` is the **heart of the application**. It:
 
-1. Maintient l'état du projet (`self.state: ProjectState`)
-2. Maintient les objets pylmgc90 en mémoire :
+1. Maintains the project state (`self.state: ProjectState`)
+2. Maintains the pylmgc90 objects in memory:
    ```python
    self._materials_container   # pre.materials()
    self._models_container      # pre.models()
@@ -262,353 +262,353 @@ Le format `.lmgc90` est du **JSON pur**. Seuls les avatars `origin == MANUAL` so
    self._visibility_container  # pre.see_tables()
    self._postpro_container     # pre.postpro_commands()
    
-   self._pylmgc_materials: Dict[str, Any]  # nom → objet pylmgc90
+   self._pylmgc_materials: Dict[str, Any]  # name → pylmgc90 object
    self._pylmgc_models: Dict[str, Any]
-   self._pylmgc_bodies: List[Any]          # indexé comme state.avatars
+   self._pylmgc_bodies: List[Any]          # indexed like state.avatars
    self._pylmgc_laws: Dict[str, Any]
    ```
-3. Émet `state_changed = pyqtSignal()` à chaque modification
+3. Emits `state_changed = pyqtSignal()` on every modification
 
-**Invariant fondamental :** `self._pylmgc_bodies[i]` correspond toujours à `self.state.avatars[i]`.
+**Fundamental invariant:** `self._pylmgc_bodies[i]` always corresponds to `self.state.avatars[i]`.
 
-#### API du contrôleur (méthodes principales)
+#### Controller API (main methods)
 
 ```python
-# Projet
+# Project
 controller.new_project(name)
 controller.save_project(filepath?)
-controller.load_project(filepath)        # → reconstruit tout via _rebuild_pylmgc_objects()
+controller.load_project(filepath)        # → rebuilds everything via _rebuild_pylmgc_objects()
 
-# CRUD Matériaux
-controller.add_material(material)        # valide + crée objet pylmgc + state
-controller.update_material(old_name, m)  # met à jour refs dans avatars
+# Material CRUD
+controller.add_material(material)        # validates + creates pylmgc object + state
+controller.update_material(old_name, m)  # updates refs in avatars
 controller.remove_material(name)
 
-# CRUD Modèles (identique)
-# CRUD Avatars
-controller.add_avatar(avatar, create_pylmgc=True)  # create_pylmgc=False pour perf
+# Model CRUD (identical)
+# Avatar CRUD
+controller.add_avatar(avatar, create_pylmgc=True)  # create_pylmgc=False for performance
 controller.update_avatar(index, avatar)
 controller.remove_avatar(index)
 controller.duplicate_avatar(index, n, offset, group?)
 controller.duplicate_group(group_name, n, offset, prefix?)
 
-# Génération
-controller.generate_loop(loop)           # → crée avatars + ajoute au groupe
+# Generation
+controller.generate_loop(loop)           # → creates avatars + adds to the group
 controller.generate_granulo(config)      # → via GranuloGenerator
-controller.generate_for_loop(for_loop)   # → boucle for générique
+controller.generate_for_loop(for_loop)   # → generic for loop
 
 # DATBOX
 controller.generate_datbox(output_path) # → pre.writeDatbox(...)
 ```
 
-#### `_rebuild_pylmgc_objects()` — Reconstruction au chargement
+#### `_rebuild_pylmgc_objects()` — Reconstruction on Loading
 
-Au chargement d'un projet, l'ordre est **strict** :
-1. Matériaux → modèles → avatars MANUAL → boucles → granulo → boucles For
-2. Lois de contact → visibilité → DOF
+When loading a project, the order is **strict**:
+1. Materials → models → MANUAL avatars → loops → granulo → For loops
+2. Contact laws → visibility → DOF
 
-Si une erreur survient (ex : matériau manquant), elle est stockée dans `state.load_warnings` et affichée dans l'UI.
+If an error occurs (e.g.: missing material), it is stored in `state.load_warnings` and displayed in the UI.
 
-#### Mode batch
+#### Batch Mode
 
 ```python
-self._batch_mode = True   # Désactive state_changed.emit() pendant la création
-# ... créer N avatars ...
+self._batch_mode = True   # Disables state_changed.emit() during creation
+# ... create N avatars ...
 self._batch_mode = False
-self.state_changed.emit()  # Un seul signal à la fin
+self.state_changed.emit()  # A single signal at the end
 ```
 
 ---
 
-## 5. Couche GUI / Views
+## 5. GUI / Views Layer
 
-### 5.1 `main_window.py` — Fenêtre principale
+### 5.1 `main_window.py` — Main Window
 
-`MainWindow(QMainWindow)` orchestre tout :
+`MainWindow(QMainWindow)` orchestrates everything:
 
 ```
 MainWindow
-├── MenuBar                # Fichier, Assistants, Outils, Calcul, Onglets, Aide
-├── ToolBar                # Nouveau, Ouvrir, Sauvegarder, DATBOX, Script
-├── DockWidget (gauche)
-│   └── ModelTreeView      # Arbre QTreeWidget
-└── Central (QSplitter vertical)
-    ├── QTabWidget         # Onglets de travail (70%)
+├── MenuBar                # File, Wizards, Tools, Computation, Tabs, Help
+├── ToolBar                # New, Open, Save, DATBOX, Script
+├── DockWidget (left)
+│   └── ModelTreeView      # QTreeWidget tree
+└── Central (vertical QSplitter)
+    ├── QTabWidget         # Working tabs (70%)
     │   ├── MaterialTab
     │   ├── ModelTab
     │   ├── AvatarTab
     │   └── ...
-    └── QWidget (bas 30%)  # Boutons LMGC90 Viz + ParaView
+    └── QWidget (bottom 30%)  # LMGC90 Viz + ParaView buttons
 ```
 
-**Gestion des onglets :** Les onglets peuvent être ouverts/fermés dynamiquement. `material_tab` et `model_tab` sont **essentiels** (non fermables). Chaque onglet est instancié une seule fois et caché/montré.
+**Tab management:** Tabs can be opened/closed dynamically. `material_tab` and `model_tab` are **essential** (cannot be closed). Each tab is instantiated only once and hidden/shown.
 
-**Connexion des signaux :**
+**Signal connections:**
 ```python
-# Chaque onglet émet des signaux → MainWindow._refresh_all()
+# Each tab emits signals → MainWindow._refresh_all()
 self.material_tab.material_created.connect(self._refresh_all)
-# _refresh_all() appelle tree_view.refresh() + tab.refresh() sur tous les onglets
+# _refresh_all() calls tree_view.refresh() + tab.refresh() on all tabs
 ```
 
 ---
 
-### 5.2 `tree_view.py` — Arbre du modèle
+### 5.2 `tree_view.py` — Model Tree
 
-`ModelTreeView(QObject)` gère un `QTreeWidget` affichant la structure complète :
+`ModelTreeView(QObject)` manages a `QTreeWidget` displaying the complete structure:
 
 ```
-Modèle LMGC90
-├── Matériaux (N)
-├── Modèles (N)
-├── Avatars (N) [filtrés selon préférence show_granulo_individually]
-├── Groupes d'avatars
-├── Lois de contact
-├── Tables de visibilité
-├── Opérations DOF
-├── Boucles
-├── Dépôts Granulo
+LMGC90 Model
+├── Materials (N)
+├── Models (N)
+├── Avatars (N) [filtered according to the show_granulo_individually preference]
+├── Avatar Groups
+├── Contact Laws
+├── Visibility Tables
+├── DOF Operations
+├── Loops
+├── Granulo Deposits
 └── Post-Processing
 ```
 
-**Signal émis :** `item_selected = pyqtSignal(str, object)` → type d'élément + données. `MainWindow` reçoit ce signal et charge l'élément dans l'onglet approprié.
+**Signal emitted:** `item_selected = pyqtSignal(str, object)` → element type + data. `MainWindow` receives this signal and loads the element into the appropriate tab.
 
-**Menu contextuel :** Clic droit sur Avatar → `DuplicateDialog`. Clic droit sur Groupe → duplication du groupe entier.
+**Context menu:** Right-click on Avatar → `DuplicateDialog`. Right-click on Group → duplication of the entire group.
 
 ---
 
-### 5.3 `base_tab.py` — Classe de base des onglets
+### 5.3 `base_tab.py` — Base Tab Class
 
-Tous les onglets héritent de `BaseTab(QWidget)`. Elle fournit :
+All tabs inherit from `BaseTab(QWidget)`. It provides:
 
 ```python
-# Évaluation sécurisée d'expressions (utilise SafeEvaluator)
+# Secure evaluation of expressions (uses SafeEvaluator)
 self.eval_float(text, default, field_name)  # "0.5 * pi" → 1.5707...
 self.eval_int(text, default, field_name)
 self.eval_list(text, expected_length, field_name)  # "1.0, 2.0" → [1.0, 2.0]
 self.eval_dict(text, field_name)    # "k=1, nu=0.3" → {"k": 1, "nu": 0.3}
 
-# Label d'aide contextuelle
+# Contextual help label
 self.add_expression_help_label(layout)
 ```
 
-L'évaluateur donne accès au **contexte projet complet** dans les champs de formulaire :
+The evaluator gives access to the **full project context** in the form fields:
 `avatar[0].x`, `group['mur'][0].radius`, `material['acier'].density`, etc.
 
 ---
 
-### 5.4 Les onglets (tabs/)
+### 5.4 The Tabs (tabs/)
 
-Chaque onglet suit le même **pattern CRUD** :
+Each tab follows the same **CRUD pattern**:
 
 ```
 Tab
-├── QTreeWidget        # Liste des éléments existants
-├── Boutons (✏️ Modifier, 🗑️ Supprimer)
-├── QFormLayout        # Formulaire de création/édition
-├── Boutons (✅ Créer, 💾 Enregistrer, ❌ Annuler, 🔄 Réinitialiser)
-└── Signaux émis       # element_created, element_updated, element_deleted
+├── QTreeWidget        # List of existing elements
+├── Buttons (✏️ Edit, 🗑️ Delete)
+├── QFormLayout        # Creation/editing form
+├── Buttons (✅ Create, 💾 Save, ❌ Cancel, 🔄 Reset)
+└── Signals emitted    # element_created, element_updated, element_deleted
 ```
 
-**Méthodes à implémenter dans chaque onglet :**
+**Methods to implement in each tab:**
 
 ```python
-def _setup_ui(self)              # Construction de l'interface
-def _connect_signals(self)       # Connexion signaux/slots
-def _on_create(self)             # Créer un élément
-def _on_edit_from_tree(self)     # Charger pour édition depuis l'arbre
-def _on_update(self)             # Enregistrer les modifications
-def _on_delete(self)             # Supprimer
-def load_for_edit(self, ...)     # Remplir le formulaire depuis un objet
-def refresh(self)                # Rafraîchir l'affichage
+def _setup_ui(self)              # Interface construction
+def _connect_signals(self)       # Signal/slot connection
+def _on_create(self)             # Create an element
+def _on_edit_from_tree(self)     # Load for editing from the tree
+def _on_update(self)             # Save the modifications
+def _on_delete(self)             # Delete
+def load_for_edit(self, ...)     # Fill the form from an object
+def refresh(self)                # Refresh the display
 ```
 
-#### `avatar_tab.py` — Onglet Avatar
+#### `avatar_tab.py` — Avatar Tab
 
-Gère 18+ types d'avatars 2D/3D. La méthode `_on_type_changed()` affiche/masque dynamiquement les champs selon le type sélectionné. `_build_avatar_from_form()` construit l'objet `Avatar` depuis les champs visibles.
+Manages 18+ types of 2D/3D avatars. The `_on_type_changed()` method dynamically shows/hides fields based on the selected type. `_build_avatar_from_form()` builds the `Avatar` object from the visible fields.
 
-#### `model_tab.py` — Onglet Modèle
+#### `model_tab.py` — Model Tab
 
-Gestion complexe des options selon la physique (MECAx/THERx/POROx/MULTI) et l'élément. `_on_element_changed()` reconstruit dynamiquement les combos d'options.
+Complex management of options depending on the physics (MECAx/THERx/POROx/MULTI) and the element. `_on_element_changed()` dynamically rebuilds the option combo boxes.
 
-#### `granulo_tab.py` — Génération granulométrique
+#### `granulo_tab.py` — Granulometric Generation
 
-Utilise un **QThread** (`GranuloWorker`) pour les calculs. La création des avatars se fait par **batches progressifs** via un `QTimer` pour ne pas bloquer l'UI :
+Uses a **QThread** (`GranuloWorker`) for the computations. Avatar creation is done in **progressive batches** via a `QTimer` so as not to block the UI:
 
 ```
 _on_generate() → GranuloWorker.run() → data_ready signal
                                           ↓
                                _on_data_ready() → QTimer(0ms)
                                                      ↓
-                               _create_next_avatar() × N [batches de 50-100]
+                               _create_next_avatar() × N [batches of 50-100]
                                                      ↓
                                _on_creation_completed()
 ```
 
 ---
 
-### 5.5 `viewer_3d.py` — Visualisation 3D
+### 5.5 `viewer_3d.py` — 3D Visualization
 
-`Viewer3D(QWidget)` wrappant `pyvistaqt.QtInteractor`. Ne se rafraîchit **jamais automatiquement** pour éviter les freezes. L'utilisateur clique "🔄 Rafraîchir la scène".
+`Viewer3D(QWidget)` wrapping `pyvistaqt.QtInteractor`. **Never** refreshes automatically, to avoid freezes. The user clicks "🔄 Refresh the scene".
 
-**Construction des meshes :**
+**Mesh construction:**
 ```python
 build_avatar_mesh(avatar) → pv.PolyData
-# Dispatche vers _MESH_BUILDERS[avatar.avatar_type]
-# Ex: _mesh_rigid_disk → pv.Circle().extrude(h)
-#     _mesh_rigid_polygon → pv.PolyData(vertices)
-#     _mesh_deformable → reconstruit depuis mesh_params (geom)
+# Dispatches to _MESH_BUILDERS[avatar.avatar_type]
+# E.g.: _mesh_rigid_disk → pv.Circle().extrude(h)
+#       _mesh_rigid_polygon → pv.PolyData(vertices)
+#       _mesh_deformable → rebuilt from mesh_params (geom)
 ```
 
-**Modes couleur :** LMGC90 (par code couleur) | Par type | Par matériau | Par origine  
-**Modes interaction :** Navigation | Sélection (avatar_clicked signal) | Règle (mesure distance)
+**Color modes:** LMGC90 (by color code) | By type | By material | By origin  
+**Interaction modes:** Navigation | Selection (avatar_clicked signal) | Ruler (distance measurement)
 
 ---
 
-### 5.6 Les Wizards (dialogs/)
+### 5.6 The Wizards (dialogs/)
 
-Assistants `QWizard` multi-pages pour des tâches complexes :
+Multi-page `QWizard` assistants for complex tasks:
 
-| Wizard | Pages | Résultat |
+| Wizard | Pages | Result |
 |---|---|---|
-| `ProjectSetupWizard` | Projet → Dim → Mat → Mod → Avatar → Contact → Visibilité → Résumé | Projet complet initialisé |
-| `GranuloWizard` | Distribution → Conteneur → Propriétés → Résumé | Dépôt granulo généré |
-| `MeshWizard` | Intro → Dim → Mat → Mod → Géom → Raffin → Boundary → Résumé | Corps déformable FEM |
-| `MasonryWizard` | Config → Modèle → Résumé | Mur de maçonnerie |
-| `FactoryWizard` | Intro → Zone → Particules → Conteneur → Planning → Résumé | Factory configurée |
+| `ProjectSetupWizard` | Project → Dim → Mat → Mod → Avatar → Contact → Visibility → Summary | Fully initialized project |
+| `GranuloWizard` | Distribution → Container → Properties → Summary | Generated granulo deposit |
+| `MeshWizard` | Intro → Dim → Mat → Mod → Geom → Refinement → Boundary → Summary | FEM deformable body |
+| `MasonryWizard` | Config → Model → Summary | Masonry wall |
+| `FactoryWizard` | Intro → Zone → Particles → Container → Schedule → Summary | Configured factory |
 
 ---
 
-## 6. Couche Utils
+## 6. Utils Layer
 
-### 6.1 `safe_eval.py` — Évaluation sécurisée
+### 6.1 `safe_eval.py` — Secure Evaluation
 
-**Problème résolu :** Permettre aux utilisateurs d'entrer des expressions Python (`avatar[0].x + 0.1`, `sqrt(2) * radius`) dans les formulaires sans risque de sécurité.
+**Problem solved:** Allow users to enter Python expressions (`avatar[0].x + 0.1`, `sqrt(2) * radius`) in the forms without security risk.
 
-**Architecture :**
+**Architecture:**
 
 ```python
-# 1. SafeEvaluator — vérification AST + eval isolé
+# 1. SafeEvaluator — AST checking + isolated eval
 ev = SafeEvaluator(allowed_names=context_dict)
 result = ev.eval_expression("avatar[0].x * 2")
 
-# 2. Proxies — accès aux données du projet
+# 2. Proxies — access to project data
 AvatarCollectionProxy  # avatar[i], len(avatar), list(avatar)
 AvatarProxy            # .center, .x, .y, .z, .radius, .nodes[1].coor, ...
-GroupProxy             # group['nom'][0].center
+GroupProxy             # group['name'][0].center
 MaterialProxy          # material['acier'].density
 ModelProxy             # model['rigid'].physics
 
-# 3. build_eval_context() — construit le contexte complet
+# 3. build_eval_context() — builds the full context
 ctx = build_eval_context(controller)
-# ctx contient: math, np, avatar, group, material, model,
+# ctx contains: math, np, avatar, group, material, model,
 #               avatars_by_color(), avatars_by_material(), ...
-#               + toutes les variables dynamiques du projet
+#               + all the project's dynamic variables
 ```
 
-**Sécurité :** `SafeEvaluator._check_safe()` parcourt l'AST et rejette tout nœud non autorisé (import, exec, attributs dangereux, etc.).
+**Security:** `SafeEvaluator._check_safe()` walks the AST and rejects any disallowed node (import, exec, dangerous attributes, etc.).
 
 ---
 
-### 6.2 `script_generator.py` — Génération script pre.py
+### 6.2 `script_generator.py` — pre.py Script Generation
 
-`ScriptGenerator(controller)` génère un script Python reproduisant le projet :
+`ScriptGenerator(controller)` generates a Python script reproducing the project:
 
 ```
 generate(output_path)
-├── _write_header()           # Commentaire d'en-tête
+├── _write_header()           # Header comment
 ├── _write_imports()          # from pylmgc90 import pre, numpy, math
-├── _write_dynamic_vars()     # Évaluation et injection des vars dynamiques
+├── _write_dynamic_vars()     # Evaluation and injection of dynamic vars
 ├── _write_containers()       # mats, mods, bodies, tacts, sees, posts
-├── _write_materials()        # mat_NOM = pre.material(...)
-├── _write_models()           # mod_NOM = pre.model(...)
-├── _write_avatars_manual()   # Avatars MANUAL (avec option boucle ou individuel)
-│   ├── _write_avatars_manual_loop()   # Mode boucle (par groupes)
-│   │   ├── _write_masonry_group_loop()  # Boucles briques de maçonnerie
-│   │   └── _write_standard_group_loop() # Boucle for + liste de centers
-│   └── _write_single_avatar()          # Avatar individuel
-├── _write_for_loops()        # Boucles For génériques
-├── _write_loops()            # Boucles géométriques (cercle, grille...)
+├── _write_materials()        # mat_NAME = pre.material(...)
+├── _write_models()           # mod_NAME = pre.model(...)
+├── _write_avatars_manual()   # MANUAL avatars (with loop or individual option)
+│   ├── _write_avatars_manual_loop()   # Loop mode (by groups)
+│   │   ├── _write_masonry_group_loop()  # Masonry brick loops
+│   │   └── _write_standard_group_loop() # for loop + list of centers
+│   └── _write_single_avatar()          # Individual avatar
+├── _write_for_loops()        # Generic For loops
+├── _write_loops()            # Geometric loops (circle, grid...)
 ├── _write_granulo()          # pre.granulo_Random + depositIn*
 ├── _write_contact_laws()     # pre.tact_behav(...)
 ├── _write_visibility()       # pre.see_table(...)
 ├── _write_dof_operations()   # body.translate / imposeDrivenDof
 ├── _write_postpro()          # pre.postpro_command(...)
-├── _write_factories()        # Particle Factories (code pré-calculé)
+├── _write_factories()        # Particle Factories (pre-computed code)
 └── _write_datbox()           # pre.writeDatbox(...)
 ```
 
-**Préférence `script_use_loop` :** Si activée, les avatars d'un même groupe homogène sont regroupés dans une boucle `for _c in _centers_<groupe>:` pour un script plus compact.
+**`script_use_loop` preference:** If enabled, avatars from the same homogeneous group are grouped into a `for _c in _centers_<group>:` loop for a more compact script.
 
 ---
 
-### 6.3 `compute_script_generator.py` — Génération script chipy
+### 6.3 `compute_script_generator.py` — chipy Script Generation
 
-`ComputeScriptGenerator(controller)` génère `command.py` (boucle de simulation) selon les paramètres configurés dans `ChipyRoutinesDialog`.
+`ComputeScriptGenerator(controller)` generates `command.py` (simulation loop) according to the parameters configured in `ChipyRoutinesDialog`.
 
-Sections générées :
-1. Configuration chipy (`SetDimension`, `ReadDatbox`, ...)
-2. Initialisation des Particle Factories (invisibilité + planning)
-3. Boucle principale `for k in range(nb_steps):`
+Generated sections:
+1. chipy configuration (`SetDimension`, `ReadDatbox`, ...)
+2. Initialization of the Particle Factories (invisibility + schedule)
+3. Main loop `for k in range(nb_steps):`
    - FreeVelocity RBDY2/RBDY3/FEM
-   - Détection contact (détecteurs sélectionnés)
-   - Résolution NLGS
-   - Activation des vagues de factory
+   - Contact detection (selected detectors)
+   - NLGS resolution
+   - Factory wave activation
    - ComputeDof + UpdateStep
-   - Extraction (énergie, GBV, inspection)
+   - Extraction (energy, GBV, inspection)
    - WriteOut + WriteDisplayFiles
-4. Finalisation
+4. Finalization
 
 ---
 
-### 6.4 `fast_granulo_engin.py` — Granulométrie numpy
+### 6.4 `fast_granulo_engin.py` — Numpy Granulometry
 
-Moteur **sans pylmgc90**, entièrement numpy, pour générer des milliers de particules sans bloquer l'UI :
+A **pylmgc90-free**, fully numpy engine, for generating thousands of particles without blocking the UI:
 
 ```python
 GranuloFastEngine.generate(nb, rmin, rmax, container_type, ...)
-# → Placement par batches (candidats → filtrage bbox → filtrage collisions vectorisé)
-# → FastGranuloResult avec List[FastParticle]
+# → Placement in batches (candidates → bbox filtering → vectorized collision filtering)
+# → FastGranuloResult with List[FastParticle]
 
 GranuloFileWriter.write(result, output_dir)
-# → Écrit DATBOX/BODIES.DAT directement (bypass pylmgc90)
+# → Writes DATBOX/BODIES.DAT directly (bypassing pylmgc90)
 
 GranuloStateIntegrator.integrate(result, controller)
-# → Ajoute les avatars en batch unique dans controller.state
+# → Adds the avatars in a single batch into controller.state
 ```
 
 ---
 
-### 6.5 `convert.py` — Convertisseur de scripts
+### 6.5 `convert.py` — Script Converter
 
-Convertit un script `pre.py` existant en fichier `.lmgc90` en **exécutant le script** avec un module `_MockPre` qui intercepte tous les appels `pre.*` :
+Converts an existing `pre.py` script into a `.lmgc90` file by **executing the script** with a `_MockPre` module that intercepts all `pre.*` calls:
 
 ```python
-class _MockPre:          # Remplace pylmgc90.pre pendant l'exec
-class _AvatarObj         # Proxy d'un avatar rigide
-class _MeshAvatarObj     # Proxy d'un corps déformable
-class _EmptyAvatarObj    # Proxy d'un avatar vide
-class _BrickObj          # Proxy d'une brique de maçonnerie
-class _WallObj           # Proxy d'un mur de maçonnerie
+class _MockPre:          # Replaces pylmgc90.pre during exec
+class _AvatarObj         # Proxy of a rigid avatar
+class _MeshAvatarObj     # Proxy of a deformable body
+class _EmptyAvatarObj    # Proxy of an empty avatar
+class _BrickObj          # Proxy of a masonry brick
+class _WallObj           # Proxy of a masonry wall
 
 class Converter:
-    run()                # Exécute le script avec le mock
-    to_lmgc90_dict()    # Construit le JSON projet
+    run()                # Executes the script with the mock
+    to_lmgc90_dict()    # Builds the project JSON
 
-# CLI :
-# python convert.py mon_script.py -o sortie.lmgc90
+# CLI:
+# python convert.py my_script.py -o output.lmgc90
 ```
 
 ---
 
-## 7. Flux de données
+## 7. Data Flow
 
-### 7.1 Création d'un avatar (exemple complet)
+### 7.1 Creating an Avatar (complete example)
 
 ```
-Utilisateur remplit AvatarTab → clique "✅ Créer Avatar"
+User fills in AvatarTab → clicks "✅ Create Avatar"
          ↓
 AvatarTab._on_create()
-  → _build_avatar_from_form()   # Valeurs → Avatar dataclass
+  → _build_avatar_from_form()   # Values → Avatar dataclass
   → controller.add_avatar(avatar)
          ↓
 ProjectController.add_avatar()
@@ -619,223 +619,223 @@ ProjectController.add_avatar()
   → self._bodies_container.addAvatar(body_obj)
   → self._pylmgc_bodies.append(body_obj)
   → self.state.avatars.append(avatar)
-  → self.state_changed.emit()   # si pas en batch_mode
+  → self.state_changed.emit()   # if not in batch_mode
          ↓
 AvatarTab.avatar_created.emit()
          ↓
 MainWindow._refresh_all()
-  → tree_view.refresh()         # Arbre mis à jour
-  → [tous les onglets].refresh() # Combos mis à jour
+  → tree_view.refresh()         # Tree updated
+  → [all tabs].refresh() # Combos updated
 ```
 
-### 7.2 Sauvegarde et chargement
+### 7.2 Saving and Loading
 
 ```
-Sauvegarde :
+Saving:
   ProjectController.save_project()
     → ProjectSerializer.save(state, filepath)
-      → state.to_dict()            # Seulement avatars MANUAL
-        → json.dump(data, file)   # Fichier .lmgc90
+      → state.to_dict()            # Only MANUAL avatars
+        → json.dump(data, file)   # .lmgc90 file
 
-Chargement :
+Loading:
   ProjectController.load_project(filepath)
     → ProjectSerializer.load(filepath)
-      → ProjectState.from_dict(data)   # Dataclasses reconstruites
-    → _rebuild_pylmgc_objects()        # Reconstruction ordre strict
-      1. Matériaux + Modèles           # Objets pylmgc90 recréés
-      2. Avatars MANUAL                # bridge.create_avatar()
-      3. Boucles → generate_loop()     # Avatars LOOP recréés
-      4. Granulo → generate_granulo()  # Avatars GRANULO recréés
-      5. Boucles For → generate_for_loop()
-      6. Lois + Visibilité + DOF
+      → ProjectState.from_dict(data)   # Dataclasses rebuilt
+    → _rebuild_pylmgc_objects()        # Strict-order reconstruction
+      1. Materials + Models           # pylmgc90 objects recreated
+      2. MANUAL Avatars                # bridge.create_avatar()
+      3. Loops → generate_loop()     # LOOP avatars recreated
+      4. Granulo → generate_granulo()  # GRANULO avatars recreated
+      5. For Loops → generate_for_loop()
+      6. Laws + Visibility + DOF
 ```
 
 ---
 
-## 8. Systèmes clés expliqués
+## 8. Key Systems Explained
 
-### 8.1 Indexation des avatars
+### 8.1 Avatar Indexing
 
-L'index d'un avatar dans `state.avatars` est son identifiant partout :
-- `state.avatar_groups["mur"] = [0, 1, 2, 3]` → indices dans state.avatars
+The index of an avatar in `state.avatars` is its identifier everywhere:
+- `state.avatar_groups["mur"] = [0, 1, 2, 3]` → indices in state.avatars
 - `state.operations[0].target_value = 5` → avatar #5
-- `self._pylmgc_bodies[5]` → objet pylmgc90 de l'avatar #5
+- `self._pylmgc_bodies[5]` → pylmgc90 object of avatar #5
 
-**⚠️ Attention lors de la suppression :** `remove_avatar(index)` fait un `pop(index)` qui décale tous les indices suivants. Les groupes et opérations qui référencent des avatars d'index supérieur deviennent invalides. C'est une limitation connue qui nécessite une refonte future (IDs stables).
+**⚠️ Caution when deleting:** `remove_avatar(index)` does a `pop(index)` which shifts all subsequent indices. Groups and operations referencing avatars with a higher index become invalid. This is a known limitation that will require a future redesign (stable IDs).
 
-### 8.2 Variables dynamiques
+### 8.2 Dynamic Variables
 
-Les variables dynamiques (`state.dynamic_vars`) sont des **expressions Python** :
+Dynamic variables (`state.dynamic_vars`) are **Python expressions**:
 ```python
 {"thickness": "0.5", "radius": "thickness * 2 + 0.1", "x_wall": "avatar[0].x"}
 ```
 
-Elles sont évaluées dans l'ordre de définition et injectées dans le contexte de `SafeEvaluator`. Ainsi, dans un formulaire, l'utilisateur peut écrire `radius` et obtenir la valeur calculée.
+They are evaluated in definition order and injected into `SafeEvaluator`'s context. Thus, in a form, the user can write `radius` and get the computed value.
 
-### 8.3 Système de préférences
+### 8.3 Preferences System
 
-`ProjectPreferences` est stocké dans `state.preferences` et sauvegardé avec le projet. Les préférences importantes :
+`ProjectPreferences` is stored in `state.preferences` and saved with the project. Important preferences:
 
-| Préférence | Impact |
+| Preference | Impact |
 |---|---|
-| `show_granulo_individually` | Masque les avatars GRANULO dans l'arbre et les onglets |
-| `create_pylmgc_on_generate` | Désactive la création pylmgc pendant génération massive |
-| `script_use_loop` | Génère des boucles compactes dans le script pre.py |
-| `auto_refresh_viewer` | (réservé) Rafraîchissement auto de la vue 3D |
+| `show_granulo_individually` | Hides GRANULO avatars in the tree and tabs |
+| `create_pylmgc_on_generate` | Disables pylmgc creation during massive generation |
+| `script_use_loop` | Generates compact loops in the pre.py script |
+| `auto_refresh_viewer` | (reserved) Automatic refresh of the 3D view |
 
 ### 8.4 Particle Factory
 
-Les factories sont persistées comme `List[dict]` dans `state.factories`. Au chargement et à la génération du script, `ParticleFactory.from_list_of_dicts()` reconstruit l'engine, recalcule les indices bodies, et génère les blocs de code.
+Factories are persisted as `List[dict]` in `state.factories`. On loading and when generating the script, `ParticleFactory.from_list_of_dicts()` rebuilds the engine, recomputes the body indices, and generates the code blocks.
 
 ---
 
-## 9. Cycle de vie d'un projet
+## 9. Project Life Cycle
 
 ```
-1. NOUVEAU PROJET
+1. NEW PROJECT
    MainWindow._on_new_project()
    → controller.new_project(name)
-   → _reset_containers() [conteneurs pylmgc vides]
+   → _reset_containers() [empty pylmgc containers]
    → state = ProjectState(name)
 
 2. CONFIGURATION
-   Onglet Matériaux → add_material()
-   Onglet Modèles   → add_model()
-   Onglet Avatars   → add_avatar()
-   ... (lois, visibilité, DOF, boucles, granulo)
+   Materials Tab → add_material()
+   Models Tab   → add_model()
+   Avatars Tab  → add_avatar()
+   ... (laws, visibility, DOF, loops, granulo)
 
-3. SAUVEGARDE
+3. SAVING
    Ctrl+S → save_project()
    → state.to_dict() → JSON
 
-4. GÉNÉRATION DATBOX
-   Outils → DATBOX → controller.generate_datbox(path)
+4. DATBOX GENERATION
+   Tools → DATBOX → controller.generate_datbox(path)
    → pre.writeDatbox(dim, mats, mods, bodies, tacts, sees, post)
 
-5. GÉNÉRATION SCRIPT PRE.PY
-   Outils → Script Python → ScriptGenerator.generate(path)
+5. PRE.PY SCRIPT GENERATION
+   Tools → Python Script → ScriptGenerator.generate(path)
 
-6. GÉNÉRATION SCRIPT CHIPY (command.py)
-   Calcul → Générer Script → ComputeScriptGenerator.generate(path, params)
+6. CHIPY SCRIPT GENERATION (command.py)
+   Computation → Generate Script → ComputeScriptGenerator.generate(path, params)
 
-7. CALCUL
-   Calcul → Lancer → compute_tab.run_computation()
-   → Exécute command.py dans un subprocess
-   → Affiche les logs LMGC90
+7. COMPUTATION
+   Computation → Run → compute_tab.run_computation()
+   → Executes command.py in a subprocess
+   → Displays the LMGC90 logs
 
-8. CHARGEMENT
-   Fichier → Ouvrir → controller.load_project(path)
+8. LOADING
+   File → Open → controller.load_project(path)
    → ProjectState.from_dict() + _rebuild_pylmgc_objects()
 ```
 
 ---
 
-## 10. Conventions et patterns
+## 10. Conventions and Patterns
 
-### Conventions de nommage
+### Naming Conventions
 
-| Élément | Convention | Exemple |
+| Element | Convention | Example |
 |---|---|---|
 | Classes | PascalCase | `AvatarTab`, `LMGC90Bridge` |
-| Méthodes | snake_case | `_on_create()`, `load_for_edit()` |
-| Slots Qt | Préfixe `_on_` | `_on_type_changed()` |
-| Signaux Qt | Suffixe descriptif | `avatar_created`, `state_changed` |
-| Méthodes privées | Préfixe `_` | `_build_avatar_from_form()` |
-| Conteneurs pylmgc | Préfixe `_pylmgc_` | `_pylmgc_materials` |
+| Methods | snake_case | `_on_create()`, `load_for_edit()` |
+| Qt Slots | `_on_` prefix | `_on_type_changed()` |
+| Qt Signals | Descriptive suffix | `avatar_created`, `state_changed` |
+| Private methods | `_` prefix | `_build_avatar_from_form()` |
+| pylmgc containers | `_pylmgc_` prefix | `_pylmgc_materials` |
 
-### Pattern signal/slot
+### Signal/Slot Pattern
 
 ```python
-# Dans un onglet :
+# In a tab:
 class AvatarTab(BaseTab):
-    avatar_created = pyqtSignal()   # Déclaration au niveau classe
+    avatar_created = pyqtSignal()   # Declaration at class level
 
     def _on_create(self):
         ...
-        self.avatar_created.emit()  # Émission après action réussie
+        self.avatar_created.emit()  # Emission after successful action
 
-# Dans MainWindow :
+# In MainWindow:
 self.avatar_tab.avatar_created.connect(self._refresh_all)
 ```
 
-### Gestion des erreurs
+### Error Handling
 
 ```python
 try:
-    # Code métier
+    # Business logic
     avatar = self._build_avatar_from_form()
     self.controller.add_avatar(avatar)
-    # Succès
-    QMessageBox.information(self, "Succès", "✅ Avatar créé")
+    # Success
+    QMessageBox.information(self, "Success", "✅ Avatar created")
 except ValidationError as e:
     QMessageBox.warning(self, "Validation", str(e))
 except ValueError as e:
-    QMessageBox.critical(self, "Erreur", f"Valeurs invalides :\n{e}")
+    QMessageBox.critical(self, "Error", f"Invalid values:\n{e}")
 except Exception as e:
-    QMessageBox.critical(self, "Erreur", f"Création échouée :\n{e}")
+    QMessageBox.critical(self, "Error", f"Creation failed:\n{e}")
 ```
 
 ---
 
-## 11. Guide de contribution
+## 11. Contribution Guide
 
-### Ajouter un nouveau type d'avatar
+### Adding a New Avatar Type
 
-1. **`models.py`** : Ajouter la valeur dans `AvatarType`
-2. **`validators.py`** : Ajouter la validation dans `AvatarValidator.validate()`
-3. **`pylmgc_bridge.py`** : Ajouter le cas dans `LMGC90Bridge.create_avatar()`
-4. **`avatar_tab.py`** :
-   - Ajouter le type dans `AVATAR_TYPES_2D` ou `AVATAR_TYPES_3D`
-   - Gérer l'affichage des champs dans `_on_type_changed()`
-   - Construire l'avatar dans `_build_avatar_from_form()`
-5. **`viewer_3d.py`** : Ajouter le builder de mesh dans `_MESH_BUILDERS`
-6. **`script_generator.py`** : Gérer la génération dans `_write_single_avatar()`
+1. **`models.py`**: Add the value to `AvatarType`
+2. **`validators.py`**: Add the validation in `AvatarValidator.validate()`
+3. **`pylmgc_bridge.py`**: Add the case in `LMGC90Bridge.create_avatar()`
+4. **`avatar_tab.py`**:
+   - Add the type to `AVATAR_TYPES_2D` or `AVATAR_TYPES_3D`
+   - Handle field display in `_on_type_changed()`
+   - Build the avatar in `_build_avatar_from_form()`
+5. **`viewer_3d.py`**: Add the mesh builder to `_MESH_BUILDERS`
+6. **`script_generator.py`**: Handle the generation in `_write_single_avatar()`
 
-### Ajouter un nouvel onglet
+### Adding a New Tab
 
-1. Créer `src/views/tabs/mon_tab.py` héritant de `BaseTab`
-2. Implémenter le pattern CRUD complet
-3. Déclarer les signaux nécessaires
-4. Importer dans `src/views/tabs/__init__.py`
-5. Instancier dans `MainWindow._create_tabs()`
-6. Ajouter dans `MainWindow.all_tabs`
-7. Connecter les signaux dans `MainWindow._connect_signals()`
+1. Create `src/views/tabs/my_tab.py` inheriting from `BaseTab`
+2. Implement the complete CRUD pattern
+3. Declare the necessary signals
+4. Import it in `src/views/tabs/__init__.py`
+5. Instantiate it in `MainWindow._create_tabs()`
+6. Add it to `MainWindow.all_tabs`
+7. Connect the signals in `MainWindow._connect_signals()`
 
-### Ajouter une nouvelle loi de contact
+### Adding a New Contact Law
 
-1. **`models.py`** : Ajouter dans `ContactLawType` et la catégorie appropriée dans `CONTACT_LAW_CATEGORIES`
-2. **`validators.py`** : Ajouter propriétés requises dans `ContactLawValidator._REQUIRED_PROPS`
-3. **`pylmgc_bridge.py`** : Ajouter le cas dans `create_contact_law()`
-4. **`contact_tab.py`** : Ajouter les champs UI dans `_on_type_changed()` et `_build_law_from_form()`
+1. **`models.py`**: Add it to `ContactLawType` and the appropriate category in `CONTACT_LAW_CATEGORIES`
+2. **`validators.py`**: Add the required properties to `ContactLawValidator._REQUIRED_PROPS`
+3. **`pylmgc_bridge.py`**: Add the case in `create_contact_law()`
+4. **`contact_tab.py`**: Add the UI fields in `_on_type_changed()` and `_build_law_from_form()`
 
-### Ajouter un paramètre de préférences
+### Adding a Preference Parameter
 
-1. **`models.py`** : Ajouter le champ dans `ProjectPreferences` avec valeur par défaut
-2. Ajouter dans `to_dict()` et `from_dict()`
-3. **`dialogs.py`** : Ajouter le widget dans `PreferencesDialog._build_perf_tab()` (ou autre onglet)
-4. Ajouter dans `_load_preferences()` et `get_preferences()`
-5. Utiliser la préférence via `getattr(self.controller.state.preferences, 'ma_pref', default)`
+1. **`models.py`**: Add the field to `ProjectPreferences` with a default value
+2. Add it to `to_dict()` and `from_dict()`
+3. **`dialogs.py`**: Add the widget in `PreferencesDialog._build_perf_tab()` (or another tab)
+4. Add it to `_load_preferences()` and `get_preferences()`
+5. Use the preference via `getattr(self.controller.state.preferences, 'my_pref', default)`
 
-### Tests et débogage
+### Testing and Debugging
 
-- **Logger applicatif** : `from src.core.app_logger import get_logger; _log = get_logger('mon_module')`
-- **Journal** : Calcul → Journal de l'application (F7)
-- **Logs LMGC90** : Calcul → Voir Logs LMGC90 (F6)
-- **Variables dynamiques** : Outils → Variables dynamiques (Ctrl+V)
+- **Application logger**: `from src.core.app_logger import get_logger; _log = get_logger('my_module')`
+- **Journal**: Computation → Application Journal (F7)
+- **LMGC90 Logs**: Computation → View LMGC90 Logs (F6)
+- **Dynamic Variables**: Tools → Dynamic Variables (Ctrl+V)
 
 ---
 
-## Annexe — Fichiers de référence rapide
+## Appendix — Quick Reference Files
 
-| Besoin | Fichier |
+| Need | File |
 |---|---|
-| Ajouter/modifier un type de données | `src/core/models.py` |
-| Modifier la validation | `src/core/validators.py` |
-| Modifier l'appel pylmgc90 | `src/core/pylmgc_bridge.py` |
-| Ajouter une logique métier | `src/controllers/project_controller.py` |
-| Modifier l'UI d'un onglet | `src/views/tabs/<nom>_tab.py` |
-| Modifier la vue 3D | `src/gui/dialogs/viewer_3d.py` |
-| Modifier le script pre.py généré | `src/utils/script_generator.py` |
-| Modifier le script chipy généré | `src/utils/compute_script_generator.py` |
-| Modifier l'évaluation des expressions | `src/utils/safe_eval.py` |
-| Modifier la sérialisation JSON | `src/core/serializers.py` + `models.py` |
+| Add/modify a data type | `src/core/models.py` |
+| Modify validation | `src/core/validators.py` |
+| Modify the pylmgc90 call | `src/core/pylmgc_bridge.py` |
+| Add business logic | `src/controllers/project_controller.py` |
+| Modify a tab's UI | `src/views/tabs/<name>_tab.py` |
+| Modify the 3D view | `src/gui/dialogs/viewer_3d.py` |
+| Modify the generated pre.py script | `src/utils/script_generator.py` |
+| Modify the generated chipy script | `src/utils/compute_script_generator.py` |
+| Modify expression evaluation | `src/utils/safe_eval.py` |
+| Modify JSON serialization | `src/core/serializers.py` + `models.py` |
