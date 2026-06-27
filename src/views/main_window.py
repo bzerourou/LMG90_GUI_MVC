@@ -2,12 +2,14 @@
 Fenêtre principale de l'application.
 Interface entre l'utilisateur et le contrôleur.
 """
+import sys
 from PyQt6.QtWidgets import (
     QMainWindow, QToolBar, QPushButton, QDockWidget,
     QTabWidget, QMessageBox, QFileDialog, QApplication,
-    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
+    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
+    QDialog, QTextEdit,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QProcess, QProcessEnvironment
 from PyQt6.QtGui import QAction, QKeySequence, QIcon
 from pathlib import Path
 
@@ -42,6 +44,10 @@ class MainWindow(QMainWindow):
         if not hasattr(self.controller.state, 'preferences'):
             from ..core.models import ProjectPreferences
             self.controller.state.preferences = ProjectPreferences()
+
+        # Suivi du sous-processus d'exécution de script (voir _on_run_script)
+        self._script_process = None
+        self._script_log_dialog = None
         
         # Configuration fenêtre
         self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
@@ -274,6 +280,8 @@ class MainWindow(QMainWindow):
             ("Sauvegarder", self.style().StandardPixmap.SP_DriveHDIcon, self._on_save_project),
             ("DATBOX", self.style().StandardPixmap.SP_FileDialogStart, self._on_generate_datbox),
             ("Script Python", self.style().StandardPixmap.SP_FileDialogDetailedView, self._on_generate_script),
+            ("Exécuter Script", self.style().StandardPixmap.SP_MediaPlay, self._on_run_script),
+            ("Charger Factory", self.style().StandardPixmap.SP_FileDialogListView, self._on_load_factory_avatars),
    
         ]
         
@@ -923,6 +931,196 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
+
+    def _on_run_script(self):
+        """
+        Exécute le script Python généré (<projet>.py) dans un sous-processus.
+
+        Fonctionne IDENTIQUEMENT en dev et en production (exécutable
+        PyInstaller) : on relance sys.executable (= l'app elle-même une
+        fois packagée) avec la variable d'environnement LMGC90_WORKER
+        positionnée sur le script à exécuter. main.py détecte cette
+        variable AVANT de créer QApplication/MainWindow, exécute juste
+        le script via runpy puis quitte (sys.exit(0)) — donc aucune
+        nouvelle fenêtre / instance de l'application ne s'ouvre.
+        """
+        if not self.controller.project_path:
+            QMessageBox.warning(self, "Attention", "Enregistrez d'abord le projet")
+            return self._on_save_project_as()
+
+        script_path = self.controller.project_path.parent / f"{self.controller.state.name}.py"
+
+        if not script_path.exists():
+            reply = QMessageBox.question(
+                self, "Script introuvable",
+                f"Le script '{script_path.name}' n'existe pas encore.\n\n"
+                "Voulez-vous le générer maintenant ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._on_generate_script()
+            if not script_path.exists():
+                return
+
+        if self._script_process is not None \
+                and self._script_process.state() != QProcess.ProcessState.NotRunning:
+            QMessageBox.information(
+                self, "Script en cours",
+                "Un script est déjà en cours d'exécution. Attendez sa fin."
+            )
+            return
+
+        self._run_script_subprocess(script_path)
+
+    def _run_script_subprocess(self, script_path: Path):
+        """Lance script_path en tant que sous-processus 'worker' (cf. main.py)."""
+        proc = QProcess(self)
+
+        # En dev, sys.executable est l'interpréteur Python : il faut lui
+        # repasser les arguments de lancement (sys.argv, dont argv[0] =
+        # chemin de main.py) pour qu'il réexécute bien main.py.
+        # En production (PyInstaller), sys.executable EST l'application
+        # elle-même : pas d'argument supplémentaire nécessaire.
+        if getattr(sys, 'frozen', False):
+            proc.setProgram(sys.executable)
+            proc.setArguments([])
+        else:
+            proc.setProgram(sys.executable)
+            proc.setArguments(list(sys.argv))
+
+        proc.setWorkingDirectory(str(script_path.parent))
+        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+
+        env = QProcessEnvironment.systemEnvironment()
+        env.insert("LMGC90_WORKER", str(script_path))
+        proc.setProcessEnvironment(env)
+
+        self._script_log_dialog = self._make_script_log_dialog(script_path.name)
+        self._script_log_dialog.show()
+
+        proc.readyReadStandardOutput.connect(lambda: self._on_script_stdout(proc))
+        proc.finished.connect(
+            lambda code, status: self._on_script_finished(script_path, code, status)
+        )
+        proc.errorOccurred.connect(
+            lambda err: _log.warning(f"Erreur lancement sous-processus script : {err}")
+        )
+
+        self._script_process = proc
+        self.statusBar().showMessage(f"⏳ Exécution de {script_path.name}...")
+        proc.start()
+
+    def _make_script_log_dialog(self, title: str) -> QDialog:
+        """Petite fenêtre non-modale affichant la sortie live du script."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"▶️ Exécution — {title}")
+        dlg.resize(750, 480)
+        layout = QVBoxLayout(dlg)
+
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet(
+            "QTextEdit { font-family: 'Consolas', 'Courier New', monospace; "
+            "font-size: 9pt; background:#1e1e2e; color:#c8d0e8; }"
+        )
+        layout.addWidget(text_edit)
+
+        close_btn = QPushButton("Fermer")
+        close_btn.clicked.connect(dlg.close)
+        layout.addWidget(close_btn)
+
+        dlg.text_edit = text_edit
+        return dlg
+
+    def _on_script_stdout(self, proc: QProcess):
+        data = bytes(proc.readAllStandardOutput()).decode('utf-8', errors='replace')
+        if self._script_log_dialog is not None:
+            self._script_log_dialog.text_edit.append(data.rstrip('\n'))
+
+    def _on_script_finished(self, script_path: Path, exit_code: int, exit_status):
+        self._script_process = None
+
+        if self._script_log_dialog is not None:
+            if exit_code == 0:
+                self._script_log_dialog.text_edit.append(
+                    "\n✅ Script terminé avec succès (code 0)."
+                )
+            else:
+                self._script_log_dialog.text_edit.append(
+                    f"\n❌ Le script s'est terminé avec le code {exit_code}."
+                )
+
+        if exit_code == 0:
+            self.statusBar().showMessage(f"✅ {script_path.name} terminé avec succès", 5000)
+
+            # Si une factory a généré ses métadonnées, proposer de les charger
+            json_path = script_path.parent / "factory_avatars_metadata.json"
+            if json_path.exists():
+                reply = QMessageBox.question(
+                    self, "Avatars de factory détectés",
+                    "Le script a généré factory_avatars_metadata.json.\n"
+                    "Voulez-vous charger ces avatars dans le projet maintenant ?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    self._on_load_factory_avatars()
+        else:
+            self.statusBar().showMessage(
+                f"❌ {script_path.name} a échoué (code {exit_code})", 8000
+            )
+
+    def _on_load_factory_avatars(self):
+        """Charge les métadonnées des avatars de factory et les ajoute au projet"""
+        if not self.controller.project_path:
+            QMessageBox.warning(
+                self, "Attention", 
+                "Enregistrez d'abord le projet"
+            )
+            return self._on_save_project_as()
+        
+        # Chercher factory_avatars_metadata.json dans le même répertoire que le projet
+        json_path = self.controller.project_path.parent / "factory_avatars_metadata.json"
+        
+        if not json_path.exists():
+            QMessageBox.warning(
+                self, "Fichier non trouvé",
+                f"Le fichier factory_avatars_metadata.json n'existe pas.\n\n"
+                f"Chemin attendu:\n{json_path}\n\n"
+                f"Assurez-vous que pre.py a été exécuté dans le répertoire:\n"
+                f"{self.controller.project_path.parent}"
+            )
+            return
+        
+        try:
+            self.statusBar().showMessage("Chargement des avatars de factory...", 2000)
+            QApplication.processEvents()
+            
+            # Charger les factory avatars via le controller
+            indices = self.controller.load_factory_avatars_from_json(str(json_path))
+            
+            # Rafraîchir l'interface
+            self.avatar_tab.refresh()
+            self.viewer_tab.refresh()
+            
+            if indices:
+                QMessageBox.information(
+                    self, "Succès",
+                    f"✅ {len(indices)} avatar(s) de factory chargé(s) avec succès !\n\n"
+                    f"Indices: {indices}\n\n"
+                    f"Les avatars sont maintenant visibles dans l'arborescence du projet.\n"
+                    f"Vous pouvez leur appliquer des lois de contact ou les utiliser dans\n"
+                    f"d'autres workflows."
+                )
+            else:
+                QMessageBox.warning(
+                    self, "Aucun avatar",
+                    "Aucun avatar de factory trouvé dans le fichier JSON."
+                )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Erreur",
+                f"Chargement des avatars échoué :\n{e}"
+            )
     
     def _on_convert_script(self):
         dialog = ConvertDialog(self)
