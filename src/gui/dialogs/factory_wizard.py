@@ -18,7 +18,7 @@ from PyQt6.QtGui import QFont
 
 from ...core.particle_factory import (
     FactoryConfig, FactoryType, ZoneShape, ContainerShape,
-    SizeDistribution, ParticleFactory
+    ParticleFactory
 )
 from ...core.models import Material, MaterialType, Model
 from ...core.validators import ValidationError
@@ -470,17 +470,20 @@ class FactoryParticlesPage(QWizardPage):
         inner_layout.addWidget(type_group)
 
         # Taille
-        size_group = QGroupBox("Distribution de taille")
+        size_group = QGroupBox("Taille des particules")
         sf = QFormLayout(size_group)
-        self.dist_combo = QComboBox()
-        self.dist_combo.addItems(["Uniforme (rayon fixe)",
-                                  "Aléatoire [rmin, rmax]",
-                                  "granulo_Random (LMGC90)"])
-        sf.addRow("Distribution :", self.dist_combo)
         self.r_min = _dbl(0.010)
         self.r_max = _dbl(0.020)
         sf.addRow("Rayon min :", self.r_min)
         sf.addRow("Rayon max :", self.r_max)
+        size_hint = QLabel(
+            "💡 Rayon constant si min = max, sinon tirage uniforme aléatoire "
+            "dans [min, max]. Le placement est toujours fait sur un réseau "
+            "régulier (squareLattice2D/3D) garanti sans chevauchement."
+        )
+        size_hint.setWordWrap(True)
+        size_hint.setStyleSheet(_STYLE_SUBTITLE)
+        sf.addRow(size_hint)
         self.seed_check = QCheckBox("Graine aléatoire fixe")
         self.seed_spin = _spin(42)
         self.seed_spin.setEnabled(False)
@@ -571,13 +574,9 @@ class FactoryParticlesPage(QWizardPage):
     def get_particle_params(self) -> dict:
         # Index 0 = "rigidDisk (2D)", index 1 = "rigidSphere (3D)"
         ptype = 'rigidDisk' if self.particle_type.currentIndex() == 0 else 'rigidSphere'
-        dist_map = {0: SizeDistribution.UNIFORM.value,
-                    1: SizeDistribution.RANDOM.value,
-                    2: SizeDistribution.GRANULO.value}
         seed = self.seed_spin.value() if self.seed_check.isChecked() else None
         return {
             'particle_type': ptype,
-            'distribution': dist_map.get(self.dist_combo.currentIndex(), SizeDistribution.RANDOM.value),
             'radius_min': self.r_min.value(),
             'radius_max': self.r_max.value(),
             'nb_particles': self.nb_spin.value(),

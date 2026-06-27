@@ -16,7 +16,8 @@ Types de Factory disponibles
 
 Chaque Factory produit :
   1. Un bloc de code pre.py   → création des avatars (à insérer avant writeDatbox)
-  2. Un bloc de code chipy.py → activation progressive (à insérer dans la boucle chipy)
+  2. Un fichier body_collection.pkl → indices corps réels (pattern box_generation)
+  3. Un bloc de code chipy.py → activation progressive via pickle (box_simulation)
 
 API pylmgc90 utilisée (vérifiée)
 ──────────────────────────────────
@@ -31,6 +32,9 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
+
+# Nom du fichier pickle (indices corps réels) — cf. exemples/box_generation.py
+BODY_COLLECTION_PICKLE = 'body_collection.pkl'
 
 
 # ============================================================================
@@ -104,7 +108,6 @@ class FactoryConfig:
 
     # ── Particules ────────────────────────────────────────────────────────────
     particle_type:   str        = 'rigidDisk'   # rigidSphere | rigidDisk
-    distribution:    str        = SizeDistribution.RANDOM.value
     radius_min:      float      = 0.01
     radius_max:      float      = 0.02
     nb_particles:    int        = 1000
@@ -145,6 +148,12 @@ class FactoryConfig:
     wall_index_start: int       = 0      # Premier indice des parois dans bodies
     wall_index_end:   int       = 0
 
+    # Indices figes : True dès que le DATBOX/pre.py a ete genere avec ces indices.
+    # Tant que ce flag est False, l'UI peut recalculer librement (avant-projet
+    # pas encore exporte). Une fois True, AUCUN recalcul ne doit ecraser les
+    # indices, sous peine de desynchroniser command.py par rapport au DATBOX reel.
+    indices_frozen:   bool      = False
+
     @property
     def nb_batches(self) -> int:
         return math.ceil(self.nb_particles / max(1, self.batch_size))
@@ -178,96 +187,60 @@ class FactoryConfig:
 class PositionGenerator:
     """
     Génère des positions de particules dans une zone d'injection.
-    Utilise un empilement léger sans chevauchement (réseau + perturbation).
+    Réseau régulier (type squareLattice2D/3D) — AUCUN bruit aléatoire,
+    AUCUN repli aléatoire : la grille est dimensionnée dynamiquement pour
+    contenir exactement nb points, garantissant l'absence de chevauchement
+    quel que soit nb (contrairement à l'ancien repli purement aléatoire
+    utilisé quand la grille initiale était trop petite pour la zone).
     """
 
     @staticmethod
     def generate(config: FactoryConfig, nb: int,
                  rng: Optional[np.random.Generator] = None) -> np.ndarray:
         """
-        Retourne un tableau (nb, 2 ou 3) de positions dans la zone d'injection.
-        Les positions sont espacées pour éviter les chevauchements à l'init.
+        Retourne un tableau (nb, 2 ou 3) de positions sur un réseau régulier
+        centré sur la zone d'injection, espacé de 2.2 * radius_max.
         """
-        if rng is None:
-            rng = np.random.default_rng(config.seed)
-
-        dim    = config.dimension
-        center = np.array(config.zone_center[:dim])
-        r_max  = config.radius_max
-        # Espacement minimal = 2.2 * r_max pour éviter les chevauchements
-        spacing = 2.2 * r_max
+        dim     = config.dimension
+        center  = np.array(config.zone_center[:dim])
+        spacing = 2.2 * config.radius_max
 
         if dim == 3:
-            return PositionGenerator._grid_3d(center, config.zone_lx,
-                                              config.zone_ly, config.zone_lz,
-                                              spacing, nb, rng)
-        else:
-            return PositionGenerator._grid_2d(center, config.zone_lx,
-                                              config.zone_ly,
-                                              spacing, nb, rng)
+            return PositionGenerator._lattice_3d(center, spacing, nb)
+        return PositionGenerator._lattice_2d(center, spacing, nb)
 
     @staticmethod
-    def _grid_3d(center, lx, ly, lz, spacing, nb, rng) -> np.ndarray:
-        """Réseau cubique avec perturbation aléatoire dans la zone."""
-        nx = max(1, int(lx / spacing))
-        ny = max(1, int(ly / spacing))
-        nz = max(1, int(lz / spacing))
+    def _lattice_2d(center, spacing, nb) -> np.ndarray:
+        """Réseau carré régulier, dimensionné pour contenir au moins nb points."""
+        nx = max(1, math.ceil(nb ** 0.5))
+        ny = max(1, math.ceil(nb / nx))
+        x0 = center[0] - (nx - 1) * spacing / 2.0
+        y0 = center[1] - (ny - 1) * spacing / 2.0
+
         positions = []
-
-        x0 = center[0] - lx / 2 + spacing / 2
-        y0 = center[1] - ly / 2 + spacing / 2
-        z0 = center[2] - lz / 2 + spacing / 2
-
         for ix in range(nx):
             for iy in range(ny):
-                for iz in range(nz):
-                    if len(positions) >= nb:
-                        break
-                    # Perturbation 20 % de l'espacement
-                    noise = rng.uniform(-0.2, 0.2, 3) * spacing
-                    x = x0 + ix * spacing + noise[0]
-                    y = y0 + iy * spacing + noise[1]
-                    z = z0 + iz * spacing + noise[2]
-                    # Rester dans la zone
-                    x = np.clip(x, center[0] - lx/2, center[0] + lx/2)
-                    y = np.clip(y, center[1] - ly/2, center[1] + ly/2)
-                    z = np.clip(z, center[2] - lz/2, center[2] + lz/2)
-                    positions.append([x, y, z])
-
-        # Compléter avec aléatoire si pas assez de points dans la grille
-        while len(positions) < nb:
-            x = rng.uniform(center[0] - lx/2, center[0] + lx/2)
-            y = rng.uniform(center[1] - ly/2, center[1] + ly/2)
-            z = rng.uniform(center[2] - lz/2, center[2] + lz/2)
-            positions.append([x, y, z])
+                positions.append([x0 + ix * spacing, y0 + iy * spacing])
 
         return np.array(positions[:nb])
 
     @staticmethod
-    def _grid_2d(center, lx, ly, spacing, nb, rng) -> np.ndarray:
-        """Réseau carré avec perturbation aléatoire."""
-        nx = max(1, int(lx / spacing))
-        ny = max(1, int(ly / spacing))
+    def _lattice_3d(center, spacing, nb) -> np.ndarray:
+        """Réseau cubique régulier, dimensionné pour contenir au moins nb points."""
+        n  = max(1, math.ceil(nb ** (1.0 / 3.0)))
+        nx = ny = n
+        nz = max(1, math.ceil(nb / (nx * ny)))
+        x0 = center[0] - (nx - 1) * spacing / 2.0
+        y0 = center[1] - (ny - 1) * spacing / 2.0
+        z0 = center[2] - (nz - 1) * spacing / 2.0
+
         positions = []
-
-        x0 = center[0] - lx / 2 + spacing / 2
-        y0 = center[1] - ly / 2 + spacing / 2
-
         for ix in range(nx):
             for iy in range(ny):
-                if len(positions) >= nb:
-                    break
-                noise = rng.uniform(-0.2, 0.2, 2) * spacing
-                x = np.clip(x0 + ix * spacing + noise[0],
-                             center[0] - lx/2, center[0] + lx/2)
-                y = np.clip(y0 + iy * spacing + noise[1],
-                             center[1] - ly/2, center[1] + ly/2)
-                positions.append([x, y])
-
-        while len(positions) < nb:
-            x = rng.uniform(center[0] - lx/2, center[0] + lx/2)
-            y = rng.uniform(center[1] - ly/2, center[1] + ly/2)
-            positions.append([x, y])
+                for iz in range(nz):
+                    positions.append([x0 + ix * spacing,
+                                       y0 + iy * spacing,
+                                       z0 + iz * spacing])
 
         return np.array(positions[:nb])
 
@@ -277,7 +250,9 @@ class PositionGenerator:
 # ============================================================================
 
 class RadiusGenerator:
-    """Génère les rayons des particules selon la distribution choisie."""
+    """Génère les rayons des particules : constant si rmin==rmax, sinon
+    uniforme aléatoire dans [rmin, rmax]. Un seul mécanisme, plus de choix
+    de distribution (l'ancien choix granulo_Random a été retiré)."""
 
     @staticmethod
     def generate(config: FactoryConfig, nb: int,
@@ -285,17 +260,11 @@ class RadiusGenerator:
         if rng is None:
             rng = np.random.default_rng(config.seed)
 
-        dist = config.distribution
         rmin = config.radius_min
         rmax = config.radius_max
 
-        if dist == SizeDistribution.UNIFORM.value or rmin == rmax:
-            return np.full(nb, (rmin + rmax) / 2)
-
-        if dist in (SizeDistribution.RANDOM.value, SizeDistribution.GRANULO.value):
-            # Distribution uniforme sur [rmin, rmax]
-            # pre.granulo_Random utilise une loi proche — on simule ici
-            return rng.uniform(rmin, rmax, nb)
+        if rmin == rmax:
+            return np.full(nb, rmin)
 
         return rng.uniform(rmin, rmax, nb)
 
@@ -470,59 +439,76 @@ class PreCodeGenerator:
     def _write_particle_positions(self):
         c = self.cfg
         self._w(f"# ── Positions de la zone d'injection : {c.name} ─────────────")
-        self._w(f"_factory_{c.name}_radii = np.linspace(")
-        self._w(f"    {c.radius_min}, {c.radius_max}, {c.nb_particles})")
+        self._w(f"import math")  # bloc autonome : utilisable seul (export, preview)
+        self._write_radii_block()
         self._w("")
-        # Grille de positions
-        self._w(f"_factory_{c.name}_rng = np.random.default_rng({c.seed!r})")
+
+        # Réseau régulier garanti sans chevauchement (squareLattice2D/3D),
+        # dimensionné dynamiquement pour contenir nb_particles. Remplace
+        # l'ancienne grille+bruit aléatoire+repli purement aléatoire, qui
+        # pouvait produire des chevauchements quand la grille initiale
+        # (dimensionnée sur la zone) était trop petite pour nb_particles.
         self._w(f"_factory_{c.name}_spacing = 2.2 * {c.radius_max}")
-        self._w(f"_factory_{c.name}_center = {c.zone_center[:c.dimension]}")
-        self._w(f"_factory_{c.name}_positions = []")
-        self._w("")
 
         if c.dimension == 3:
-            self._w(f"# Réseau 3D avec perturbation")
-            self._w(f"_nx = max(1, int({c.zone_lx} / _factory_{c.name}_spacing))")
-            self._w(f"_ny = max(1, int({c.zone_ly} / _factory_{c.name}_spacing))")
-            self._w(f"_nz = max(1, int({c.zone_lz} / _factory_{c.name}_spacing))")
-            self._w(f"_x0 = {c.zone_center[0]} - {c.zone_lx}/2 + _factory_{c.name}_spacing/2")
-            self._w(f"_y0 = {c.zone_center[1]} - {c.zone_ly}/2 + _factory_{c.name}_spacing/2")
-            self._w(f"_z0 = {c.zone_center[2]} - {c.zone_lz}/2 + _factory_{c.name}_spacing/2")
-            self._w(f"for _ix in range(_nx):")
-            self._w(f"    for _iy in range(_ny):")
-            self._w(f"        for _iz in range(_nz):")
-            self._w(f"            if len(_factory_{c.name}_positions) >= {c.nb_particles}: break")
-            self._w(f"            _noise = _factory_{c.name}_rng.uniform(-0.2, 0.2, 3) * _factory_{c.name}_spacing")
-            self._w(f"            _factory_{c.name}_positions.append([")
-            self._w(f"                _x0 + _ix * _factory_{c.name}_spacing + _noise[0],")
-            self._w(f"                _y0 + _iy * _factory_{c.name}_spacing + _noise[1],")
-            self._w(f"                _z0 + _iz * _factory_{c.name}_spacing + _noise[2]])")
+            self._w(f"_nx = max(1, math.ceil({c.nb_particles} ** (1.0/3.0)))")
+            self._w(f"_ny = _nx")
+            self._w(f"_nz = max(1, math.ceil({c.nb_particles} / (_nx * _ny)))")
+            self._w(f"_x0 = {c.zone_center[0]} - (_nx - 1) * _factory_{c.name}_spacing / 2.0")
+            self._w(f"_y0 = {c.zone_center[1]} - (_ny - 1) * _factory_{c.name}_spacing / 2.0")
+            self._w(f"_z0 = {c.zone_center[2]} - (_nz - 1) * _factory_{c.name}_spacing / 2.0")
+            self._w(f"try:")
+            self._w(f"    # Signature non verifiee (squareLattice2D verifiee, squareLattice3D")
+            self._w(f"    # suppose suivre le meme schema : nb_x, nb_y, nb_z, espacement, x0/y0/z0)")
+            self._w(f"    _factory_{c.name}_positions = pre.squareLattice3D(")
+            self._w(f"        _nx, _ny, _nz, _factory_{c.name}_spacing,")
+            self._w(f"        x0=_x0, y0=_y0, z0=_z0)")
+            self._w(f"    _factory_{c.name}_positions.shape = [_nx * _ny * _nz, 3]")
+            self._w(f"    _factory_{c.name}_positions = _factory_{c.name}_positions.tolist()")
+            self._w(f"except (AttributeError, TypeError):")
+            self._w(f"    # Repli si pre.squareLattice3D indisponible/signature differente :")
+            self._w(f"    # meme reseau regulier, calcule manuellement (sans chevauchement, sans alea).")
+            self._w(f"    _factory_{c.name}_positions = []")
+            self._w(f"    for _ix in range(_nx):")
+            self._w(f"        for _iy in range(_ny):")
+            self._w(f"            for _iz in range(_nz):")
+            self._w(f"                _factory_{c.name}_positions.append([")
+            self._w(f"                    _x0 + _ix * _factory_{c.name}_spacing,")
+            self._w(f"                    _y0 + _iy * _factory_{c.name}_spacing,")
+            self._w(f"                    _z0 + _iz * _factory_{c.name}_spacing])")
         else:
-            self._w(f"# Réseau 2D avec perturbation")
-            self._w(f"_nx = max(1, int({c.zone_lx} / _factory_{c.name}_spacing))")
-            self._w(f"_ny = max(1, int({c.zone_ly} / _factory_{c.name}_spacing))")
-            self._w(f"_x0 = {c.zone_center[0]} - {c.zone_lx}/2 + _factory_{c.name}_spacing/2")
-            self._w(f"_y0 = {c.zone_center[1]} - {c.zone_ly}/2 + _factory_{c.name}_spacing/2")
-            self._w(f"for _ix in range(_nx):")
-            self._w(f"    for _iy in range(_ny):")
-            self._w(f"        if len(_factory_{c.name}_positions) >= {c.nb_particles}: break")
-            self._w(f"        _noise = _factory_{c.name}_rng.uniform(-0.2, 0.2, 2) * _factory_{c.name}_spacing")
-            self._w(f"        _factory_{c.name}_positions.append([")
-            self._w(f"            _x0 + _ix * _factory_{c.name}_spacing + _noise[0],")
-            self._w(f"            _y0 + _iy * _factory_{c.name}_spacing + _noise[1]])")
+            self._w(f"_nx = max(1, math.ceil({c.nb_particles} ** 0.5))")
+            self._w(f"_ny = max(1, math.ceil({c.nb_particles} / _nx))")
+            self._w(f"_x0 = {c.zone_center[0]} - (_nx - 1) * _factory_{c.name}_spacing / 2.0")
+            self._w(f"_y0 = {c.zone_center[1]} - (_ny - 1) * _factory_{c.name}_spacing / 2.0")
+            # Signature verifiee (cf. box_generation.py) :
+            #   pre.squareLattice2D(nb_x, nb_y, espacement, x0=, y0=)
+            # retourne un tableau PLAT qu'il faut reshaper en [n, 2].
+            self._w(f"_factory_{c.name}_positions = pre.squareLattice2D(")
+            self._w(f"    _nx, _ny, _factory_{c.name}_spacing, x0=_x0, y0=_y0)")
+            self._w(f"_factory_{c.name}_positions.shape = [_nx * _ny, 2]")
+            self._w(f"_factory_{c.name}_positions = _factory_{c.name}_positions.tolist()")
 
-        self._w(f"# Compléter avec aléatoire si grille insuffisante")
-        self._w(f"while len(_factory_{c.name}_positions) < {c.nb_particles}:")
-        if c.dimension == 3:
-            self._w(f"    _factory_{c.name}_positions.append([")
-            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[0]}-{c.zone_lx/2}, {c.zone_center[0]+c.zone_lx/2}),")
-            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[1]}-{c.zone_ly/2}, {c.zone_center[1]+c.zone_ly/2}),")
-            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[2]}-{c.zone_lz/2}, {c.zone_center[2]+c.zone_lz/2})])")
-        else:
-            self._w(f"    _factory_{c.name}_positions.append([")
-            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[0]}-{c.zone_lx/2}, {c.zone_center[0]+c.zone_lx/2}),")
-            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[1]}-{c.zone_ly/2}, {c.zone_center[1]+c.zone_ly/2})])")
+        self._w(f"_factory_{c.name}_positions = _factory_{c.name}_positions[:{c.nb_particles}]")
         self._w("")
+
+    def _write_radii_block(self):
+        """
+        Écrit le calcul des rayons : constant si radius_min == radius_max,
+        sinon uniforme aléatoire dans [radius_min, radius_max]. Un seul
+        mécanisme — le choix granulo_Random / Uniforme / Aléatoire a été
+        retiré (cf. RadiusGenerator, utilisé pour la prévisualisation UI,
+        qui suit exactement la même logique).
+        """
+        c = self.cfg
+
+        if c.radius_min == c.radius_max:
+            self._w(f"_factory_{c.name}_radii = np.full({c.nb_particles}, {c.radius_min})")
+            return
+
+        self._w(f"_factory_{c.name}_rng_radii = np.random.default_rng({c.seed!r})")
+        self._w(f"_factory_{c.name}_radii = _factory_{c.name}_rng_radii.uniform(")
+        self._w(f"    {c.radius_min}, {c.radius_max}, {c.nb_particles})")
 
     # ── Création des avatars ──────────────────────────────────────────────────
 
@@ -626,38 +612,44 @@ class ChipyCodeGenerator:
         w("chipy.loadTactors()")
         w("")
 
-        # Index des corps par factory (on connaît les indices après writeDatbox)
-        w("# ── Indices des corps par factory ──────────────────────────────")
-        for fc in self.factories:
-            if fc.body_index_start > 0 and fc.body_index_end > 0:
-                w(f"# Factory '{fc.name}' : corps {fc.body_index_start}..{fc.body_index_end}")
-                w(f"_factory_{fc.name}_range = list(range(")
-                w(f"    {fc.body_index_start}, {fc.body_index_end + 1}))")
-            else:
-                w(f"# Factory '{fc.name}' : indices à renseigner après writeDatbox")
-                w(f"# (cf. _factory_{fc.name}_bodies dans le script pre.py)")
-                w(f"_factory_{fc.name}_range = []  # À compléter")
+        rbdy = f"RBDY{dim}"
+        w("# ── Chargement pickle (indices corps réels) ───────────────────")
+        w("import pickle")
+        w("import os")
+        w(f"_pkl_path = '{BODY_COLLECTION_PICKLE}'")
+        w("if not os.path.isfile(_pkl_path):")
+        w("    raise FileNotFoundError(")
+        w(f"        f\"Fichier '{{_pkl_path}}' introuvable. \"")
+        w("        \"Exécutez d'abord le script pre.py pour créer body_collection.pkl.\")")
+        w("with open(_pkl_path, 'rb') as _pkl_f:")
+        w("    body_collection = pickle.load(_pkl_f)")
+        w("print('Chargé', _pkl_path, '—', body_collection.get('total_nb_bodies', '?'), 'corps')")
         w("")
 
         # Rendre toutes les particules invisibles au départ
-        rbdy = f"RBDY{dim}"
         w("# ── Rendre toutes les particules de factory invisibles ─────────")
-        for fc in self.factories:
-            w(f"for _bnum in _factory_{fc.name}_range:")
-            w(f"    chipy.{rbdy}_SetInvisible(_bnum)")
+        w("for _fcfg in body_collection.get('factories', {}).values():")
+        w("    if not _fcfg.get('enabled', True):")
+        w("        continue")
+        w(f"    for _bnum in _fcfg['body_numbers']:")
+        w(f"        chipy.{rbdy}_SetInvisible(_bnum)")
         w("")
 
-        # Planning sous forme de dict {step → [(factory_name, batch_indices)]}
+        # Planning sous forme de dict {step → [body_nums]}
         w("# ── Construire le planning d'activation ───────────────────────")
-        w("_activation_schedule = {}  # {step: [(factory_name, [body_nums])]}")
-        for fc in self.factories:
-            w(f"# Factory {fc.name} : {fc.nb_batches} vague(s)")
-            w(f"for _batch_i in range({fc.nb_batches}):")
-            w(f"    _step = {fc.start_step} + _batch_i * {fc.interval_steps}")
-            w(f"    _bstart = _batch_i * {fc.batch_size}")
-            w(f"    _bend   = min(_bstart + {fc.batch_size}, len(_factory_{fc.name}_range))")
-            w(f"    _nums   = _factory_{fc.name}_range[_bstart:_bend]")
-            w(f"    _activation_schedule.setdefault(_step, []).append(('{fc.name}', _nums))")
+        w("_activation_schedule = {}  # {step: [body_nums]}")
+        w("for _fname, _fcfg in body_collection.get('factories', {}).items():")
+        w("    if not _fcfg.get('enabled', True):")
+        w("        continue")
+        w("    _nums = _fcfg['body_numbers']")
+        w("    _bs   = _fcfg['batch_size']")
+        w("    _ss   = _fcfg['start_step']")
+        w("    _iv   = _fcfg['interval_steps']")
+        w("    _nb   = (len(_nums) + _bs - 1) // _bs")
+        w("    for _batch_i in range(_nb):")
+        w("        _step = _ss + _batch_i * _iv")
+        w("        _batch = _nums[_batch_i * _bs : (_batch_i + 1) * _bs]")
+        w("        _activation_schedule.setdefault(_step, []).extend(_batch)")
         w("")
 
         # Réglages simulation
@@ -674,11 +666,9 @@ class ChipyCodeGenerator:
         w("")
         w("    # Activation des particules planifiées")
         w("    if step in _activation_schedule:")
-        w("        for _factory_name, _body_nums in _activation_schedule[step]:")
-        w(f"            for _bnum in _body_nums:")
-        w(f"                chipy.{rbdy}_SetVisible(_bnum)")
-        w(f"            print(f'Step {{step}}: Factory {{_factory_name}} — "
-          f"{{len(_body_nums)}} particule(s) activée(s)')")
+        w(f"        for _bnum in _activation_schedule[step]:")
+        w(f"            chipy.{rbdy}_SetVisible(_bnum)")
+        w(f"        print(f'Step {{step}}: {{len(_activation_schedule[step])}} particule(s) activée(s)')")
         w("")
         w("    # ── Boucle DEM standard ────────────────────────────────────")
         w("    chipy.IncrementStep()")
@@ -775,7 +765,11 @@ class ParticleFactory:
     def generate_pre_code(self, body_counter_start: int = 1) -> str:
         """
         Génère le code pre.py complet pour toutes les factories.
-        Recalcule les indices de corps depuis body_counter_start.
+
+        Recalcule les indices de corps depuis body_counter_start, SAUF pour
+        les factories déjà figées (indices_frozen == True), dont les indices
+        restent inchangés. Pour figer explicitement de nouveaux indices,
+        appeler freeze_body_indices() avant generate_pre_code().
         """
         self.reset_body_counter(body_counter_start)
         for cfg in self.configs:
@@ -788,6 +782,52 @@ class ParticleFactory:
 
         return '\n'.join(blocks)
 
+    def generate_pickle_code(self, dimension: int = 2) -> str:
+        """
+        Génère le code runtime qui sérialise les indices corps réels
+        (avatar.number + 1) dans body_collection.pkl.
+
+        Même principe que exemples/box_generation.py : les numéros sont
+        lus après bodies.addAvatar(), donc toujours synchronisés avec le
+        DATBOX effectivement écrit.
+        """
+        active = [c for c in self.configs if c.enabled]
+        if not active:
+            return ''
+
+        lines: List[str] = []
+        w = lines.append
+        w('')
+        w('# ============================================================')
+        w('# Sérialisation pickle — indices corps réels')
+        w('# (pattern exemples/box_generation.py → box_simulation.py)')
+        w('# ============================================================')
+        w('import pickle')
+        w('')
+        w('body_collection = {')
+        w("    'total_nb_bodies': len(bodies),")
+        w(f"    'dimension': {dimension},")
+        w("    'factories': {},")
+        w('}')
+        w('')
+        for cfg in active:
+            vn = cfg.name
+            w(f"body_collection['factories']['{vn}'] = {{")
+            w(f"    'body_numbers': [_av.number + 1 for _av in factory_{vn}_bodies],")
+            w(f"    'batch_size': {cfg.batch_size},")
+            w(f"    'start_step': {cfg.start_step},")
+            w(f"    'interval_steps': {cfg.interval_steps},")
+            w(f"    'enabled': True,")
+            w('}')
+            w('')
+        w(f"with open('{BODY_COLLECTION_PICKLE}', 'wb') as _pkl_f:")
+        w('    pickle.dump(body_collection, _pkl_f)')
+        w(f"print('Écrit {BODY_COLLECTION_PICKLE} —',")
+        w("      len(body_collection['factories']), 'factory(s),',")
+        w("      body_collection['total_nb_bodies'], 'corps au total')")
+        w('')
+        return '\n'.join(lines)
+
     def generate_chipy_code(self, nb_steps: int = 1000,
                              freq_write: int = 100,
                              dimension: int = 3) -> str:
@@ -799,6 +839,143 @@ class ParticleFactory:
             dimension=dimension,
         )
         return gen.generate()
+
+    def generate_bodies_list_code(self) -> str:
+        """
+        Génère le code pour ajouter les avatars de factory à `bodies_list`
+        avec des noms intelligibles (ex: factory_factory1_disk_0, etc.).
+        INCLUT AUSSI la génération et sauvegarde du JSON de métadonnées.
+        
+        À appeler APRÈS generate_pre_code() dans le script pre.py,
+        mais AVANT pre.writeDatbox().
+        """
+        active = [c for c in self.configs if c.enabled]
+        if not active:
+            return ''
+        
+        lines: List[str] = []
+        w = lines.append
+        w('')
+        w('# ============================================================')
+        w('# Ajouter les avatars de factory à bodies_list')
+        w('# (permet au GUI de les manipuler : CL, table de connectivité)')
+        w('# ============================================================')
+        w('')
+        
+        for cfg in active:
+            vn = cfg.name
+            particle_type_short = 'disk' if 'Disk' in cfg.particle_type else 'sphere' if 'Sphere' in cfg.particle_type else 'part'
+            w(f'# Factory: {vn}')
+            w(f'for _i, _av in enumerate(factory_{vn}_bodies):')
+            w(f'    _name = f"factory_{vn}_{particle_type_short}_{{_i}}"')
+            w(f'    _av.name = _name  # Assigner un nom intelligible')
+            w(f'    bodies_list.append(_av)')
+            w('')
+        
+        # ── GÉNÉRER ET SAUVEGARDER LE JSON DE MÉTADONNÉES ───────────────
+        w('# ============================================================')
+        w('# Générer et sauvegarder les métadonnées JSON des avatars')
+        w('# ============================================================')
+        w('import json')
+        w('')
+        w('_factory_metadata = {"factories": {}}')
+        w('')
+        
+        for cfg in active:
+            vn = cfg.name
+            particle_type_short = 'disk' if 'Disk' in cfg.particle_type else 'sphere' if 'Sphere' in cfg.particle_type else 'part'
+            w(f'# Factory: {vn}')
+            w(f'_factory_metadata["factories"]["{vn}"] = {{')
+            w(f'    "particle_type": "{cfg.particle_type}",')
+            w(f'    "nb_particles": {cfg.nb_particles},')
+            w(f'    "color": "{cfg.color}",')
+            w(f'    "avatars": []')
+            w(f'}}')
+            w(f'for _i, _av in enumerate(factory_{vn}_bodies):')
+            w(f'    _avatar_info = {{')
+            w(f'        "name": _av.name,')
+            w(f'        "body_index": _av.number + 1,  # 1-based')
+            w(f'        "type": "{cfg.particle_type}",')
+            w(f'        "center": [float(_c) for _c in _factory_{vn}_positions[_i]],')
+            w(f'        "radius": float(_av.r) if hasattr(_av, "r") else {cfg.radius_max},')
+            w(f'        "color": "{cfg.color}",')
+            w(f'        "material": "{cfg.material_name}",')
+            w(f'        "model": "{cfg.model_name}",')
+            w(f'        "factory_name": "{vn}",')
+            w(f'        "factory_type": "{cfg.factory_type}"')
+            w(f'    }}')
+            w(f'    _factory_metadata["factories"]["{vn}"]["avatars"].append(_avatar_info)')
+            w('')
+        
+        w('# Sauvegarder le JSON')
+        w('with open("factory_avatars_metadata.json", "w", encoding="utf-8") as _json_f:')
+        w('    json.dump(_factory_metadata, _json_f, indent=2, ensure_ascii=False)')
+        w('print("✓ Métadonnées factory sauvegardes dans factory_avatars_metadata.json")')
+        w('')
+        
+        return '\n'.join(lines)
+
+    def generate_avatar_metadata_json(self) -> dict:
+        """
+        Génère un dictionnaire de métadonnées des avatars de factory
+        que l'interface peut charger pour recréer les entrées dans state.avatars.
+        
+        Returns:
+            dict with structure: {
+                'factories': {
+                    'factory_name': {
+                        'particle_type': 'rigidDisk',
+                        'avatars': [
+                            {
+                                'name': 'factory_name_disk_0',
+                                'body_index': 1,
+                                'type': 'rigidDisk',
+                                'radius': 0.01,
+                                'color': 'BLUEx',
+                                'center': [0.0, 0.0, 2.0]
+                            },
+                            ...
+                        ]
+                    }
+                }
+            }
+        """
+        metadata = {'factories': {}}
+        
+        for cfg in self.configs:
+            if not cfg.enabled:
+                continue
+            
+            vn = cfg.name
+            particle_type_short = 'disk' if 'Disk' in cfg.particle_type else 'sphere' if 'Sphere' in cfg.particle_type else 'part'
+            
+            avatars_info = []
+            # Générer les infos pour chaque avatar créé
+            nb_created = cfg.nb_particles
+            for i in range(nb_created):
+                body_idx = cfg.body_index_start + i
+                avatar_name = f"factory_{vn}_{particle_type_short}_{i}"
+                
+                avatars_info.append({
+                    'name': avatar_name,
+                    'body_index': body_idx,
+                    'type': cfg.particle_type,
+                    'radius': cfg.radius_max,  # Utiliser rmax pour la métadonnée (varie à l'exécution)
+                    'color': cfg.color,
+                    'material': cfg.material_name,
+                    'model': cfg.model_name,
+                    'factory_name': vn,
+                    'factory_type': cfg.factory_type,
+                })
+            
+            metadata['factories'][vn] = {
+                'particle_type': cfg.particle_type,
+                'nb_particles': cfg.nb_particles,
+                'color': cfg.color,
+                'avatars': avatars_info
+            }
+        
+        return metadata
 
     def summary(self) -> str:
         """Retourne un résumé lisible de toutes les factories."""
@@ -830,11 +1007,61 @@ class ParticleFactory:
 
     # ── Utilitaire interne ────────────────────────────────────────────────────
 
-    def _assign_body_indices(self, config: FactoryConfig):
+    def freeze_body_indices(self, body_counter_start: int = 1) -> None:
+        """
+        Calcule et FIGE définitivement les indices de corps de toutes les
+        factories, dans l'ordre de self.configs, à partir de body_counter_start.
+
+        À appeler UNIQUEMENT au moment où le DATBOX/pre.py réel est généré
+        (bouton "Générer Script Python", "Générer DATBOX", ou équivalent).
+        C'est ce moment qui détermine l'ordre réel des corps dans le DATBOX ;
+        tout calcul ultérieur (UI, command.py) doit relire ces indices figés
+        sans les recalculer, sous peine de désynchronisation.
+        """
+        self.reset_body_counter(body_counter_start)
+        for cfg in self.configs:
+            cfg.indices_frozen = False        # autoriser un nouveau calcul
+            self._assign_body_indices(cfg, force=True)
+
+    def refresh_unfrozen_indices(self, body_counter_start: int = 1) -> None:
+        """
+        Recalcule uniquement les indices des factories PAS encore figées
+        (indices_frozen == False) — utile pour l'aperçu dans l'UI avant tout
+        export. Les factories déjà figées (export déjà effectué) ne sont pas
+        modifiées : leurs indices restent ceux du dernier DATBOX généré.
+        """
+        self.reset_body_counter(body_counter_start)
+        for cfg in self.configs:
+            self._assign_body_indices(cfg, force=False)
+
+    def _assign_body_indices(self, config: FactoryConfig, force: bool = False):
         """
         Assigne les indices de corps LMGC90 (1-based) à la factory.
         Les parois sont comptées avant les particules.
+
+        Si config.indices_frozen est True et force=False, ne fait RIEN :
+        les indices ont déjà été figés lors d'une génération précédente du
+        DATBOX/pre.py et ne doivent plus changer, sous peine de désynchroniser
+        les scripts command.py qui s'appuient sur ces indices pour
+        SetVisible/SetInvisible.
+
+        Passer force=True uniquement au moment où l'on génère réellement le
+        DATBOX/pre.py (c'est ce point qui doit figer les indices définitifs).
         """
+        if config.indices_frozen and not force:
+            # Ne pas toucher self._current_body_index : on doit tout de même
+            # l'avancer pour que les factories suivantes restent cohérentes
+            # entre elles dans cette même passe de calcul.
+            nb_walls = _count_walls(config) if config.wall_index_start else 0
+            if config.wall_index_end:
+                self._current_body_index = max(
+                    self._current_body_index, config.wall_index_end + 1
+                )
+            self._current_body_index = max(
+                self._current_body_index, config.body_index_end + 1
+            )
+            return
+
         # Compter les parois selon le type de conteneur
         nb_walls = _count_walls(config)
         if nb_walls > 0:
@@ -858,6 +1085,9 @@ class ParticleFactory:
                 step=step, body_start=b_start,
                 body_end=b_end, nb_active=nb_act
             ).to_dict())
+
+        if force:
+            config.indices_frozen = True
 
 
 def _count_walls(config: FactoryConfig) -> int:
@@ -886,6 +1116,11 @@ def write_factories(f, factories: List[FactoryConfig], dimension: int = 3):
     Écrit le bloc de code pré-traitement de toutes les factories dans le
     fichier ouvert `f`.
     Appeler depuis ScriptGenerator.generate() après _write_datbox().
+    
+    Génère automatiquement :
+    1. Code pre.py pour créer les avatars (factory_factory1_bodies, etc.)
+    2. Code pour ajouter les avatars à bodies_list (avec noms intelligibles)
+    3. Code pour générer factory_avatars_metadata.json dans le script pre.py
     """
     active = [c for c in factories if c.enabled]
     if not active:
@@ -901,3 +1136,199 @@ def write_factories(f, factories: List[FactoryConfig], dimension: int = 3):
     f.write('# ============================================================\n')
     f.write(engine.generate_pre_code())
     f.write('\n')
+    
+    # Ajouter les avatars de factory à bodies_list avec des noms intelligibles
+    # ET générer le JSON de métadonnées
+    f.write(engine.generate_bodies_list_code())
+
+
+# ============================================================================
+# Sérialisation pickle — avatars et indices corps
+# ============================================================================
+
+def save_bodies_to_pickle(bodies_container, pickle_path: str = 'bodies_collection.pkl') -> None:
+    """
+    Sérialise les avatars créés dans un fichier pickle.
+    À appeler APRÈS bodies.addAvatar() et AVANT pre.writeDatbox().
+    
+    Args:
+        bodies_container: conteneur pre.avatars() contenant tous les corps
+        pickle_path: chemin du fichier pickle à créer
+    
+    Exemple:
+        bodies = pre.avatars()
+        # ... créer les avatars et les ajouter avec bodies.addAvatar()
+        save_bodies_to_pickle(bodies, 'bodies_collection.pkl')
+        pre.writeDatbox(mats=mats, mods=mods, bodies=bodies, ...)
+    """
+    import pickle
+    
+    bodies_data = {
+        'total_nb_bodies': len(bodies_container),
+        'bodies_info': []
+    }
+    
+    # Parcourir tous les avatars dans le conteneur
+    for avatar in bodies_container:
+        # Récupérer les infos essentielles : numéro (1-based), type, position, rayon si applicable
+        info = {
+            'number': avatar.number + 1,  # 1-based indexing
+            'name': getattr(avatar, 'name', 'unknown'),
+            'type': type(avatar).__name__,  # rigidDisk, rigidSphere, rigidJonc, etc.
+        }
+        
+        # Position du centre
+        if hasattr(avatar, 'center'):
+            info['center'] = list(avatar.center) if hasattr(avatar.center, '__iter__') else [avatar.center]
+        
+        # Rayon (pour disques/sphères)
+        if hasattr(avatar, 'r'):
+            info['radius'] = avatar.r
+        
+        # Couleur
+        if hasattr(avatar, 'color'):
+            info['color'] = avatar.color
+        
+        bodies_data['bodies_info'].append(info)
+    
+    # Écrire le pickle
+    with open(pickle_path, 'wb') as f:
+        pickle.dump(bodies_data, f)
+    
+    print(f'✓ Sérialisé {bodies_data["total_nb_bodies"]} corps dans {pickle_path}')
+
+
+def load_bodies_from_pickle(pickle_path: str = 'bodies_collection.pkl') -> dict:
+    """
+    Charge les avatars sérialisés depuis un fichier pickle.
+    À appeler dans le script de calcul (command.py / chipy.py).
+    
+    Returns:
+        dict contenant 'total_nb_bodies' et 'bodies_info' (liste des infos corps)
+    
+    Exemple:
+        bodies_data = load_bodies_from_pickle('bodies_collection.pkl')
+        print(f"Total: {bodies_data['total_nb_bodies']} corps")
+        for info in bodies_data['bodies_info']:
+            print(f"  Corps {info['number']}: {info['type']} à {info['center']}")
+    """
+    import pickle
+    import os
+    
+    if not os.path.isfile(pickle_path):
+        raise FileNotFoundError(f"Fichier pickle non trouvé: {pickle_path}")
+    
+    with open(pickle_path, 'rb') as f:
+        bodies_data = pickle.load(f)
+    
+    print(f'✓ Chargé {bodies_data["total_nb_bodies"]} corps depuis {pickle_path}')
+    return bodies_data
+
+
+def load_factory_avatars_from_json(json_path: str = 'factory_avatars_metadata.json') -> dict:
+    """
+    Charge les métadonnées des avatars de factory depuis le JSON généré.
+    À utiliser par le GUI pour recréer les entrées Avatar dans state.avatars.
+    
+    Args:
+        json_path: chemin du fichier JSON de métadonnées
+    
+    Returns:
+        dict avec structure:
+        {
+            'factories': {
+                'factory1': {
+                    'particle_type': 'rigidDisk',
+                    'nb_particles': 100,
+                    'color': 'BLUEx',
+                    'avatars': [
+                        {'name': 'factory_factory1_disk_0', 'body_index': 1, ...},
+                        {'name': 'factory_factory1_disk_1', 'body_index': 2, ...},
+                        ...
+                    ]
+                }
+            }
+        }
+    
+    Exemple d'utilisation dans le GUI :
+        metadata = load_factory_avatars_from_json()
+        for factory_name, factory_data in metadata['factories'].items():
+            print(f"Factory {factory_name}: {factory_data['nb_particles']} particles")
+            for avatar_info in factory_data['avatars']:
+                # Créer des Avatar objects et les ajouter à state.avatars
+                avatar = Avatar(
+                    avatar_type=AvatarType(...),
+                    center=...,
+                    material_name=avatar_info['material'],
+                    model_name=avatar_info['model'],
+                    color=avatar_info['color'],
+                    origin=AvatarOrigin.LOOP,  # avatars générés
+                    radius=avatar_info['radius']
+                )
+                controller.add_avatar(avatar)
+    """
+    import json
+    import os
+    
+    if not os.path.isfile(json_path):
+        raise FileNotFoundError(f"Fichier JSON non trouvé: {json_path}")
+    
+    with open(json_path, 'r', encoding='utf-8') as f:
+        metadata = json.load(f)
+    
+    nb_factories = len(metadata.get('factories', {}))
+    nb_total = sum(
+        len(factory['avatars']) 
+        for factory in metadata.get('factories', {}).values()
+    )
+    
+    print(f'✓ Chargé métadonnées : {nb_factories} factory(ies), {nb_total} avatar(s) total')
+    return metadata
+
+
+def create_avatars_from_factory_metadata(metadata: dict) -> list:
+    """
+    Crée des objets Avatar à partir des métadonnées JSON de factory.
+    À appeler après load_factory_avatars_from_json().
+    
+    Args:
+        metadata: dict retourné par load_factory_avatars_from_json()
+    
+    Returns:
+        Liste d'Avatar objects prêts à être ajoutés au state via controller.add_avatar()
+    
+    Exemple:
+        metadata = load_factory_avatars_from_json()
+        avatars = create_avatars_from_factory_metadata(metadata)
+        for avatar in avatars:
+            controller.add_avatar(avatar)
+    """
+    from .models import Avatar, AvatarType, AvatarOrigin
+    
+    avatars = []
+    
+    for factory_name, factory_data in metadata.get('factories', {}).items():
+        for avatar_info in factory_data.get('avatars', []):
+            # Convertir le type de particule en AvatarType enum
+            particle_type_str = avatar_info['type']
+            try:
+                avatar_type = AvatarType(particle_type_str)
+            except ValueError:
+                print(f"⚠ Type d'avatar non reconnu: {particle_type_str}, ignoré")
+                continue
+            
+            # Créer l'objet Avatar
+            avatar = Avatar(
+                avatar_type=avatar_type,
+                center=avatar_info.get('center', [0., 0., 0.]),
+                material_name=avatar_info.get('material', 'default'),
+                model_name=avatar_info.get('model', 'default'),
+                color=avatar_info.get('color', 'BLUEx'),
+                origin=AvatarOrigin.LOOP,  # Marqués comme générés (pas manuels)
+                radius=avatar_info.get('radius'),
+            )
+            
+            avatars.append(avatar)
+    
+    print(f'✓ Créé {len(avatars)} Avatar objects à partir des métadonnées')
+    return avatars

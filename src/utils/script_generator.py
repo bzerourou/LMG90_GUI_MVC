@@ -82,6 +82,15 @@ class ScriptGenerator:
         f.write('import numpy as np\n')
         f.write('import math\n\n')
         f.write('import copy\n\n')
+        # ── Repertoire de travail ────────────────────────────────────────
+        # Force le cwd sur le dossier du script : sans cela, les chemins
+        # relatifs (body_collection.pkl, factory_avatars_metadata.json,
+        # DATBOX/) sont ecrits dans le cwd du processus appelant (terminal,
+        # IDE...) et non dans le dossier du projet, ce qui fait croire que
+        # ces fichiers ne sont jamais generes alors qu'ils existent ailleurs.
+        f.write('import os\n')
+        f.write('_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))\n')
+        f.write('os.chdir(_SCRIPT_DIR)\n\n')
         # ── Variables dynamiques ──────────────────────────────────────────────────
     def _write_dynamic_vars(self, f: TextIO):
         """
@@ -836,8 +845,16 @@ class ScriptGenerator:
         #    - il n'est pas déjà dans wall_params,
         #    - ET ce n'est PAS un polygone full/bevel
         if avatar.radius and not has_r_in_wall_params and not exclude_r:
-
-            args.append(f"radius={avatar.radius}")
+            # pylmgc90 attend le mot-cle 'r=' pour rigidDisk/rigidSphere/
+            # rigidCylinder/etc., mais 'radius=' pour rigidPolygon et
+            # rigidPolyhedron (cf. Avatar.to_dict() dans models.py, qui
+            # fait deja cette distinction a la serialisation).
+            radius_kw = (
+                'radius'
+                if avatar.avatar_type in (AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON)
+                else 'r'
+            )
+            args.append(f"{radius_kw}={avatar.radius}")
         
         if avatar.axis:
             args.append(f"axe1={avatar.axis['axe1']}")
@@ -943,21 +960,16 @@ class ScriptGenerator:
         """Boucles For génériques"""
         if not hasattr(self.state, 'for_loops') or not self.state.for_loops:
             return
-        f.write("# Boucles for génériques\n")
+        f.write("#Boucles for génériques\n")
         for idx, for_loop in enumerate(self.state.for_loops):
             f.write(f"# Boucle For {idx + 1} : {for_loop.target_type}\n")
-
-            # Cas spécial granulo : le code pré-boucle doit précéder la ligne for
-            if for_loop.target_type == "granulo":
-                self._write_for_granulo(f, idx, for_loop)
-                f.write("\n")
-                continue
-
-            # Tous les autres types : ligne for puis corps
+            
+            # Évaluer les expressions de début/fin/step
             f.write(f"for {for_loop.loop_var} in range({for_loop.start_expr}, {for_loop.end_expr}, {for_loop.step_expr}):\n")
-
+            
+            # Générer l'élément selon le type
             template = for_loop.template_config
-
+            
             if for_loop.target_type == "avatar":
                 self._write_for_avatar(f, template, for_loop.loop_var)
             elif for_loop.target_type == "material":
@@ -970,7 +982,7 @@ class ScriptGenerator:
                 self._write_for_visibility(f, template, for_loop.loop_var)
             elif for_loop.target_type == "dof":
                 self._write_for_dof(f, template, for_loop.loop_var)
-
+            
             f.write("\n")
     
     
@@ -1029,85 +1041,6 @@ class ScriptGenerator:
             f.write(f"\n    )\n")
             f.write(f"    bodies.addAvatar(body)\n")
             f.write(f"    bodies_list.append(body)\n")
-
-    def _write_for_granulo(self, f: 'TextIO', idx: int, for_loop) -> None:
-        """
-        Génère le code pour une boucle For de type 'granulo'.
-
-        Structure du script généré :
-          1. Avant la boucle : granulo_Random + dépôt pylmgc90 (calculé UNE SEULE FOIS)
-          2. La boucle for   : évaluation de l'expression 'origin' (peut contenir la
-                               variable de boucle), décalage des coordonnées de référence,
-                               puis création des avatars.
-
-        Le template_config attendu :
-          {
-            'nb_particles'    : int,
-            'radius_min'      : float,
-            'radius_max'      : float,
-            'container_type'  : str  (ex: 'Box2D'),
-            'container_params': dict (ex: {'lx': 2.0, 'ly': 1.0}),
-            'origin'          : str  (expression Python avec la var de boucle,
-                                      ex: '[i * 3.0, 0.0]'),
-            'material_name'   : str,
-            'model_name'      : str,
-            'avatar_type'     : str  (ex: 'rigidDisk'),
-            'color'           : str,
-            'seed'            : int | None
-          }
-        """
-        template         = for_loop.template_config
-        loop_var         = for_loop.loop_var
-        safe             = f"fg{idx}"   # suffixe unique : fg0, fg1, …
-
-        nb               = template.get('nb_particles',    100)
-        r_min            = template.get('radius_min',       0.01)
-        r_max            = template.get('radius_max',       0.05)
-        seed             = template.get('seed')
-        container_type   = template.get('container_type',  'Box2D')
-        container_params = template.get('container_params', {})
-        origin_expr      = template.get('origin',          '[0.0, 0.0]')
-        mat              = template.get('material_name',   'TDURx')
-        mod              = template.get('model_name',      'rigid')
-        avatar_type      = template.get('avatar_type',     'rigidDisk')
-        color            = template.get('color',           'BLUEx')
-
-        deposit_func = _DEPOSIT_FUNC.get(container_type, 'depositInBox2D')
-        deposit_keys = _DEPOSIT_PARAMS.get(container_type, ['lx', 'ly'])
-
-        # ── 1. Génération des rayons et dépôt — UNE SEULE FOIS avant la boucle ──
-        f.write(f"# Génération granulo (calculée une seule fois, réutilisée à chaque itération)\n")
-        f.write(f"_radii_{safe} = pre.granulo_Random(\n")
-        f.write(f"    nb={nb},\n")
-        f.write(f"    r_min={r_min},\n")
-        f.write(f"    r_max={r_max}")
-        if seed:
-            f.write(f",\n    seed={seed}")
-        f.write(f"\n)\n")
-
-        f.write(f"_nb_rem_{safe}, _coords_ref_{safe} = pre.{deposit_func}(\n")
-        f.write(f"    radii=_radii_{safe},\n")
-        for key in deposit_keys:
-            val = container_params.get(key, 1.0)
-            f.write(f"    {key}={val},\n")
-        f.write(f")\n")
-        f.write(f"_coords_ref_{safe}.shape = [_coords_ref_{safe}.size // 2, 2]\n")
-        f.write(f"_radii_{safe} = _radii_{safe}[:_nb_rem_{safe}]\n\n")
-
-        # ── 2. Boucle for : décalage de l'origin + création des avatars ─────────
-        f.write(f"for {loop_var} in range({for_loop.start_expr}, {for_loop.end_expr}, {for_loop.step_expr}):\n")
-        f.write(f"    _origin_{safe} = {origin_expr}\n")
-        f.write(f"    _coords_{safe} = _coords_ref_{safe} + np.array(_origin_{safe})\n")
-        f.write(f"    for _j in range(len(_radii_{safe})):\n")
-        f.write(f"        av = pre.{avatar_type}(\n")
-        f.write(f"            center=_coords_{safe}[_j],\n")
-        f.write(f"            model=mods['{mod}'],\n")
-        f.write(f"            material=mats['{mat}'],\n")
-        f.write(f"            color='{color}',\n")
-        f.write(f"            r=float(_radii_{safe}[_j])\n")
-        f.write(f"        )\n")
-        f.write(f"        bodies.addAvatar(av)\n")
-        f.write(f"        bodies_list.append(av)\n")
 
     def _write_for_material(self, f, template: dict, loop_var: str):
         """Génère un matériau dans une boucle for"""
@@ -1186,12 +1119,6 @@ class ScriptGenerator:
 
         f.write('# Génération granulométrique\n')
         for i, gen in enumerate(self.state.granulo_generations):
-            # Les entrées "Distribution" sont des références pures utilisées par les
-            # boucles For granulo — elles n'ont pas de dépôt pylmgc90 direct.
-            if gen.container_type == "Distribution":
-                f.write(f"# Distribution {i+1} (référence pour boucles For — pas de dépôt direct)\n\n")
-                continue
-
             f.write(f"# Dépôt granulo {i+1}  : {gen.color}----\n")
             
             container_params_str = ', '.join(f"{k}={v}" for k, v in gen.container_params.items())
@@ -1340,7 +1267,17 @@ class ScriptGenerator:
 
     # ── Particle Factories ──────────────────────────────────────────────────
     def _write_factories(self, f: TextIO) -> None:
-        """Generate factory particles code before writeDatbox."""
+        """
+        Genere le code des Particle Factories avant writeDatbox.
+
+        Ce point determine l'ORDRE REEL des corps dans le DATBOX final.
+        Les indices calcules ici sont donc FIGES (freeze_body_indices) et
+        persistes dans controller.state.factories, afin que toute generation
+        ulterieure de command.py (compute_script_generator.py) relise
+        exactement les memes indices au lieu d'en recalculer de nouveaux —
+        ce qui desynchroniserait SetVisible/SetInvisible par rapport au
+        DATBOX reellement ecrit.
+        """
         factories = getattr(self.state, 'factories', None) or []
         if not factories:
             return
@@ -1349,20 +1286,39 @@ class ScriptGenerator:
         except ImportError:
             f.write('# particle_factory.py introuvable\n')
             return
-        
+
         engine = ParticleFactory.from_list_of_dicts(factories)
-        
+
         nb_existing = len(self.state.avatars)
-        engine.reset_body_counter(nb_existing+1)
-        for cfg in engine.configs :
-            engine._assign_body_indices(cfg)
+        # Fige definitivement les indices : ce calcul devient la reference
+        # pour tous les exports ulterieurs (command.py) tant qu'aucun avatar
+        # normal du projet n'est ajoute/retire avant la PROCHAINE generation
+        # de ce script pre.py (qui re-figera alors avec les nouveaux indices).
+        engine.freeze_body_indices(body_counter_start=nb_existing + 1)
+
+        # Persister le gel dans le projet pour que compute_script_generator.py
+        # (et l'UI FactoryTab) lisent ces memes indices sans les recalculer.
+        if self.controller is not None:
+            self.controller.state.factories = engine.to_list_of_dicts()
+
         pre_code = engine.generate_pre_code(body_counter_start=nb_existing + 1)
         f.write('\n')
         f.write('# ============================================================\n')
         f.write('# Avatars (Particles Factories) crees invisibles \n')
         f.write('# ============================================================\n')
         f.write(pre_code)
+        pickle_code = engine.generate_pickle_code(dimension=self.state.dimension)
+        if pickle_code:
+            f.write(pickle_code)
         f.write('\n')
+
+        # Ajoute les avatars de factory a bodies_list (noms intelligibles)
+        # + genere le code qui ecrit factory_avatars_metadata.json a l'execution
+        # de pre.py. Sans cet appel, les avatars de factory restent invisibles
+        # pour le GUI (pas dans bodies_list) et le JSON n'est jamais cree.
+        bodies_list_code = engine.generate_bodies_list_code()
+        if bodies_list_code:
+            f.write(bodies_list_code)
 
     # ── DATBOX ────────────────────────────────────────────────────────────────
     def _write_datbox(self, f: TextIO):

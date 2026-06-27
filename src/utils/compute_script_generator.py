@@ -9,6 +9,8 @@ from io import StringIO
 from pathlib import Path
 from typing import Dict, Any
 
+from ..core.particle_factory import BODY_COLLECTION_PICKLE, ParticleFactory
+
 
 class ComputeScriptGenerator:
     """Genere le script command.py pour chipy."""
@@ -86,16 +88,14 @@ class ComputeScriptGenerator:
         w   = buf.write
 
         # ── Factories ─────────────────────────────────────────────────────────
+        # Les indices corps sont lus depuis body_collection.pkl (genere par
+        # le script pre.py au moment de bodies.addAvatar), sur le modele
+        # exemples/box_generation.py / box_simulation.py.
         _factory_active = []
         try:
-            from ..core.particle_factory import ParticleFactory
             _fraw = getattr(self.controller.state, 'factories', None) or []
             if _fraw:
                 _fengine = ParticleFactory.from_list_of_dicts(_fraw)
-                _nb_av   = len(getattr(self.controller.state, 'avatars', []))
-                _fengine.reset_body_counter(_nb_av + 1)
-                for _fc in _fengine.configs:
-                    _fengine._assign_body_indices(_fc)
                 _factory_active = [c for c in _fengine.configs if c.enabled]
         except Exception:
             _factory_active = []
@@ -129,6 +129,10 @@ class ComputeScriptGenerator:
         w('# Script de calcul genere automatiquement par LMGC90_GUI\n')
         w(f'# Projet    : {self.controller.state.name}\n')
         w(f'# Dimension : {dim}D\n')
+        if _factory_active:
+            w('#\n')
+            w('# Particle Factories : indices corps via body_collection.pkl\n')
+            w('# (genere par le script pre.py — cf. exemples/box_simulation.py)\n')
         w('\n')
         w('from pylmgc90 import chipy\n')
         if use_stop:
@@ -356,65 +360,53 @@ class ComputeScriptGenerator:
         if _vis_before:
             w('\n')
 
-        # ── 6c. Particle Factories : invisibilite initiale + planning ──────────
+        # ── 6c. Particle Factories : pickle + invisibilite + planning ───────────
         #
-        # Principe :
-        #   1. On calcule la plage d'indices corps (1-based) de chaque factory.
-        #   2. On rend toutes ces particules invisibles AVANT la boucle via
-        #      chipy.RBDY2_SetInvisible / chipy.RBDY3_SetInvisible.
-        #   3. On construit un dict Python  _factory_schedule = {k: [ids]}
-        #      qui associe a chaque pas de boucle k la liste des corps a activer.
-        #   4. DANS la boucle, on teste  if k in _factory_schedule  et on appelle
-        #      chipy.RBDY2_SetVisible / RBDY3_SetVisible pour chaque corps.
+        # Pattern box_simulation.py :
+        #   1. Charger body_collection.pkl (ecrit par pre.py apres addAvatar)
+        #   2. SetInvisible sur tous les corps factory
+        #   3. Construire _factory_schedule = {k: [ids]} depuis les vagues
+        #   4. Dans la boucle : SetVisible aux pas planifies
         #
         if _factory_active:
             w('# ============================================================\n')
-            w('# Particle Factories — initialisation avant la boucle\n')
+            w('# Particle Factories — body_collection.pkl\n')
             w('# ============================================================\n')
-
-            # Plages d'indices par factory
-            for cfg in _factory_active:
-                if cfg.body_index_start > 0 and cfg.body_index_end > 0:
-                    w(f'# Factory "{cfg.name}" : {cfg.nb_particles} particule(s), '
-                      f'indices {cfg.body_index_start}..{cfg.body_index_end}\n')
-                    w(f'_factory_{cfg.name}_range = list(range('
-                      f'{cfg.body_index_start}, {cfg.body_index_end + 1}))\n')
-                else:
-                    # Les indices ne sont pas encore calcules (ne devrait pas arriver
-                    # si le wizard a ete utilise correctement).
-                    w(f'# ATTENTION : indices non calcules pour la factory "{cfg.name}"\n')
-                    w(f'# Verifiez que le wizard FactoryWizard a ete execute avant de\n')
-                    w(f'# generer ce script (les indices corps doivent etre assigne).\n')
-                    w(f'_factory_{cfg.name}_range = []  # a renseigner manuellement\n')
+            w('import pickle\n')
+            w('import os\n')
+            w(f"_pkl_path = '{BODY_COLLECTION_PICKLE}'\n")
+            w("if not os.path.isfile(_pkl_path):\n")
+            w("    raise FileNotFoundError(\n")
+            w(f"        f\"Fichier '{{_pkl_path}}' introuvable. \"\n")
+            w("        \"Executez d'abord le script pre.py (generation DATBOX) \"\n")
+            w("        \"pour creer body_collection.pkl.\")\n")
+            w("with open(_pkl_path, 'rb') as _pkl_f:\n")
+            w("    body_collection = pickle.load(_pkl_f)\n")
+            w("print('Charge', _pkl_path, '—', body_collection.get('total_nb_bodies', '?'), 'corps')\n")
             w('\n')
 
-            # Rendre toutes les particules invisibles au depart
             w('# Masquer toutes les particules de factory au depart\n')
-            for cfg in _factory_active:
-                w(f'for _bnum in _factory_{cfg.name}_range:\n')
-                w(f'    chipy.{_rbdy_prefix}_SetInvisible(_bnum)\n')
+            w("for _fcfg in body_collection.get('factories', {}).values():\n")
+            w("    if not _fcfg.get('enabled', True):\n")
+            w("        continue\n")
+            w(f"    for _bnum in _fcfg['body_numbers']:\n")
+            w(f"        chipy.{_rbdy_prefix}_SetInvisible(_bnum)\n")
             w('\n')
 
-            # Construire le planning : { k_boucle : [liste_ids_a_activer] }
-            # La variable de boucle est k (0-base dans range(nb_steps)).
-            # start_step est interprete comme la valeur de k au moment de l'activation.
-            # Exemple : start_step=0 => activation des la premiere iteration (k=0),
-            #           start_step=50 => activation a la 51eme iteration (k=50).
-            w('# Planning d\'activation : {k: [ids_corps_a_rendre_visibles]}\n')
+            w("# Planning d'activation : {k: [ids_corps_a_rendre_visibles]}\n")
             w('_factory_schedule: dict = {}\n')
-            for cfg in _factory_active:
-                # Nom de variable unique pour eviter les collisions entre factories
-                _vn = cfg.name  # identifiant Python valide (valide par le wizard)
-                w(f'# Factory "{cfg.name}" — {cfg.nb_batches} vague(s) '
-                  f'de {cfg.batch_size} particule(s) '
-                  f'(premiere vague a k={cfg.start_step}, '
-                  f'intervalle={cfg.interval_steps} pas)\n')
-                w(f'for _bi_{_vn} in range({cfg.nb_batches}):\n')
-                w(f'    _k_{_vn}  = {cfg.start_step} + _bi_{_vn} * {cfg.interval_steps}\n')
-                w(f'    _bs_{_vn} = {cfg.body_index_start} + _bi_{_vn} * {cfg.batch_size}\n')
-                w(f'    _be_{_vn} = min(_bs_{_vn} + {cfg.batch_size} - 1, {cfg.body_index_end})\n')
-                w(f'    _factory_schedule.setdefault(_k_{_vn}, []).extend(\n')
-                w(f'        range(_bs_{_vn}, _be_{_vn} + 1))\n')
+            w("for _fname, _fcfg in body_collection.get('factories', {}).items():\n")
+            w("    if not _fcfg.get('enabled', True):\n")
+            w("        continue\n")
+            w("    _nums = _fcfg['body_numbers']\n")
+            w("    _bs   = _fcfg['batch_size']\n")
+            w("    _ss   = _fcfg['start_step']\n")
+            w("    _iv   = _fcfg['interval_steps']\n")
+            w("    _nb   = (len(_nums) + _bs - 1) // _bs\n")
+            w("    for _bi in range(_nb):\n")
+            w("        _k = _ss + _bi * _iv\n")
+            w("        _batch = _nums[_bi * _bs : (_bi + 1) * _bs]\n")
+            w("        _factory_schedule.setdefault(_k, []).extend(_batch)\n")
             w('\n')
 
         # ── 7. Restart ────────────────────────────────────────────────────────
@@ -617,10 +609,10 @@ class ComputeScriptGenerator:
             L("chipy.utilities_logMes('VISU & POSTPRO')")
             wrote_visu = False
             if p.get('visu_RBDY2') and use_RBDY2:
-                L('chipy.RBDY2_WriteDisplayFiles(freq_display)')
+                L('chipy.WriteDisplayFiles(freq_display)')
                 wrote_visu = True
             if p.get('visu_RBDY3') and use_RBDY3:
-                L('chipy.RBDY3_WriteDisplayFiles(freq_display)')
+                L('chipy.WriteDisplayFiles(freq_display)')
                 wrote_visu = True
             if p.get('visu_mecaFEM') and use_mecaFEM:
                 L('chipy.mecaFEMx_WriteDisplayFiles(freq_display)')

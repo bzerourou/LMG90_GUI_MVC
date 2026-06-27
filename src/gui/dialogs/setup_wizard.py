@@ -179,7 +179,7 @@ class ProjectSetupWizard(QWizard):
             )
             self.controller.add_visibility_rule(rule)
         #rafraîchir la vue pour afficher les nouveaux éléments
-        super().setWindowTitle(f"LMGC90_GUI v0.4.0 - {project_name}")
+        super().setWindowTitle(f"LMGC90_GUI v0.4.5 - {project_name}")
 
 class IntroPage(QWizardPage):
     """Page d'introduction"""
