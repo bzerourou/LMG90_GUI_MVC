@@ -1067,6 +1067,75 @@ class ProjectController(QObject):
                 self.state.avatar_groups[config.group_name] = []
             self.state.avatar_groups[config.group_name].extend(indices)
 
+    # ========== FACTORY AVATARS ==========
+    def load_factory_avatars_from_json(self, json_path: str = 'factory_avatars_metadata.json') -> List[int]:
+        """
+        Charge les métadonnées des avatars de factory depuis le JSON généré
+        et les ajoute au projet.
+        
+        À appeler après que pre.py a été exécuté et que factory_avatars_metadata.json
+        a été créé.
+        
+        Args:
+            json_path: chemin du fichier JSON de métadonnées (défaut: factory_avatars_metadata.json)
+        
+        Returns:
+            Liste des indices des avatars créés dans state.avatars
+        
+        Raises:
+            FileNotFoundError: Si le fichier JSON n'existe pas
+            ValueError: Si un matériau ou modèle requis manque
+        """
+        from ..core.particle_factory import load_factory_avatars_from_json, create_avatars_from_factory_metadata
+        
+        # Charger le JSON
+        try:
+            metadata = load_factory_avatars_from_json(json_path)
+        except FileNotFoundError as e:
+            print(f"⚠ Impossible de charger factory avatars: {e}")
+            return []
+        
+        # Créer des objets Avatar
+        avatars_to_add = create_avatars_from_factory_metadata(metadata)
+        
+        if not avatars_to_add:
+            print("⚠ Aucun avatar à créer depuis le JSON de factory")
+            return []
+        
+        # Ajouter tous les avatars au projet
+        # create_pylmgc=True : indispensable pour que pre.visuAvatars()
+        # (bouton "Visualiser Avatars") les affiche, puisqu'il ne lit que
+        # self._bodies_container (objets pylmgc90 réels), pas state.avatars.
+        # Le viewer 3D, lui, lit directement state.avatars — c'est pourquoi
+        # les avatars y apparaissaient déjà même avec create_pylmgc=False.
+        was_batch = self._batch_mode
+        self._batch_mode = True
+        
+        try:
+            indices = []
+            skipped = 0
+            for avatar in avatars_to_add:
+                try:
+                    idx = self.add_avatar(avatar, create_pylmgc=True)
+                    indices.append(idx)
+                except Exception as exc:
+                    skipped += 1
+                    print(
+                        f"⚠ Avatar de factory ignoré "
+                        f"(matériau='{avatar.material_name}', modèle='{avatar.model_name}') : {exc}"
+                    )
+            
+            # Émettre un seul signal de changement pour tous
+            self.state_changed.emit()
+            
+            msg = f'✅ {len(indices)} factory avatar(s) créé(s) et ajouté(s) au projet'
+            if skipped:
+                msg += f' — {skipped} ignoré(s) (voir messages ci-dessus)'
+            print(msg)
+            return indices
+        finally:
+            self._batch_mode = was_batch
+
     # ========== BOUCLES FOR ==========
     def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
         """

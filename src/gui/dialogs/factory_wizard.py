@@ -419,6 +419,8 @@ class FactoryZonePage(QWizardPage):
         layout.addWidget(info)
         layout.addStretch()
 
+        self.dim_combo.setCurrentIndex(1)  # 2D par défaut (tous les widgets existent désormais)
+
     def _on_dim_changed(self, idx: int):
         is_3d = (idx == 0)
         self._cz_label.setVisible(is_3d)
@@ -472,8 +474,8 @@ class FactoryParticlesPage(QWizardPage):
         # Taille
         size_group = QGroupBox("Taille des particules")
         sf = QFormLayout(size_group)
-        self.r_min = _dbl(0.010)
-        self.r_max = _dbl(0.020)
+        self.r_min = _dbl(0.145)
+        self.r_max = _dbl(0.185)
         sf.addRow("Rayon min :", self.r_min)
         sf.addRow("Rayon max :", self.r_max)
         size_hint = QLabel(

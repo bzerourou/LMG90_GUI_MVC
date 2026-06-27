@@ -108,8 +108,8 @@ class FactoryConfig:
 
     # ── Particules ────────────────────────────────────────────────────────────
     particle_type:   str        = 'rigidDisk'   # rigidSphere | rigidDisk
-    radius_min:      float      = 0.01
-    radius_max:      float      = 0.02
+    radius_min:      float      = 0.145
+    radius_max:      float      = 0.185
     nb_particles:    int        = 1000
     model_name:      str        = ''
     material_name:   str        = ''
