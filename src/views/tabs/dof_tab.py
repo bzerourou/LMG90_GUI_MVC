@@ -210,8 +210,13 @@ class DOFTab(BaseTab):
             QMessageBox.critical(self, "Erreur", f"Échec de la modification :\n{e}")
 
     def _on_delete(self, index: int):
-        operation = self.controller.state.operations[index]
-        target_label = operation.target_value if isinstance(operation.target_value, str) else f"Avatar #{operation.target_value}"
+        operation  = self.controller.state.operations[index]
+        _id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+        if operation.target_type == 'avatar':
+            _av_idx      = _id_to_idx.get(operation.target_value)
+            target_label = f"Avatar #{_av_idx}" if _av_idx is not None else "Avatar inconnu"
+        else:
+            target_label = operation.target_value
 
         reply = QMessageBox.question(
             self,
@@ -279,7 +284,8 @@ class DOFTab(BaseTab):
             elif avatar.origin == AvatarOrigin.GRANULO:
                 origin_mark = " [Granulo]"
             label = f"Avatar #{i} — {avatar.avatar_type.value} ({avatar.color}){origin_mark}"
-            self.target_combo.addItem(label, ('avatar', i))
+            # Stocker avatar_id stable (str) et non la position (int)
+            self.target_combo.addItem(label, ('avatar', avatar.avatar_id))
 
         for group_name, indices in self.controller.state.avatar_groups.items():
             label = f"📷 GROUPE : {group_name} ({len(indices)} avatars)"
@@ -292,9 +298,17 @@ class DOFTab(BaseTab):
             idx = [self.target_combo.itemData(i) for i in range(self.target_combo.count())].index(current_target)
             self.target_combo.setCurrentIndex(idx)
 
+        # Table de résolution avatar_id → index pour l'affichage
+        _id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+
         self.tree.clear()
         for idx, op in enumerate(self.controller.state.operations):
-            target_label = op.target_value if isinstance(op.target_value, str) else f"Avatar #{op.target_value}"
+            if op.target_type == 'avatar':
+                # target_value est un avatar_id (str) — on résout vers l'index pour affichage
+                _av_idx = _id_to_idx.get(op.target_value)
+                target_label = f"Avatar #{_av_idx}" if _av_idx is not None else f"Avatar inconnu"
+            else:
+                target_label = op.target_value  # nom du groupe
             params_str = ", ".join(f"{k}={v}" for k, v in list(op.parameters.items())[:3])
             if len(op.parameters) > 3:
                 params_str += "..."

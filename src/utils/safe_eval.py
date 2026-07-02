@@ -4,6 +4,11 @@
 """
 Utilitaires pour évaluer des expressions de manière sécurisée.
 Remplace les eval() dangereux.
+
+=== REFACTOR "avatar_id stable" ===
+- AvatarProxy expose désormais la propriété `.avatar_id`
+- GroupProxy.__getitem__ résout des avatar_ids (str) et non plus des
+  positions entières dans state.avatars.
 """
 import ast
 import math
@@ -13,14 +18,17 @@ from typing import Dict, Any, Optional, List, TYPE_CHECKING
 if TYPE_CHECKING:
     from ..controllers.project_controller import ProjectController
 
-
 from ..core.models import AvatarType, AvatarOrigin
 
 
-class NodeProxy : 
+# ============================================================================
+# Proxies de nœuds
+# ============================================================================
+
+class NodeProxy:
     """
-    Simule un noeud pylmgc90.
-    pylmgc90 numerote les noeuds a partir de 1 : nodes[1] = noeud principal.
+    Simule un nœud pylmgc90.
+    pylmgc90 numérote les nœuds à partir de 1 : nodes[1] = nœud principal.
     On supporte donc nodes[0] (Python) ET nodes[1] (convention pylmgc90).
     """
     __slots__ = ('coor',)
@@ -33,13 +41,14 @@ class NodeProxy :
 
     def __repr__(self):
         return f"NodeProxy(coor={self.coor})"
-    
+
+
 class _NodeList:
     """
-    Liste de noeuds supportant l'indexation depuis 0 ET depuis 1.
-      nodes[0]  : noeud principal (convention Python)
-      nodes[1]  : noeud principal (convention pylmgc90, number=1)
-      nodes[i]  : pour les avatars polygonaux, le i-ieme sommet
+    Liste de nœuds supportant l'indexation depuis 0 ET depuis 1.
+      nodes[0]  : nœud principal (convention Python)
+      nodes[1]  : nœud principal (convention pylmgc90, number=1)
+      nodes[i]  : pour les avatars polygonaux, le i-ième sommet
     """
 
     def __init__(self, avatar):
@@ -51,7 +60,6 @@ class _NodeList:
             self._list.append(NodeProxy(avatar.center))
 
     def __getitem__(self, idx: int) -> NodeProxy:
-        # Translater : nodes[1] -> index 0, nodes[2] -> index 1, etc.
         if idx == 0:
             return self._list[0]
         if idx >= 1:
@@ -59,9 +67,9 @@ class _NodeList:
             if real < len(self._list):
                 return self._list[real]
             raise IndexError(
-                f"Noeud {idx} invalide (cet avatar a {len(self._list)} noeud(s))"
+                f"Nœud {idx} invalide (cet avatar a {len(self._list)} nœud(s))"
             )
-        raise IndexError(f"Index de noeud invalide : {idx}")
+        raise IndexError(f"Index de nœud invalide : {idx}")
 
     def __len__(self):
         return len(self._list)
@@ -69,38 +77,53 @@ class _NodeList:
     def __iter__(self):
         return iter(self._list)
 
+
+# ============================================================================
+# AvatarProxy
+# ============================================================================
+
 class AvatarProxy:
     """
-    Proxy d'acces a un avatar individuel.
+    Proxy d'accès à un avatar individuel.
 
-    Proprietes exposees (toutes en lecture) :
+    Propriétés exposées (toutes en lecture) :
+      .avatar_id       - identifiant stable (uuid hex) ← NOUVEAU
       .center          - [x, y] ou [x, y, z]
-      .x, .y, .z       - coordonnees individuelles
+      .x, .y, .z       - coordonnées individuelles
       .radius          - rayon (None si non applicable)
       .color           - couleur pylmgc90
-      .material_name   - nom du materiau
-      .model_name      - nom du modele
-      .avatar_type     - chaine (ex: 'rigidDisk')
-      .origin          - chaine (ex: 'manual', 'loop', 'granulo')
-      .generation_type - chaine (ex: 'regular', 'full', 'bevel') ou None
+      .material_name   - nom du matériau
+      .model_name      - nom du modèle
+      .avatar_type     - chaîne (ex: 'rigidDisk')
+      .origin          - chaîne (ex: 'manual', 'loop', 'granulo')
+      .generation_type - chaîne (ex: 'regular', 'full', 'bevel') ou None
       .is_hollow       - bool
       .nb_vertices     - int ou None
       .vertices        - liste de sommets ou None
       .axis            - dict axe1/axe2/axe3 ou None
       .contactors      - liste de contacteurs
-      .wall_params     - dict brut des parametres de mur
+      .wall_params     - dict brut des paramètres de mur
       .brick_lx        - alias wall_params['l']
       .brick_ly        - alias wall_params['h']
       .brick_lz        - alias wall_params['lz']
-      .mesh_params     - dict parametres de maillage ou None
-      .nodes           - NodeList (nodes[1] = noeud principal comme pylmgc90)
+      .mesh_params     - dict paramètres de maillage ou None
+      .nodes           - NodeList (nodes[1] = nœud principal comme pylmgc90)
       .index           - indice dans state.avatars
     """
 
     def __init__(self, avatar, index: int):
-        self._av   = avatar
-        self._idx  = index
+        self._av    = avatar
+        self._idx   = index
         self._nodes = None
+
+    # ── Identifiant stable ────────────────────────────────────────────────────
+
+    @property
+    def avatar_id(self) -> str:
+        """Identifiant stable de l'avatar (uuid hex, jamais modifié)."""
+        return self._av.avatar_id
+
+    # ── Géométrie ─────────────────────────────────────────────────────────────
 
     @property
     def center(self):
@@ -125,9 +148,13 @@ class AvatarProxy:
     def radius(self):
         return self._av.radius
 
+    # ── Apparence ─────────────────────────────────────────────────────────────
+
     @property
     def color(self):
         return self._av.color
+
+    # ── Matériau / modèle ─────────────────────────────────────────────────────
 
     @property
     def material_name(self):
@@ -137,6 +164,8 @@ class AvatarProxy:
     def model_name(self):
         return self._av.model_name
 
+    # ── Type / origine ────────────────────────────────────────────────────────
+
     @property
     def avatar_type(self):
         return self._av.avatar_type.value
@@ -144,6 +173,8 @@ class AvatarProxy:
     @property
     def origin(self):
         return self._av.origin.value
+
+    # ── Géométrie avancée ─────────────────────────────────────────────────────
 
     @property
     def generation_type(self):
@@ -175,19 +206,19 @@ class AvatarProxy:
 
     @property
     def brick_lx(self):
-        """Longueur brique maconnerie (alias wall_params['l'])."""
+        """Longueur brique maçonnerie (alias wall_params['l'])."""
         wp = self._av.wall_params
         return wp.get('l') if wp else None
 
     @property
     def brick_ly(self):
-        """Hauteur/profondeur brique maconnerie (alias wall_params['h'])."""
+        """Hauteur/profondeur brique maçonnerie (alias wall_params['h'])."""
         wp = self._av.wall_params
         return wp.get('h') if wp else None
 
     @property
     def brick_lz(self):
-        """Hauteur 3D brique maconnerie (alias wall_params['lz'])."""
+        """Hauteur 3D brique maçonnerie (alias wall_params['lz'])."""
         wp = self._av.wall_params
         return wp.get('lz') if wp else None
 
@@ -205,25 +236,34 @@ class AvatarProxy:
             self._nodes = _NodeList(self._av)
         return self._nodes
 
-    # Acces dict-like pour compatibilite avec l'ancien code
+    # ── Accès dict-like pour compatibilité ────────────────────────────────────
+
     def __getitem__(self, key):
         return getattr(self, key)
 
     def __repr__(self):
-        return (f"AvatarProxy(index={self._idx}, "
-                f"type={self.avatar_type}, center={self.center})")
+        return (
+            f"AvatarProxy(index={self._idx}, "
+            f"id={self._av.avatar_id[:8]}…, "
+            f"type={self.avatar_type}, center={self.center})"
+        )
+
+
+# ============================================================================
+# AvatarCollectionProxy
+# ============================================================================
 
 class AvatarCollectionProxy:
     """
-    Proxy d'acces a la collection complete des avatars.
+    Proxy d'accès à la collection complète des avatars.
 
     Usage :
         avatar[0]               - avatar par indice
         avatar[0].center        - centre
-        avatar[0].nodes[1].coor - noeud principal (convention pylmgc90)
-        avatar[0].x             - coordonnee X
+        avatar[0].nodes[1].coor - nœud principal (convention pylmgc90)
+        avatar[0].avatar_id     - identifiant stable
         len(avatar)             - nombre d'avatars
-        list(avatar)            - iterer sur tous les avatars
+        list(avatar)            - itérer sur tous les avatars
     """
 
     def __init__(self, controller: 'ProjectController'):
@@ -233,11 +273,11 @@ class AvatarCollectionProxy:
         avatars = self._ctrl.state.avatars
         if not isinstance(index, int):
             raise TypeError(
-                f"L'index doit etre un entier, recu : {type(index).__name__}"
+                f"L'index doit être un entier, reçu : {type(index).__name__}"
             )
         if index < 0 or index >= len(avatars):
             raise IndexError(
-                f"Avatar index {index} invalide (0 a {len(avatars) - 1})"
+                f"Avatar index {index} invalide (0 à {len(avatars) - 1})"
             )
         return AvatarProxy(avatars[index], index)
 
@@ -252,13 +292,22 @@ class AvatarCollectionProxy:
         return f"AvatarCollectionProxy({len(self)} avatars)"
 
 
+# ============================================================================
+# GroupProxy
+# ============================================================================
+
 class GroupProxy:
     """
-    Acces aux groupes d'avatars par nom.
+    Accès aux groupes d'avatars par nom.
+
+    Les groupes stockent désormais des avatar_ids (str) et non plus des
+    positions entières. Ce proxy résout chaque avatar_id vers l'AvatarProxy
+    correspondant à sa position COURANTE dans state.avatars.
 
     Usage :
         group['mur_briques']             - liste d'AvatarProxy du groupe
         group['mur_briques'][0].center   - centre du premier avatar
+        group['mur_briques'][0].avatar_id
         len(group['mur_briques'])        - taille du groupe
         list(group)                      - noms de tous les groupes
         'mur_briques' in group           - test d'existence
@@ -274,13 +323,19 @@ class GroupProxy:
                 f"Groupe '{name}' introuvable. "
                 f"Groupes disponibles : {list(groups.keys())}"
             )
-        indices = groups[name]
-        avatars = self._ctrl.state.avatars
-        return [
-            AvatarProxy(avatars[i], i)
-            for i in indices
-            if i < len(avatars)
-        ]
+        avatar_ids = groups[name]          # List[str] — ids stables
+        avatars    = self._ctrl.state.avatars
+
+        # Construire le mapping id → index une seule fois pour ce groupe
+        id_to_idx: Dict[str, int] = {av.avatar_id: i for i, av in enumerate(avatars)}
+
+        result: List[AvatarProxy] = []
+        for aid in avatar_ids:
+            idx = id_to_idx.get(aid)
+            if idx is not None:
+                result.append(AvatarProxy(avatars[idx], idx))
+            # Si l'avatar n'existe plus (supprimé), on le saute silencieusement
+        return result
 
     def __iter__(self):
         groups = getattr(self._ctrl.state, 'avatar_groups', {}) or {}
@@ -298,14 +353,18 @@ class GroupProxy:
         return f"GroupProxy(groupes={list(groups.keys())})"
 
 
+# ============================================================================
+# MaterialProxy
+# ============================================================================
+
 class MaterialProxy:
     """
-    Acces aux materiaux par nom.
+    Accès aux matériaux par nom.
 
     Usage :
         material['beton'].density
         material['beton'].material_type
-        material['beton']['young']   - propriete personnalisee
+        material['beton']['young']   - propriété personnalisée
     """
 
     def __init__(self, controller: 'ProjectController'):
@@ -316,14 +375,14 @@ class MaterialProxy:
         if mat is None:
             available = [m.name for m in self._ctrl.state.materials]
             raise KeyError(
-                f"Materiau '{name}' introuvable. "
+                f"Matériau '{name}' introuvable. "
                 f"Disponibles : {available}"
             )
         return _MaterialData(mat)
 
     def __repr__(self):
         names = [m.name for m in self._ctrl.state.materials]
-        return f"MaterialProxy(materiaux={names})"
+        return f"MaterialProxy(matériaux={names})"
 
 
 class _MaterialData:
@@ -347,7 +406,7 @@ class _MaterialData:
         if key in props:
             return props[key]
         raise AttributeError(
-            f"Materiau '{self._mat.name}' n'a pas de propriete '{key}'"
+            f"Matériau '{self._mat.name}' n'a pas de propriété '{key}'"
         )
 
     def __getitem__(self, key):
@@ -357,9 +416,13 @@ class _MaterialData:
         return f"Material(name={self._mat.name}, density={self._mat.density})"
 
 
+# ============================================================================
+# ModelProxy
+# ============================================================================
+
 class ModelProxy:
     """
-    Acces aux modeles par nom.
+    Accès aux modèles par nom.
 
     Usage :
         model['rigid'].physics
@@ -375,14 +438,14 @@ class ModelProxy:
         if mod is None:
             available = [m.name for m in self._ctrl.state.models]
             raise KeyError(
-                f"Modele '{name}' introuvable. "
+                f"Modèle '{name}' introuvable. "
                 f"Disponibles : {available}"
             )
         return _ModelData(mod)
 
     def __repr__(self):
         names = [m.name for m in self._ctrl.state.models]
-        return f"ModelProxy(modeles={names})"
+        return f"ModelProxy(modèles={names})"
 
 
 class _ModelData:
@@ -410,7 +473,7 @@ class _ModelData:
         if key in opts:
             return opts[key]
         raise AttributeError(
-            f"Modele '{self._mod.name}' n'a pas d'option '{key}'"
+            f"Modèle '{self._mod.name}' n'a pas d'option '{key}'"
         )
 
     def __getitem__(self, key):
@@ -424,9 +487,10 @@ class _ModelData:
 # Fonctions de filtrage
 # ============================================================================
 
-def _avatars_by_color(controller: 'ProjectController',
-                      color: str) -> List[AvatarProxy]:
-    """Retourne tous les avatars ayant la couleur donnee."""
+def _avatars_by_color(
+    controller: 'ProjectController', color: str
+) -> List[AvatarProxy]:
+    """Retourne tous les avatars ayant la couleur donnée."""
     return [
         AvatarProxy(av, i)
         for i, av in enumerate(controller.state.avatars)
@@ -434,9 +498,10 @@ def _avatars_by_color(controller: 'ProjectController',
     ]
 
 
-def _avatars_by_material(controller: 'ProjectController',
-                         material_name: str) -> List[AvatarProxy]:
-    """Retourne tous les avatars utilisant le materiau donne."""
+def _avatars_by_material(
+    controller: 'ProjectController', material_name: str
+) -> List[AvatarProxy]:
+    """Retourne tous les avatars utilisant le matériau donné."""
     return [
         AvatarProxy(av, i)
         for i, av in enumerate(controller.state.avatars)
@@ -444,11 +509,12 @@ def _avatars_by_material(controller: 'ProjectController',
     ]
 
 
-def _avatars_by_type(controller: 'ProjectController',
-                     avatar_type) -> List[AvatarProxy]:
+def _avatars_by_type(
+    controller: 'ProjectController', avatar_type
+) -> List[AvatarProxy]:
     """
-    Retourne tous les avatars du type donne.
-    Accepte une chaine ('rigidDisk') ou un AvatarType.
+    Retourne tous les avatars du type donné.
+    Accepte une chaîne ('rigidDisk') ou un AvatarType.
     """
     if isinstance(avatar_type, AvatarType):
         avatar_type = avatar_type.value
@@ -459,11 +525,12 @@ def _avatars_by_type(controller: 'ProjectController',
     ]
 
 
-def _avatars_by_origin(controller: 'ProjectController',
-                       origin) -> List[AvatarProxy]:
+def _avatars_by_origin(
+    controller: 'ProjectController', origin
+) -> List[AvatarProxy]:
     """
-    Retourne tous les avatars d'une origine donnee.
-    Accepte une chaine ('manual', 'loop', 'granulo') ou un AvatarOrigin.
+    Retourne tous les avatars d'une origine donnée.
+    Accepte une chaîne ('manual', 'loop', 'granulo') ou un AvatarOrigin.
     """
     if isinstance(origin, AvatarOrigin):
         origin = origin.value
@@ -475,33 +542,36 @@ def _avatars_by_origin(controller: 'ProjectController',
 
 
 # ============================================================================
-# Construction du contexte d'evaluation complet
+# Construction du contexte d'évaluation complet
 # ============================================================================
 
-def build_eval_context(controller: 'ProjectController',
-                       extra_vars: Optional[Dict[str, Any]] = None
-                       ) -> Dict[str, Any]:
+def build_eval_context(
+    controller: 'ProjectController',
+    extra_vars: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
-    Construit le contexte d'evaluation complet pour un projet.
+    Construit le contexte d'évaluation complet pour un projet.
 
-    Retourne un dict pret a passer a eval() (avec __builtins__={}).
+    Retourne un dict prêt à passer à eval() (avec __builtins__={}).
 
     Contenu :
-      Mathematiques   : math, np, sqrt, pi, e, abs, min, max, sum, len, round
+      Mathématiques   : math, np, sqrt, pi, e, abs, min, max, sum, len, round
       Avatars         : avatar[i], len(avatar), list(avatar)
-      Groupes         : group['nom'], list(group), 'nom' in group
-      Materiaux       : material['nom'].density, material['nom']['young']
-      Modeles         : model['nom'].physics, model['nom'].dimension
+                        avatar[i].avatar_id  ← NOUVEAU
+      Groupes         : group['nom'] → List[AvatarProxy] résolu par avatar_id
+                        list(group), 'nom' in group
+      Matériaux       : material['nom'].density, material['nom']['young']
+      Modèles         : model['nom'].physics, model['nom'].dimension
       Filtres         : avatars_by_color('BLUEx')
                         avatars_by_material('beton')
                         avatars_by_type('rigidDisk')
                         avatars_by_origin('manual')
       Types           : AvatarType, AvatarOrigin
-      Variables dyn.  : toutes les cles de state.dynamic_vars (evaluees)
-      extra_vars      : variables supplementaires (priorite la plus haute)
+      Variables dyn.  : toutes les clés de state.dynamic_vars (évaluées)
+      extra_vars      : variables supplémentaires (priorité la plus haute)
     """
     ctx: Dict[str, Any] = {
-        # Mathematiques
+        # Mathématiques
         'math':  math,
         'np':    np,
         'sqrt':  math.sqrt,
@@ -537,7 +607,7 @@ def build_eval_context(controller: 'ProjectController',
         'avatars_by_origin':   lambda orig: _avatars_by_origin(controller, orig),
     }
 
-    # Variables dynamiques du projet evaluees dans l'ordre de definition
+    # Variables dynamiques du projet évaluées dans l'ordre de définition
     dyn_vars = getattr(controller.state, 'dynamic_vars', {}) or {}
     evaluated: Dict[str, Any] = {}
     for var_name, var_expr in dyn_vars.items():
@@ -550,22 +620,22 @@ def build_eval_context(controller: 'ProjectController',
             else:
                 evaluated[var_name] = var_expr
         except Exception:
-            evaluated[var_name] = var_expr  # garder brut si echec
+            evaluated[var_name] = var_expr   # garder brut si échec
     ctx.update(evaluated)
 
-    # Variables supplementaires (priorite maximale)
+    # Variables supplémentaires (priorité maximale)
     if extra_vars:
         ctx.update(extra_vars)
 
     return ctx
 
 
-
-# ===================================================================
+# ============================================================================
 # SafeEvaluator
-# ===================================================================
+# ============================================================================
+
 class SafeEvaluator:
-    """Évaluateur sécurisé d'expressions Python"""
+    """Évaluateur sécurisé d'expressions Python."""
 
     _SAFE_NODES = (
         ast.Expression, ast.Constant, ast.Name, ast.Load,
@@ -578,7 +648,7 @@ class SafeEvaluator:
         ast.List, ast.Tuple, ast.Dict, ast.Set,
         ast.Call, ast.Attribute, ast.keyword,
         ast.Subscript, ast.Index, ast.Slice,
-        ast.IfExp,          # ternaire : a if cond else b
+        ast.IfExp,
         ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp,
         ast.comprehension,
         ast.Store,
@@ -586,13 +656,7 @@ class SafeEvaluator:
     )
 
     def __init__(self, allowed_names: Optional[Dict[str, Any]] = None):
-        """
-        Initialise l'évaluateur.
-        
-        Args:
-            allowed_names: Variables autorisées (ex: {'pi': 3.14})
-        """
-        self.allowed_names : Dict[str, Any] = {
+        self.allowed_names: Dict[str, Any] = {
             'math':  math,
             'np':    np,
             'pi':    math.pi,
@@ -617,40 +681,28 @@ class SafeEvaluator:
         }
         if allowed_names:
             self.allowed_names.update(allowed_names)
-    
+
     def eval_expression(self, expression: str) -> Any:
-        """
-        Évalue une expression simple.
-        
-        Args:
-            expression: Expression à évaluer
-            
-        Returns:
-            Résultat de l'évaluation
-        """
+        """Évalue une expression simple de façon sécurisée."""
         try:
             tree = ast.parse(expression.strip(), mode='eval')
             self._check_safe(tree)
-            
             return eval(
                 compile(tree, '<string>', 'eval'),
                 {"__builtins__": {}},
-                self.allowed_names
+                self.allowed_names,
             )
         except ValueError:
             raise
         except SyntaxError as e:
             raise ValueError(f"Syntaxe invalide : {e}")
         except Exception as e:
-            raise ValueError(f"Erreur d'evaluation : {e}")
-    
+            raise ValueError(f"Erreur d'évaluation : {e}")
+
     def eval_dict(self, expression: str) -> Dict[str, Any]:
         """
-        Evalue une expression sous forme de dictionnaire.
+        Évalue une expression sous forme de dictionnaire.
         Format : "cle1=val1, cle2=val2"
-
-        Raises:
-            ValueError : si l'expression est invalide.
         """
         if not expression.strip():
             return {}
@@ -661,31 +713,22 @@ class SafeEvaluator:
             return eval(
                 compile(tree, '<dict_expr>', 'eval'),
                 {"__builtins__": {}},
-                self.allowed_names
+                self.allowed_names,
             )
         except ValueError:
             raise
         except SyntaxError as e:
             raise ValueError(f"Syntaxe invalide : {e}")
         except Exception as e:
-            raise ValueError(f"Erreur d'evaluation : {e}")
-    
-    def _check_safe(self, node: ast.AST) -> None:
-        """
-        Vérifie qu'un nœud AST est sûr.
-        
-        Raises:
-            ValueError: Si le nœud contient des opérations dangereuses
-        """
+            raise ValueError(f"Erreur d'évaluation : {e}")
 
-        
+    def _check_safe(self, node: ast.AST) -> None:
+        """Vérifie qu'un nœud AST est sûr."""
         for n in ast.walk(node):
             if not isinstance(n, self._SAFE_NODES):
                 raise ValueError(
-                    f"Opération non autorisée: {n.__class__.__name__}"
+                    f"Opération non autorisée : {n.__class__.__name__}"
                 )
-            
-            # Vérifier les appels de fonctions
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
-                    if n.func.id not in self.allowed_names:
-                        raise ValueError(f"Fonction non autorisée: {n.func.id}")
+                if n.func.id not in self.allowed_names:
+                    raise ValueError(f"Fonction non autorisée : {n.func.id}")

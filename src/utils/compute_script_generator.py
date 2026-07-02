@@ -216,10 +216,27 @@ class ComputeScriptGenerator:
         # ── Helpers locaux ────────────────────────────────────────────────────
 
         def _resolve_group_ids(grp_name: str):
+            """
+            Retourne les numéros de corps LMGC90 (1-based, en chaînes) pour
+            les avatars du groupe donné.
+
+            avatar_groups contient désormais des avatar_ids (str) et non plus
+            des positions entières.  On résout chaque id vers sa position
+            courante dans state.avatars, puis on ajoute 1 pour obtenir le
+            numéro LMGC90.
+            """
             if not grp_name or self.controller is None:
                 return []
-            groups = getattr(getattr(self.controller, 'state', None), 'avatar_groups', {}) or {}
-            return [str(i + 1) for i in groups.get(grp_name, [])]
+            state = getattr(self.controller, 'state', None)
+            if state is None:
+                return []
+            groups     = getattr(state, 'avatar_groups', {}) or {}
+            avatar_ids = groups.get(grp_name, [])
+            if not avatar_ids:
+                return []
+            # Construire le mapping id → index en une seule passe
+            id_to_idx = {av.avatar_id: i for i, av in enumerate(state.avatars)}
+            return [str(id_to_idx[aid] + 1) for aid in avatar_ids if aid in id_to_idx]
 
         def _timing_guard(entry: dict):
             mode = entry.get('step_mode', '')

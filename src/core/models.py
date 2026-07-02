@@ -1,11 +1,19 @@
 """
 Modèles de données pour LMGC90_GUI.
 Représentation pure des objets sans logique UI (Model dans MVC).
+
+=== REFACTOR "avatar_id stable" ===
+Chaque Avatar possède désormais un identifiant `avatar_id` (uuid hex),
+généré une seule fois à la création et JAMAIS modifié, y compris quand
+sa position dans `state.avatars` change (suppression d'un autre avatar,
+réordonnancement, etc.).
+
 """
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 from enum import Enum
 from pathlib import Path
+import uuid
 
 
 def convert_to_serializable(obj):
@@ -14,7 +22,7 @@ def convert_to_serializable(obj):
     Gère numpy.ndarray, numpy.integer, numpy.floating, etc.
     """
     import numpy as np
-    
+
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     elif isinstance(obj, dict):
@@ -27,6 +35,9 @@ def convert_to_serializable(obj):
         return obj
 
 
+def new_avatar_id() -> str:
+    """Génère un nouvel identifiant stable d'avatar (uuid4 hex, 32 car.)."""
+    return uuid.uuid4().hex
 
 
 # ============================================================================
@@ -68,7 +79,7 @@ class AvatarType(Enum):
     RIGID_POLYHEDRON = "rigidPolyhedron"
     ROUGH_WALL_3D = "roughWall3D"
     GRANULO_ROUGH_WALL_3D = "granuloRoughWall3D"
-    
+
 class ContactLawType(Enum):
     """Types de lois de contact pylmgc90"""
     # Rigide / Rigide
@@ -241,6 +252,12 @@ class Avatar:
     """
     Représente un avatar (corps rigide).
     Contient tous les champs possibles pour tous les types.
+
+    `avatar_id` est l'identité STABLE de l'avatar : générée une seule fois
+    à la création, elle ne change jamais, même si la position de l'avatar
+    dans `state.avatars` change (suppression d'un autre avatar, etc.).
+    C'est cet id qui doit être utilisé pour toute référence persistée
+    (groupes, opérations DOF, post-pro, boucles, granulo...).
     """
     avatar_type: AvatarType
     center: List[float]
@@ -248,6 +265,7 @@ class Avatar:
     model_name: str
     color: str = "BLUEx"
     origin: AvatarOrigin = AvatarOrigin.MANUAL
+    avatar_id: str = field(default_factory=new_avatar_id)
     controller: Any = field(repr=False, default=None)  # Référence au contrôleur (non sérialisé)
     
     # Champs spécifiques selon le type
@@ -266,6 +284,7 @@ class Avatar:
         """Convertit en dictionnaire pour sérialisation"""
         data = {
             'type': self.avatar_type.value,
+            'avatar_id': self.avatar_id,
             'center': convert_to_serializable(self.center),
             'material': self.material_name,
             'model': self.model_name,
@@ -310,7 +329,17 @@ class Avatar:
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Avatar':
-        """Crée un Avatar depuis un dictionnaire"""
+        """
+        Crée un Avatar depuis un dictionnaire.
+
+        Si 'avatar_id' est absent (anciens fichiers .lmgc90), un nouvel id
+        est généré. C'est sans risque pour CET avatar individuellement :
+        la résolution des anciennes références positionnelles qui le
+        visaient éventuellement est gérée à un niveau supérieur, dans
+        ProjectState.from_dict() / _migrate_legacy_avatar_refs(), qui a
+        accès à l'ORDRE des avatars (donc à la correspondance
+        position -> avatar_id) au moment du chargement.
+        """
         # Reconstruire axis si présent
         axis = None
         if 'axe1' in data and 'axe2' in data:
@@ -330,6 +359,7 @@ class Avatar:
             model_name=data['model'],
             color=data.get('color', 'BLUEx'),
             origin=AvatarOrigin(data.get('__origin', 'manual')),
+            avatar_id=data.get('avatar_id') or new_avatar_id(),
             radius=data.get('r') or data.get('radius'),
             axis=axis,
             vertices=data.get('vertices'),
@@ -415,10 +445,21 @@ class VisibilityRule:
 
 @dataclass
 class DOFOperation:
-    """Opération sur les degrés de liberté (conditions aux limites)"""
+    """
+    Opération sur les degrés de liberté (conditions aux limites).
+
+    `target_value` :
+        - si target_type == 'avatar' : contient désormais l'avatar_id
+          (str) de l'avatar visé (et non plus sa position).
+        - si target_type == 'group'  : contient le nom du groupe (str),
+          inchangé.
+    Aucun changement de signature n'était nécessaire ici : `target_value`
+    était déjà typé `Any` et contenait déjà un `str` dans le cas 'group' ;
+    seul le contenu sémantique du cas 'avatar' change (int -> str).
+    """
     operation_type: str  # translate, rotate, imposeDrivenDof, imposeInitValue
     target_type: str  # 'avatar' ou 'group'
-    target_value: Any  # index d'avatar ou nom de groupe
+    target_value: Any  # avatar_id (str) ou nom de groupe (str)
     parameters: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict:
@@ -459,9 +500,16 @@ class DOFOperation:
 
 @dataclass
 class Loop:
-    """Configuration d'une boucle de génération d'avatars"""
+    """
+    Configuration d'une boucle de génération d'avatars.
+
+    `model_avatar_id` (avant : `model_avatar_index`) référence l'avatar
+    modèle par son id stable plutôt que par sa position.
+    `generated_ids` (avant : `generated_indices`) référence de la même
+    façon les avatars produits par cette boucle.
+    """
     loop_type: str  # Cercle, Grille, Ligne, Spirale, Manuel
-    model_avatar_index: int
+    model_avatar_id: str
     count: int
     radius: float = 0.0
     step: float = 0.0
@@ -470,13 +518,13 @@ class Loop:
     spiral_factor: float = 0.0
     invert_axis: bool = False
     group_name: Optional[str] = None
-    generated_indices: List[int] = field(default_factory=list)
+    generated_ids: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
         return {
             'type': self.loop_type,
-            'model_avatar_index': self.model_avatar_index,
+            'model_avatar_id': self.model_avatar_id,
             'count': self.count,
             'radius': self.radius,
             'step': self.step,
@@ -485,15 +533,24 @@ class Loop:
             'spiral_factor': self.spiral_factor,
             'invert_axis': self.invert_axis,
             'stored_in_group': self.group_name,
-            'generated_avatar_indices': self.generated_indices
+            'generated_avatar_ids': self.generated_ids,
         }
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Loop':
-        """Crée depuis un dictionnaire"""
+        """
+        Crée depuis un dictionnaire.
+
+        Attend le NOUVEAU format ('model_avatar_id' / 'generated_avatar_ids').
+        La traduction depuis l'ancien format positionnel
+        ('model_avatar_index' / 'generated_avatar_indices') est effectuée
+        EN AMONT par `ProjectState._migrate_legacy_avatar_refs()`, qui a
+        accès à la liste des avatars pour résoudre position -> id avant
+        d'appeler cette méthode.
+        """
         return cls(
             loop_type=data['type'],
-            model_avatar_index=data['model_avatar_index'],
+            model_avatar_id=data['model_avatar_id'],
             count=data['count'],
             radius=data.get('radius', 0.0),
             step=data.get('step', 0.0),
@@ -502,12 +559,20 @@ class Loop:
             spiral_factor=data.get('spiral_factor', 0.0),
             invert_axis=data.get('invert_axis', False),
             group_name=data.get('stored_in_group'),
-            generated_indices=data.get('generated_avatar_indices', [])
+            generated_ids=data.get('generated_avatar_ids', [])
         )
 
 @dataclass
 class ForLoop:
-    """Configuration d'une boucle for générique"""
+    """
+    Configuration d'une boucle for générique.
+
+    `generated_refs` (avant : `generated_indices`) contient :
+        - des avatar_id (str)   si target_type == 'avatar'
+        - des positions (int)   si target_type in ('material', 'model')
+          (ces deux derniers cas restent positionnels : le refactor
+          "id stable" ne concerne que les avatars).
+    """
     loop_var: str
     start_expr: str
     end_expr: str
@@ -515,7 +580,7 @@ class ForLoop:
     target_type: str = "avatar"
     template_config: dict = field(default_factory=dict)
     group_name: str = None
-    generated_indices: list = field(default_factory=list)
+    generated_refs: list = field(default_factory=list)
     
     def to_dict(self) -> dict:
         return {
@@ -526,11 +591,20 @@ class ForLoop:
             'target_type': self.target_type,
             'template_config': self.template_config,
             'group_name': self.group_name,
-            'generated_indices': self.generated_indices
+            'generated_refs': self.generated_refs,
         }
     
     @classmethod
     def from_dict(cls, data: dict) -> 'ForLoop':
+        # 'generated_refs' = nouveau format. 'generated_indices' = alias
+        # legacy accepté en lecture directe UNIQUEMENT pour les ForLoop
+        # dont target_type n'est pas 'avatar' (material/model restent
+        # positionnels, donc aucune migration n'est nécessaire pour eux).
+        # Pour target_type == 'avatar', la migration positions -> ids est
+        # effectuée en amont par ProjectState._migrate_legacy_avatar_refs().
+        refs = data.get('generated_refs')
+        if refs is None:
+            refs = data.get('generated_indices', [])
         return cls(
             loop_var=data['loop_var'],
             start_expr=data['start_expr'],
@@ -539,12 +613,17 @@ class ForLoop:
             target_type=data['target_type'],
             template_config=data.get('template_config', {}),
             group_name=data.get('group_name'),
-            generated_indices=data.get('generated_indices', [])
+            generated_refs=refs,
         )
 
 @dataclass
 class GranuloGeneration:
-    """Configuration d'une génération granulométrique"""
+    """
+    Configuration d'une génération granulométrique.
+
+    `generated_ids` (avant : `generated_indices`) référence les avatars
+    produits par leur id stable plutôt que leur position.
+    """
     nb_particles: int
     radius_min: float
     radius_max: float
@@ -556,7 +635,7 @@ class GranuloGeneration:
     color: str = "BLUEx"
     seed: Optional[int] = None
     group_name: Optional[str] = None
-    generated_indices: List[int] = field(default_factory=list)
+    generated_ids: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
@@ -574,12 +653,17 @@ class GranuloGeneration:
             'color': self.color,
             'seed': self.seed,
             'stored_in_group': self.group_name,
-            'avatar_indices': self.generated_indices
+            'avatar_ids': self.generated_ids,
         }
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'GranuloGeneration':
-        """Crée depuis un dictionnaire"""
+        """
+        Crée depuis un dictionnaire.
+        Attend le nouveau format ('avatar_ids'). La traduction depuis
+        l'ancien format positionnel ('avatar_indices') est effectuée en
+        amont par ProjectState._migrate_legacy_avatar_refs().
+        """
         container = data.get('container_params', {})
         return cls(
             nb_particles=data['nb'],
@@ -593,17 +677,23 @@ class GranuloGeneration:
             color=data.get('color', 'BLUEx'),
             seed=data.get('seed'),
             group_name=data.get('stored_in_group'),
-            generated_indices=data.get('avatar_indices', [])
+            generated_ids=data.get('avatar_ids', [])
         )
 
 
 @dataclass
 class PostProCommand:
-    """Commande de post-traitement"""
+    """
+    Commande de post-traitement.
+
+    `target_value` : contient désormais l'avatar_id (str) quand
+    target_type == 'avatar' (au lieu de la position). Pas de changement
+    de signature (déjà typé Any), contenu de groupe (str) inchangé.
+    """
     name: str
     step: int
     target_type: Optional[str] = None  # None, 'avatar', 'group'
-    target_value: Optional[Any] = None  # index ou nom
+    target_value: Optional[Any] = None  # avatar_id (str) ou nom de groupe (str)
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
@@ -708,6 +798,9 @@ class ProjectState:
     """
     État complet du projet.
     Contient toutes les données du modèle LMGC90.
+
+    `avatar_groups` : Dict[str, List[str]] — les listes contiennent
+    désormais des avatar_id (str) et non plus des positions (int).
     """
     name: str
     dimension: int = 2
@@ -725,14 +818,24 @@ class ProjectState:
     granulo_generations: List[GranuloGeneration] = field(default_factory=list)
     postpro_commands: List[PostProCommand] = field(default_factory=list)
     factories: List[dict] = field(default_factory=list)  # FactoryConfig sérialisés
-    avatar_groups: Dict[str, List[int]] = field(default_factory=dict)
+    avatar_groups: Dict[str, List[str]] = field(default_factory=dict)
     dynamic_vars: Dict[str, Any] = field(default_factory=dict)
-    
+    # Avertissements non bloquants accumulés au chargement (régénération,
+    # migration d'anciennes références positionnelles, etc.)
+    load_warnings: List[str] = field(default_factory=list)
+
+    # Version du format de fichier .lmgc90. Incrémentée à 2 avec
+    # l'introduction des avatar_id stables. Les fichiers sans ce champ
+    # (ou avec une valeur < 2) sont considérés "legacy" et passent par
+    # _migrate_legacy_avatar_refs() à la lecture.
+    FILE_FORMAT_VERSION = 2
+
     def to_dict(self) -> Dict:
         """Convertit l'état complet en dictionnaire pour sauvegarde JSON"""
         manual_avatars = [a for a in self.avatars if a.origin == AvatarOrigin.MANUAL]
         
         return {
+            'file_format_version': self.FILE_FORMAT_VERSION,
             'project_name': self.name,
             'dimension': self.dimension,
             'units': self.units,
@@ -755,17 +858,34 @@ class ProjectState:
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'ProjectState':
-        """Crée un état complet depuis un dictionnaire"""
+        """Crée un état complet depuis un dictionnaire."""
         prefs_data = data.get('preferences', {})
         preferences = ProjectPreferences.from_dict(prefs_data) if prefs_data else ProjectPreferences()
-        return cls(
+
+        # 1. Construire les avatars MANUAL d'abord : à ce stade, leur ORDRE
+        #    dans `data['avatars']` correspond exactement à leur position
+        #    d'origine au moment de la sauvegarde (cf. to_dict()).
+        avatars = [Avatar.from_dict(a) for a in data.get('avatars', [])]
+
+        file_version = data.get('file_format_version', 1)
+        load_warnings: List[str] = []
+
+        if file_version < cls.FILE_FORMAT_VERSION:
+            # Fichier "legacy" : les références (avatar_groups, loops,
+            # operations, postpro, granulo, for_loops) utilisent encore des
+            # positions entières. On les traduit en avatar_id quand c'est
+            # possible (cf. docstring de _migrate_legacy_avatar_refs).
+            data, extra_warnings = cls._migrate_legacy_avatar_refs(data, avatars)
+            load_warnings.extend(extra_warnings)
+
+        state = cls(
             name=data.get('project_name', 'Projet'),
             dimension=data.get('dimension', 2),
             units=data.get('units', {}),
             preferences=preferences,
             materials=[Material.from_dict(m) for m in data.get('materials', [])],
             models=[Model.from_dict(m) for m in data.get('models', [])],
-            avatars=[Avatar.from_dict(a) for a in data.get('avatars', [])],
+            avatars=avatars,
             contact_laws=[ContactLaw.from_dict(c) for c in data.get('contact_laws', [])],
             visibility_rules=[VisibilityRule.from_dict(v) for v in data.get('visibility_rules', [])],
             operations=[DOFOperation.from_dict(o) for o in data.get('operations', [])],
@@ -776,5 +896,143 @@ class ProjectState:
             factories=data.get('factories', []),
             avatar_groups=data.get('avatar_groups', {}),
             custom_templates=data.get('custom_templates', {}),
-            dynamic_vars=data.get('dynamic_vars', {})
+            dynamic_vars=data.get('dynamic_vars', {}),
         )
+        state.load_warnings = load_warnings
+        return state
+
+    # =========================================================================
+    # Migration des anciens fichiers (positions -> avatar_id)
+    # =========================================================================
+
+    @staticmethod
+    def _migrate_legacy_avatar_refs(data: Dict, manual_avatars: List['Avatar']
+                                     ) -> tuple[Dict, List[str]]:
+        """
+        Traduit les références positionnelles d'un ancien fichier .lmgc90
+        en avatar_id, partout où c'est possible.
+
+        Pourquoi "partout où c'est possible" et pas "partout" :
+        au moment où cette fonction tourne, on dispose UNIQUEMENT des
+        avatars d'origine MANUAL (`manual_avatars`, dans leur ordre de
+        création original). Les avatars générés par les boucles / la
+        granulométrie / les boucles for n'existent pas encore : ils sont
+        recréés plus tard par
+        `ProjectController._rebuild_pylmgc_objects()`, dans cet ordre
+        précis : matériaux, modèles, avatars manuels, PUIS boucles, PUIS
+        granulométrie, PUIS boucles for.
+
+        Cet ordre garantit qu'au moment de la sauvegarde ET au moment du
+        rechargement, les avatars manuels occupent toujours les positions
+        [0 .. len(manual_avatars)-1]. Toute référence ancienne dont la
+        valeur entière est < len(manual_avatars) désigne donc forcément un
+        avatar manuel et peut être traduite en avatar_id de façon fiable.
+
+        En revanche, une référence ancienne >= len(manual_avatars) désigne
+        un avatar généré (boucle/granulo/for_loop) qui n'existe pas encore
+        à cet instant : elle est IRRÉCUPÉRABLE ici. Dans ce cas, on
+        supprime la référence orpheline et on ajoute un avertissement
+        explicite dans `load_warnings`, plutôt que de produire une donnée
+        fausse silencieusement.
+
+        Retourne (data_migré, liste_d_avertissements).
+        """
+        warnings: List[str] = []
+        n_manual = len(manual_avatars)
+
+        def pos_to_id(pos: int) -> Optional[str]:
+            if isinstance(pos, str):
+                # Déjà un id (fichier partiellement migré à la main) : on
+                # le laisse passer tel quel.
+                return pos
+            if isinstance(pos, int) and 0 <= pos < n_manual:
+                return manual_avatars[pos].avatar_id
+            return None
+
+        # ── avatar_groups : Dict[str, List[int|str]] ────────────────────────
+        old_groups = data.get('avatar_groups', {}) or {}
+        new_groups: Dict[str, List[str]] = {}
+        for grp_name, refs in old_groups.items():
+            kept: List[str] = []
+            for ref in refs:
+                aid = pos_to_id(ref)
+                if aid is not None:
+                    kept.append(aid)
+                else:
+                    warnings.append(
+                        f"Groupe '{grp_name}' : référence à l'avatar généré "
+                        f"#{ref} introuvable lors de la migration (sera "
+                        f"reconstituée si la boucle/granulo source est "
+                        f"toujours présente dans le projet, sinon perdue)."
+                    )
+            new_groups[grp_name] = kept
+        data['avatar_groups'] = new_groups
+
+        # ── loops : 'model_avatar_index' -> 'model_avatar_id' ───────────────
+        for i, loop_d in enumerate(data.get('loops', [])):
+            if 'model_avatar_id' not in loop_d and 'model_avatar_index' in loop_d:
+                aid = pos_to_id(loop_d['model_avatar_index'])
+                if aid is None:
+                    warnings.append(
+                        f"Boucle #{i + 1} : avatar modèle #"
+                        f"{loop_d['model_avatar_index']} introuvable "
+                        f"(devait être un avatar manuel) — boucle ignorée "
+                        f"au rechargement."
+                    )
+                    aid = ''  # Loop.from_dict() exige une str ; sera invalide
+                loop_d['model_avatar_id'] = aid
+            if 'generated_avatar_ids' not in loop_d:
+                # Les anciens indices générés seront re-générés de toute
+                # façon par generate_loop() ; on ne tente pas de les migrer.
+                loop_d['generated_avatar_ids'] = []
+
+        # ── granulo_generations : 'avatar_indices' -> 'avatar_ids' ──────────
+        for gran_d in data.get('granulo_generations', []):
+            if 'avatar_ids' not in gran_d:
+                # Régénérés par generate_granulo() au chargement -> liste
+                # vide acceptable, aucune perte d'information utile.
+                gran_d['avatar_ids'] = []
+
+        # ── for_loops : 'generated_indices' -> 'generated_refs' ─────────────
+        for fl_d in data.get('for_loops', []):
+            if 'generated_refs' not in fl_d and 'generated_indices' in fl_d:
+                if fl_d.get('target_type') == 'avatar':
+                    # Régénérés par generate_for_loop() au chargement.
+                    fl_d['generated_refs'] = []
+                else:
+                    # material/model : restent positionnels, aucune
+                    # traduction nécessaire.
+                    fl_d['generated_refs'] = fl_d['generated_indices']
+
+        # ── operations (DOF) : target_value avatar -> avatar_id ─────────────
+        for i, op_d in enumerate(data.get('operations', [])):
+            if op_d.get('target') == 'avatar':
+                old_val = op_d.get('target_value')
+                aid = pos_to_id(old_val)
+                if aid is None:
+                    warnings.append(
+                        f"Opération DOF #{i + 1} ({op_d.get('type')}) : "
+                        f"avatar cible #{old_val} introuvable (généré par "
+                        f"boucle/granulo, non résolvable à la migration) — "
+                        f"opération ignorée."
+                    )
+                    aid = '__unresolved__'
+                op_d['target_value'] = aid
+
+        # ── postpro_creations : target_value avatar -> avatar_id ────────────
+        for i, pp_d in enumerate(data.get('postpro_creations', [])):
+            target_info = pp_d.get('target_info')
+            if target_info and target_info.get('type') == 'avatar':
+                old_val = target_info.get('value')
+                aid = pos_to_id(old_val)
+                if aid is None:
+                    warnings.append(
+                        f"Commande post-pro '{pp_d.get('name')}' : avatar "
+                        f"cible #{old_val} introuvable à la migration — "
+                        f"cible retirée (commande conservée en mode global)."
+                    )
+                    pp_d['target_info'] = None
+                else:
+                    target_info['value'] = aid
+
+        return data, warnings

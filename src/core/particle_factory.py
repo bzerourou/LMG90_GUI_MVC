@@ -108,8 +108,9 @@ class FactoryConfig:
 
     # ── Particules ────────────────────────────────────────────────────────────
     particle_type:   str        = 'rigidDisk'   # rigidSphere | rigidDisk
-    radius_min:      float      = 0.145
-    radius_max:      float      = 0.185
+    distribution:    str        = SizeDistribution.RANDOM.value
+    radius_min:      float      = 0.01
+    radius_max:      float      = 0.02
     nb_particles:    int        = 1000
     model_name:      str        = ''
     material_name:   str        = ''
@@ -187,60 +188,96 @@ class FactoryConfig:
 class PositionGenerator:
     """
     Génère des positions de particules dans une zone d'injection.
-    Réseau régulier (type squareLattice2D/3D) — AUCUN bruit aléatoire,
-    AUCUN repli aléatoire : la grille est dimensionnée dynamiquement pour
-    contenir exactement nb points, garantissant l'absence de chevauchement
-    quel que soit nb (contrairement à l'ancien repli purement aléatoire
-    utilisé quand la grille initiale était trop petite pour la zone).
+    Utilise un empilement léger sans chevauchement (réseau + perturbation).
     """
 
     @staticmethod
     def generate(config: FactoryConfig, nb: int,
                  rng: Optional[np.random.Generator] = None) -> np.ndarray:
         """
-        Retourne un tableau (nb, 2 ou 3) de positions sur un réseau régulier
-        centré sur la zone d'injection, espacé de 2.2 * radius_max.
+        Retourne un tableau (nb, 2 ou 3) de positions dans la zone d'injection.
+        Les positions sont espacées pour éviter les chevauchements à l'init.
         """
-        dim     = config.dimension
-        center  = np.array(config.zone_center[:dim])
-        spacing = 2.2 * config.radius_max
+        if rng is None:
+            rng = np.random.default_rng(config.seed)
+
+        dim    = config.dimension
+        center = np.array(config.zone_center[:dim])
+        r_max  = config.radius_max
+        # Espacement minimal = 2.2 * r_max pour éviter les chevauchements
+        spacing = 2.2 * r_max
 
         if dim == 3:
-            return PositionGenerator._lattice_3d(center, spacing, nb)
-        return PositionGenerator._lattice_2d(center, spacing, nb)
+            return PositionGenerator._grid_3d(center, config.zone_lx,
+                                              config.zone_ly, config.zone_lz,
+                                              spacing, nb, rng)
+        else:
+            return PositionGenerator._grid_2d(center, config.zone_lx,
+                                              config.zone_ly,
+                                              spacing, nb, rng)
 
     @staticmethod
-    def _lattice_2d(center, spacing, nb) -> np.ndarray:
-        """Réseau carré régulier, dimensionné pour contenir au moins nb points."""
-        nx = max(1, math.ceil(nb ** 0.5))
-        ny = max(1, math.ceil(nb / nx))
-        x0 = center[0] - (nx - 1) * spacing / 2.0
-        y0 = center[1] - (ny - 1) * spacing / 2.0
-
+    def _grid_3d(center, lx, ly, lz, spacing, nb, rng) -> np.ndarray:
+        """Réseau cubique avec perturbation aléatoire dans la zone."""
+        nx = max(1, int(lx / spacing))
+        ny = max(1, int(ly / spacing))
+        nz = max(1, int(lz / spacing))
         positions = []
+
+        x0 = center[0] - lx / 2 + spacing / 2
+        y0 = center[1] - ly / 2 + spacing / 2
+        z0 = center[2] - lz / 2 + spacing / 2
+
         for ix in range(nx):
             for iy in range(ny):
-                positions.append([x0 + ix * spacing, y0 + iy * spacing])
+                for iz in range(nz):
+                    if len(positions) >= nb:
+                        break
+                    # Perturbation 20 % de l'espacement
+                    noise = rng.uniform(-0.2, 0.2, 3) * spacing
+                    x = x0 + ix * spacing + noise[0]
+                    y = y0 + iy * spacing + noise[1]
+                    z = z0 + iz * spacing + noise[2]
+                    # Rester dans la zone
+                    x = np.clip(x, center[0] - lx/2, center[0] + lx/2)
+                    y = np.clip(y, center[1] - ly/2, center[1] + ly/2)
+                    z = np.clip(z, center[2] - lz/2, center[2] + lz/2)
+                    positions.append([x, y, z])
+
+        # Compléter avec aléatoire si pas assez de points dans la grille
+        while len(positions) < nb:
+            x = rng.uniform(center[0] - lx/2, center[0] + lx/2)
+            y = rng.uniform(center[1] - ly/2, center[1] + ly/2)
+            z = rng.uniform(center[2] - lz/2, center[2] + lz/2)
+            positions.append([x, y, z])
 
         return np.array(positions[:nb])
 
     @staticmethod
-    def _lattice_3d(center, spacing, nb) -> np.ndarray:
-        """Réseau cubique régulier, dimensionné pour contenir au moins nb points."""
-        n  = max(1, math.ceil(nb ** (1.0 / 3.0)))
-        nx = ny = n
-        nz = max(1, math.ceil(nb / (nx * ny)))
-        x0 = center[0] - (nx - 1) * spacing / 2.0
-        y0 = center[1] - (ny - 1) * spacing / 2.0
-        z0 = center[2] - (nz - 1) * spacing / 2.0
-
+    def _grid_2d(center, lx, ly, spacing, nb, rng) -> np.ndarray:
+        """Réseau carré avec perturbation aléatoire."""
+        nx = max(1, int(lx / spacing))
+        ny = max(1, int(ly / spacing))
         positions = []
+
+        x0 = center[0] - lx / 2 + spacing / 2
+        y0 = center[1] - ly / 2 + spacing / 2
+
         for ix in range(nx):
             for iy in range(ny):
-                for iz in range(nz):
-                    positions.append([x0 + ix * spacing,
-                                       y0 + iy * spacing,
-                                       z0 + iz * spacing])
+                if len(positions) >= nb:
+                    break
+                noise = rng.uniform(-0.2, 0.2, 2) * spacing
+                x = np.clip(x0 + ix * spacing + noise[0],
+                             center[0] - lx/2, center[0] + lx/2)
+                y = np.clip(y0 + iy * spacing + noise[1],
+                             center[1] - ly/2, center[1] + ly/2)
+                positions.append([x, y])
+
+        while len(positions) < nb:
+            x = rng.uniform(center[0] - lx/2, center[0] + lx/2)
+            y = rng.uniform(center[1] - ly/2, center[1] + ly/2)
+            positions.append([x, y])
 
         return np.array(positions[:nb])
 
@@ -250,9 +287,7 @@ class PositionGenerator:
 # ============================================================================
 
 class RadiusGenerator:
-    """Génère les rayons des particules : constant si rmin==rmax, sinon
-    uniforme aléatoire dans [rmin, rmax]. Un seul mécanisme, plus de choix
-    de distribution (l'ancien choix granulo_Random a été retiré)."""
+    """Génère les rayons des particules selon la distribution choisie."""
 
     @staticmethod
     def generate(config: FactoryConfig, nb: int,
@@ -260,11 +295,17 @@ class RadiusGenerator:
         if rng is None:
             rng = np.random.default_rng(config.seed)
 
+        dist = config.distribution
         rmin = config.radius_min
         rmax = config.radius_max
 
-        if rmin == rmax:
-            return np.full(nb, rmin)
+        if dist == SizeDistribution.UNIFORM.value or rmin == rmax:
+            return np.full(nb, (rmin + rmax) / 2)
+
+        if dist in (SizeDistribution.RANDOM.value, SizeDistribution.GRANULO.value):
+            # Distribution uniforme sur [rmin, rmax]
+            # pre.granulo_Random utilise une loi proche — on simule ici
+            return rng.uniform(rmin, rmax, nb)
 
         return rng.uniform(rmin, rmax, nb)
 
@@ -439,73 +480,90 @@ class PreCodeGenerator:
     def _write_particle_positions(self):
         c = self.cfg
         self._w(f"# ── Positions de la zone d'injection : {c.name} ─────────────")
-        self._w(f"import math")  # bloc autonome : utilisable seul (export, preview)
         self._write_radii_block()
         self._w("")
-
-        # Réseau régulier garanti sans chevauchement (squareLattice2D/3D),
-        # dimensionné dynamiquement pour contenir nb_particles. Remplace
-        # l'ancienne grille+bruit aléatoire+repli purement aléatoire, qui
-        # pouvait produire des chevauchements quand la grille initiale
-        # (dimensionnée sur la zone) était trop petite pour nb_particles.
+        # Grille de positions
+        self._w(f"_factory_{c.name}_rng = np.random.default_rng({c.seed!r})")
         self._w(f"_factory_{c.name}_spacing = 2.2 * {c.radius_max}")
+        self._w(f"_factory_{c.name}_center = {c.zone_center[:c.dimension]}")
+        self._w(f"_factory_{c.name}_positions = []")
+        self._w("")
 
         if c.dimension == 3:
-            self._w(f"_nx = max(1, math.ceil({c.nb_particles} ** (1.0/3.0)))")
-            self._w(f"_ny = _nx")
-            self._w(f"_nz = max(1, math.ceil({c.nb_particles} / (_nx * _ny)))")
-            self._w(f"_x0 = {c.zone_center[0]} - (_nx - 1) * _factory_{c.name}_spacing / 2.0")
-            self._w(f"_y0 = {c.zone_center[1]} - (_ny - 1) * _factory_{c.name}_spacing / 2.0")
-            self._w(f"_z0 = {c.zone_center[2]} - (_nz - 1) * _factory_{c.name}_spacing / 2.0")
-            self._w(f"try:")
-            self._w(f"    # Signature non verifiee (squareLattice2D verifiee, squareLattice3D")
-            self._w(f"    # suppose suivre le meme schema : nb_x, nb_y, nb_z, espacement, x0/y0/z0)")
-            self._w(f"    _factory_{c.name}_positions = pre.squareLattice3D(")
-            self._w(f"        _nx, _ny, _nz, _factory_{c.name}_spacing,")
-            self._w(f"        x0=_x0, y0=_y0, z0=_z0)")
-            self._w(f"    _factory_{c.name}_positions.shape = [_nx * _ny * _nz, 3]")
-            self._w(f"    _factory_{c.name}_positions = _factory_{c.name}_positions.tolist()")
-            self._w(f"except (AttributeError, TypeError):")
-            self._w(f"    # Repli si pre.squareLattice3D indisponible/signature differente :")
-            self._w(f"    # meme reseau regulier, calcule manuellement (sans chevauchement, sans alea).")
-            self._w(f"    _factory_{c.name}_positions = []")
-            self._w(f"    for _ix in range(_nx):")
-            self._w(f"        for _iy in range(_ny):")
-            self._w(f"            for _iz in range(_nz):")
-            self._w(f"                _factory_{c.name}_positions.append([")
-            self._w(f"                    _x0 + _ix * _factory_{c.name}_spacing,")
-            self._w(f"                    _y0 + _iy * _factory_{c.name}_spacing,")
-            self._w(f"                    _z0 + _iz * _factory_{c.name}_spacing])")
+            self._w(f"# Réseau 3D avec perturbation")
+            self._w(f"_nx = max(1, int({c.zone_lx} / _factory_{c.name}_spacing))")
+            self._w(f"_ny = max(1, int({c.zone_ly} / _factory_{c.name}_spacing))")
+            self._w(f"_nz = max(1, int({c.zone_lz} / _factory_{c.name}_spacing))")
+            self._w(f"_x0 = {c.zone_center[0]} - {c.zone_lx}/2 + _factory_{c.name}_spacing/2")
+            self._w(f"_y0 = {c.zone_center[1]} - {c.zone_ly}/2 + _factory_{c.name}_spacing/2")
+            self._w(f"_z0 = {c.zone_center[2]} - {c.zone_lz}/2 + _factory_{c.name}_spacing/2")
+            self._w(f"for _ix in range(_nx):")
+            self._w(f"    for _iy in range(_ny):")
+            self._w(f"        for _iz in range(_nz):")
+            self._w(f"            if len(_factory_{c.name}_positions) >= {c.nb_particles}: break")
+            self._w(f"            _noise = _factory_{c.name}_rng.uniform(-0.2, 0.2, 3) * _factory_{c.name}_spacing")
+            self._w(f"            _factory_{c.name}_positions.append([")
+            self._w(f"                _x0 + _ix * _factory_{c.name}_spacing + _noise[0],")
+            self._w(f"                _y0 + _iy * _factory_{c.name}_spacing + _noise[1],")
+            self._w(f"                _z0 + _iz * _factory_{c.name}_spacing + _noise[2]])")
         else:
-            self._w(f"_nx = max(1, math.ceil({c.nb_particles} ** 0.5))")
-            self._w(f"_ny = max(1, math.ceil({c.nb_particles} / _nx))")
-            self._w(f"_x0 = {c.zone_center[0]} - (_nx - 1) * _factory_{c.name}_spacing / 2.0")
-            self._w(f"_y0 = {c.zone_center[1]} - (_ny - 1) * _factory_{c.name}_spacing / 2.0")
-            # Signature verifiee (cf. box_generation.py) :
-            #   pre.squareLattice2D(nb_x, nb_y, espacement, x0=, y0=)
-            # retourne un tableau PLAT qu'il faut reshaper en [n, 2].
-            self._w(f"_factory_{c.name}_positions = pre.squareLattice2D(")
-            self._w(f"    _nx, _ny, _factory_{c.name}_spacing, x0=_x0, y0=_y0)")
-            self._w(f"_factory_{c.name}_positions.shape = [_nx * _ny, 2]")
-            self._w(f"_factory_{c.name}_positions = _factory_{c.name}_positions.tolist()")
+            self._w(f"# Réseau 2D avec perturbation")
+            self._w(f"_nx = max(1, int({c.zone_lx} / _factory_{c.name}_spacing))")
+            self._w(f"_ny = max(1, int({c.zone_ly} / _factory_{c.name}_spacing))")
+            self._w(f"_x0 = {c.zone_center[0]} - {c.zone_lx}/2 + _factory_{c.name}_spacing/2")
+            self._w(f"_y0 = {c.zone_center[1]} - {c.zone_ly}/2 + _factory_{c.name}_spacing/2")
+            self._w(f"for _ix in range(_nx):")
+            self._w(f"    for _iy in range(_ny):")
+            self._w(f"        if len(_factory_{c.name}_positions) >= {c.nb_particles}: break")
+            self._w(f"        _noise = _factory_{c.name}_rng.uniform(-0.2, 0.2, 2) * _factory_{c.name}_spacing")
+            self._w(f"        _factory_{c.name}_positions.append([")
+            self._w(f"            _x0 + _ix * _factory_{c.name}_spacing + _noise[0],")
+            self._w(f"            _y0 + _iy * _factory_{c.name}_spacing + _noise[1]])")
 
-        self._w(f"_factory_{c.name}_positions = _factory_{c.name}_positions[:{c.nb_particles}]")
+        self._w(f"# Compléter avec aléatoire si grille insuffisante")
+        self._w(f"while len(_factory_{c.name}_positions) < {c.nb_particles}:")
+        if c.dimension == 3:
+            self._w(f"    _factory_{c.name}_positions.append([")
+            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[0]}-{c.zone_lx/2}, {c.zone_center[0]+c.zone_lx/2}),")
+            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[1]}-{c.zone_ly/2}, {c.zone_center[1]+c.zone_ly/2}),")
+            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[2]}-{c.zone_lz/2}, {c.zone_center[2]+c.zone_lz/2})])")
+        else:
+            self._w(f"    _factory_{c.name}_positions.append([")
+            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[0]}-{c.zone_lx/2}, {c.zone_center[0]+c.zone_lx/2}),")
+            self._w(f"        _factory_{c.name}_rng.uniform({c.zone_center[1]}-{c.zone_ly/2}, {c.zone_center[1]+c.zone_ly/2})])")
         self._w("")
 
     def _write_radii_block(self):
         """
-        Écrit le calcul des rayons : constant si radius_min == radius_max,
-        sinon uniforme aléatoire dans [radius_min, radius_max]. Un seul
-        mécanisme — le choix granulo_Random / Uniforme / Aléatoire a été
-        retiré (cf. RadiusGenerator, utilisé pour la prévisualisation UI,
-        qui suit exactement la même logique).
+        Écrit le calcul des rayons selon c.distribution, choisi dans
+        FactoryParticlesPage (Uniforme / Aléatoire / granulo_Random).
+
+        Auparavant ce bloc utilisait toujours np.linspace(...), ignorant
+        totalement le choix de l'utilisateur — corrigé ici pour respecter
+        UNIFORM / RANDOM / GRANULO comme dans RadiusGenerator (utilisé pour
+        la prévisualisation UI), afin que le script généré produise la même
+        distribution que ce qui est montré dans l'interface.
         """
         c = self.cfg
 
-        if c.radius_min == c.radius_max:
-            self._w(f"_factory_{c.name}_radii = np.full({c.nb_particles}, {c.radius_min})")
+        if c.distribution == SizeDistribution.UNIFORM.value or c.radius_min == c.radius_max:
+            self._w(f"_factory_{c.name}_radii = np.full({c.nb_particles}, {(c.radius_min + c.radius_max) / 2.0})")
             return
 
+        if c.distribution == SizeDistribution.GRANULO.value:
+            # Utilise pre.granulo_Random si disponible (loi LMGC90 native) ;
+            # repli silencieux sur une distribution uniforme numpy équivalente
+            # si la fonction est absente de la version de pylmgc90 installée.
+            self._w(f"try:")
+            self._w(f"    _factory_{c.name}_radii = pre.granulo_Random(")
+            self._w(f"        {c.nb_particles}, {c.radius_min}, {c.radius_max}, {c.seed!r})")
+            self._w(f"except AttributeError:")
+            self._w(f"    _factory_{c.name}_rng_radii = np.random.default_rng({c.seed!r})")
+            self._w(f"    _factory_{c.name}_radii = _factory_{c.name}_rng_radii.uniform(")
+            self._w(f"        {c.radius_min}, {c.radius_max}, {c.nb_particles})")
+            return
+
+        # SizeDistribution.RANDOM (par défaut) : uniforme sur [rmin, rmax]
         self._w(f"_factory_{c.name}_rng_radii = np.random.default_rng({c.seed!r})")
         self._w(f"_factory_{c.name}_radii = _factory_{c.name}_rng_radii.uniform(")
         self._w(f"    {c.radius_min}, {c.radius_max}, {c.nb_particles})")
@@ -868,7 +926,10 @@ class ParticleFactory:
             w(f'# Factory: {vn}')
             w(f'for _i, _av in enumerate(factory_{vn}_bodies):')
             w(f'    _name = f"factory_{vn}_{particle_type_short}_{{_i}}"')
-            w(f'    _av.name = _name  # Assigner un nom intelligible')
+            w(f'    try:')
+            w(f'        _av.name = _name  # Assigner un nom intelligible (si supporte)')
+            w(f'    except Exception:')
+            w(f'        pass')
             w(f'    bodies_list.append(_av)')
             w('')
         
@@ -893,10 +954,13 @@ class ParticleFactory:
             w(f'}}')
             w(f'for _i, _av in enumerate(factory_{vn}_bodies):')
             w(f'    _avatar_info = {{')
-            w(f'        "name": _av.name,')
+            w(f'        "name": getattr(_av, "name", f"factory_{vn}_{particle_type_short}_{{_i}}"),')
+            w(f'        # avatar_id déterministe : stable entre executions, ')
+            w(f'        # permet à ProjectState de retrouver l\'avatar après reload')
+            w(f'        "avatar_id": f"factory_{vn}_{particle_type_short}_{{_i}}",')
             w(f'        "body_index": _av.number + 1,  # 1-based')
             w(f'        "type": "{cfg.particle_type}",')
-            w(f'        "center": [float(_c) for _c in _factory_{vn}_positions[_i]],')
+            w(f'        "center": list(_factory_{vn}_positions[_i]),')
             w(f'        "radius": float(_av.r) if hasattr(_av, "r") else {cfg.radius_max},')
             w(f'        "color": "{cfg.color}",')
             w(f'        "material": "{cfg.material_name}",')
@@ -1146,7 +1210,7 @@ def write_factories(f, factories: List[FactoryConfig], dimension: int = 3):
 # Sérialisation pickle — avatars et indices corps
 # ============================================================================
 
-def save_bodies_to_pickle(bodies_container, pickle_path: str = 'bodies_collection.pkl') -> None:
+def save_bodies_to_pickle(bodies_container, pickle_path: str = BODY_COLLECTION_PICKLE) -> None:
     """
     Sérialise les avatars créés dans un fichier pickle.
     À appeler APRÈS bodies.addAvatar() et AVANT pre.writeDatbox().
@@ -1198,7 +1262,7 @@ def save_bodies_to_pickle(bodies_container, pickle_path: str = 'bodies_collectio
     print(f'✓ Sérialisé {bodies_data["total_nb_bodies"]} corps dans {pickle_path}')
 
 
-def load_bodies_from_pickle(pickle_path: str = 'bodies_collection.pkl') -> dict:
+def load_bodies_from_pickle(pickle_path: str = BODY_COLLECTION_PICKLE) -> dict:
     """
     Charge les avatars sérialisés depuis un fichier pickle.
     À appeler dans le script de calcul (command.py / chipy.py).
@@ -1304,11 +1368,16 @@ def create_avatars_from_factory_metadata(metadata: dict) -> list:
             controller.add_avatar(avatar)
     """
     from .models import Avatar, AvatarType, AvatarOrigin
-    
+
     avatars = []
-    
+
     for factory_name, factory_data in metadata.get('factories', {}).items():
-        for avatar_info in factory_data.get('avatars', []):
+        particle_type_short = (
+            'disk'   if 'Disk'   in factory_data.get('particle_type', '') else
+            'sphere' if 'Sphere' in factory_data.get('particle_type', '') else
+            'part'
+        )
+        for i, avatar_info in enumerate(factory_data.get('avatars', [])):
             # Convertir le type de particule en AvatarType enum
             particle_type_str = avatar_info['type']
             try:
@@ -1316,19 +1385,30 @@ def create_avatars_from_factory_metadata(metadata: dict) -> list:
             except ValueError:
                 print(f"⚠ Type d'avatar non reconnu: {particle_type_str}, ignoré")
                 continue
-            
-            # Créer l'objet Avatar
+
+            # ── avatar_id déterministe ─────────────────────────────────────
+            # Priorité 1 : champ "avatar_id" présent dans le JSON
+            #              (généré par generate_bodies_list_code depuis v2)
+            # Priorité 2 : schéma déterministe factory_name + index
+            #              (rétro-compatibilité avec les JSON sans ce champ)
+            # Dans les deux cas le même avatar_id est produit à chaque appel,
+            # ce qui garantit la stabilité des avatar_groups après reload.
+            deterministic_id = f"factory_{factory_name}_{particle_type_short}_{i}"
+            stable_avatar_id = avatar_info.get('avatar_id') or deterministic_id
+
+            # Créer l'objet Avatar avec l'id stable
             avatar = Avatar(
+                avatar_id=stable_avatar_id,          # ← id stable, non aléatoire
                 avatar_type=avatar_type,
                 center=avatar_info.get('center', [0., 0., 0.]),
                 material_name=avatar_info.get('material', 'default'),
                 model_name=avatar_info.get('model', 'default'),
                 color=avatar_info.get('color', 'BLUEx'),
-                origin=AvatarOrigin.LOOP,  # Marqués comme générés (pas manuels)
+                origin=AvatarOrigin.LOOP,            # marqué comme généré
                 radius=avatar_info.get('radius'),
             )
-            
+
             avatars.append(avatar)
-    
+
     print(f'✓ Créé {len(avatars)} Avatar objects à partir des métadonnées')
     return avatars

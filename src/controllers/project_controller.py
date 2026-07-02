@@ -1,9 +1,22 @@
 # ============================================================================
-# Contrôleur principal 
+# Contrôleur principal
 # ============================================================================
 """
 Contrôleur principal gérant la logique métier.
 Fait le lien entre Model et View.
+
+=== REFACTOR "avatar_id stable" ===
+Toutes les références à des avatars utilisent désormais avatar_id (str)
+plutôt que la position dans state.avatars (int), qui est instable dès
+qu'un autre avatar est supprimé.
+
+Points de vigilance :
+  - avatar_groups : Dict[str, List[str]]  (avatar_ids, non positions)
+  - Loop.model_avatar_id / Loop.generated_ids
+  - GranuloGeneration.generated_ids
+  - ForLoop.generated_refs
+  - DOFOperation.target_value  pour 'avatar'  → avatar_id
+  - PostProCommand.target_value pour 'avatar' → avatar_id
 """
 from typing import Optional, List, Tuple, Dict, Any
 from pathlib import Path
@@ -11,10 +24,11 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from ..core.models import (
     AvatarType, ProjectState, Material, Model, Avatar, ContactLaw, VisibilityRule,
-    DOFOperation, Loop, ForLoop, GranuloGeneration, PostProCommand, AvatarOrigin
+    DOFOperation, Loop, ForLoop, GranuloGeneration, PostProCommand, AvatarOrigin,
+    new_avatar_id,
 )
 from ..core.validators import (
-    MaterialValidator, ModelValidator, AvatarValidator, 
+    MaterialValidator, ModelValidator, AvatarValidator,
     ContactLawValidator, ValidationError
 )
 from ..core.generators import LoopGenerator, GranuloGenerator
@@ -27,13 +41,14 @@ from pylmgc90 import pre
 class ProjectController(QObject):
     """Contrôleur principal gérant l'état du projet"""
     state_changed = pyqtSignal()
-    def __init__(self, state= None):
+
+    def __init__(self, state=None):
         super().__init__()
         self.state = state or ProjectState(name="Nouveau_Projet")
         self.project_path: Optional[Path] = None
-        self._is_loading = False 
+        self._is_loading = False
         self._batch_mode = False
-        
+
         # Conteneurs pylmgc90
         self._materials_container = pre.materials()
         self._models_container = pre.models()
@@ -41,395 +56,261 @@ class ProjectController(QObject):
         self._contact_laws_container = pre.tact_behavs()
         self._visibility_container = pre.see_tables()
         self._postpro_container = pre.postpro_commands()
-        
+
         # Objets pylmgc90 créés
         self._pylmgc_materials: Dict[str, Any] = {}
         self._pylmgc_models: Dict[str, Any] = {}
         self._pylmgc_bodies: List[Any] = []
         self._pylmgc_laws: Dict[str, Any] = {}
-    
-    # ========== PROJET ==========
-    
+
+    # =========================================================================
+    # Utilitaires internes – avatar_id
+    # =========================================================================
+
+    def _find_avatar_by_id(self, avatar_id: str) -> Optional[Tuple[int, Avatar]]:
+        """
+        Retourne (index, avatar) pour l'avatar_id donné, ou None si introuvable.
+        Le scan est linéaire ; utilisez _build_id_to_idx() quand vous avez
+        besoin de résoudre plusieurs ids à la suite.
+        """
+        for i, av in enumerate(self.state.avatars):
+            if av.avatar_id == avatar_id:
+                return i, av
+        return None
+
+    def _build_id_to_idx(self) -> Dict[str, int]:
+        """Construit un dictionnaire avatar_id → index (accès O(1) en lot)."""
+        return {av.avatar_id: i for i, av in enumerate(self.state.avatars)}
+
+    # =========================================================================
+    # PROJET
+    # =========================================================================
+
     def new_project(self, name: str) -> None:
         """Crée un nouveau projet vide"""
         self.state = ProjectState(name=name)
         self.project_path = None
         self._reset_containers()
-    
+
     def save_project(self, filepath: Optional[Path] = None) -> Path:
-        """
-        Sauvegarde le projet.
-        
-        Args:
-            filepath: Chemin de sauvegarde (optionnel)
-            
-        Returns:
-            Chemin du fichier sauvegardé
-            
-        Raises:
-            ValueError: Si aucun chemin défini et non fourni
-        """
         if filepath:
             self.project_path = filepath
         elif not self.project_path:
             raise ValueError("Aucun chemin de sauvegarde défini")
-        
         ProjectSerializer.save(self.state, self.project_path)
         return self.project_path
-    
+
     def load_project(self, filepath: Path) -> None:
-        """
-        Charge un projet depuis un fichier.
-        
-        Args:
-            filepath: Chemin du fichier à charger
-        """
-        try : 
+        try:
             self._is_loading = True
             self.state = ProjectSerializer.load(filepath)
             self.project_path = filepath
             self._rebuild_pylmgc_objects()
+            # Ajouter les factory avatars APRÈS rebuild (alignement garanti)
+            self._restore_factory_avatars()
         finally:
             self._is_loading = False
-    
-    # ========== MATÉRIAUX ==========
-    
-    def add_material(self, material: Material) -> None:
-        """
-        Ajoute un matériau au projet.
-        
-        Args:
-            material: Matériau à ajouter
-            
-        Raises:
-            ValidationError: Si validation échoue
-        """
-        if any(m.name==material.name for m in self.state.materials):
-            raise ValidationError(f"Nom de matériau '{material.name}' déjà utilisé. Les noms doivent être uniques.")
 
+    # =========================================================================
+    # MATÉRIAUX
+    # =========================================================================
+
+    def add_material(self, material: Material) -> None:
+        if any(m.name == material.name for m in self.state.materials):
+            raise ValidationError(
+                f"Nom de matériau '{material.name}' déjà utilisé. Les noms doivent être uniques."
+            )
         MaterialValidator.validate_or_raise(material)
-        
-        # Créer l'objet pylmgc90
         mat_obj = LMGC90Bridge.create_material(material)
         self._materials_container.addMaterial(mat_obj)
         self._pylmgc_materials[material.name] = mat_obj
-        
-        # Ajouter au modèle
         self.state.materials.append(material)
         self.state_changed.emit()
+
     def update_material(self, old_name: str, material: Material) -> None:
-        """
-        Met à jour un matériau existant.
-        
-        Args:
-            old_name: Ancien nom du matériau
-            material: Nouveau matériau (peut avoir un nom différent)
-        
-        Raises:
-            ValueError: Si matériau introuvable
-            ValidationError: Si validation échoue
-        """
         MaterialValidator.validate_or_raise(material)
-        
-        # Trouver l'ancien matériau
         old_mat = self._find_material(old_name)
         if not old_mat:
             raise ValueError(f"Matériau '{old_name}' introuvable")
-        
-        # Vérifier si renommage
         if old_name != material.name:
-            # Vérifier que le nouveau nom n'existe pas déjà
             if self._find_material(material.name):
                 raise ValueError(f"Un matériau nommé '{material.name}' existe déjà")
-            
-            # Mettre à jour les références dans les avatars
             for avatar in self.state.avatars:
                 if avatar.material_name == old_name:
                     avatar.material_name = material.name
-        
-        # Supprimer l'ancien objet pylmgc90
         self._materials_container.pop(old_name)
         self._pylmgc_materials.pop(old_name, None)
-        
-        # Créer le nouveau
         mat_obj = LMGC90Bridge.create_material(material)
         self._materials_container.addMaterial(mat_obj)
         self._pylmgc_materials[material.name] = mat_obj
-        
-        # Mettre à jour dans l'état
         idx = self.state.materials.index(old_mat)
         self.state.materials[idx] = material
-    
+
     def remove_material(self, name: str) -> bool:
-        """
-        Supprime un matériau.
-        
-        Args:
-            name: Nom du matériau
-            
-        Returns:
-            True si supprimé, False si introuvable
-        """
         material = self._find_material(name)
         if not material:
             return False
-        
         self.state.materials.remove(material)
         self._materials_container.pop(name)
         self._pylmgc_materials.pop(name, None)
         return True
-    
+
     def get_materials(self) -> List[Material]:
-        """Retourne tous les matériaux"""
         return self.state.materials.copy()
-    
+
     def get_material(self, name: str) -> Optional[Material]:
-        """Retourne un matériau par son nom"""
         return self._find_material(name)
 
     def _find_material(self, name: str) -> Optional[Material]:
-        """Trouve un matériau par nom"""
         for mat in self.state.materials:
             if mat.name == name:
                 return mat
         return None
-    
+
     def is_material_used(self, name: str) -> tuple[bool, list[str]]:
-        """
-        Vérifie si un matériau est utilisé.
-        
-        Returns:
-            (is_used, references) où references est une liste de descriptions
-        """
         refs = []
         for i, avatar in enumerate(self.state.avatars):
             if avatar.material_name == name:
                 refs.append(f"Avatar #{i} ({avatar.avatar_type.value})")
-        
         return len(refs) > 0, refs
-    
-    # ========== MODÈLES ==========
-    
+
+    # =========================================================================
+    # MODÈLES
+    # =========================================================================
+
     def add_model(self, model: Model) -> None:
-        """
-        Ajoute un modèle au projet.
-        
-        Args:
-            model: Modèle à ajouter
-            
-        Raises:
-            ValidationError: Si validation échoue
-        """
-        if any(m.name == model.name for m in self.state.models ) :
-            raise ValidationError(f"Nom de modèle '{model.name}' déjà utilisé. Les noms doivent être uniques.")
+        if any(m.name == model.name for m in self.state.models):
+            raise ValidationError(
+                f"Nom de modèle '{model.name}' déjà utilisé. Les noms doivent être uniques."
+            )
         ModelValidator.validate_or_raise(model)
-        
-        # Créer l'objet pylmgc90
         mod_obj = LMGC90Bridge.create_model(model)
         self._models_container.addModel(mod_obj)
         self._pylmgc_models[model.name] = mod_obj
-        
-        # Ajouter au modèle
         self.state.models.append(model)
         self.state_changed.emit()
-    
+
     def update_model(self, old_name: str, model: Model) -> None:
-        """
-        Met à jour un modèle existant.
-        
-        Args:
-            old_name: Ancien nom du modèle
-            model: Nouveau modèle
-        
-        Raises:
-            ValueError: Si modèle introuvable
-            ValidationError: Si validation échoue
-        """
         ModelValidator.validate_or_raise(model)
-        
         old_mod = self._find_model(old_name)
         if not old_mod:
             raise ValueError(f"Modèle '{old_name}' introuvable")
-        
-        # Vérifier renommage
         if old_name != model.name:
             if self._find_model(model.name):
                 raise ValueError(f"Un modèle nommé '{model.name}' existe déjà")
-            
-            # Mettre à jour références
             for avatar in self.state.avatars:
                 if avatar.model_name == old_name:
                     avatar.model_name = model.name
-        
-        # Supprimer ancien
         self._models_container.pop(old_name)
         self._pylmgc_models.pop(old_name, None)
-        
-        # Créer nouveau
         mod_obj = LMGC90Bridge.create_model(model)
         self._models_container.addModel(mod_obj)
         self._pylmgc_models[model.name] = mod_obj
-        
-        # Mettre à jour état
         idx = self.state.models.index(old_mod)
         self.state.models[idx] = model
 
     def get_model(self, name: str) -> Optional[Model]:
-        """Retourne un modèle par son nom"""
         return self._find_model(name)
 
     def is_model_used(self, name: str) -> tuple[bool, list[str]]:
-        """Vérifie si un modèle est utilisé"""
         refs = []
         for i, avatar in enumerate(self.state.avatars):
             if avatar.model_name == name:
                 refs.append(f"Avatar #{i} ({avatar.avatar_type.value})")
-        
         return len(refs) > 0, refs
-    
+
     def remove_model(self, name: str) -> bool:
-        """Supprime un modèle"""
         model = self._find_model(name)
         if not model:
             return False
-        
         self.state.models.remove(model)
         self._models_container.pop(name)
         self._pylmgc_models.pop(name, None)
         return True
-    
+
     def get_models(self) -> List[Model]:
-        """Retourne tous les modèles"""
         return self.state.models.copy()
-    
+
     def _find_model(self, name: str) -> Optional[Model]:
-        """Trouve un modèle par nom"""
         for mod in self.state.models:
             if mod.name == name:
                 return mod
         return None
-    
-    # ========== AVATARS ==========
-    
+
+    # =========================================================================
+    # AVATARS
+    # =========================================================================
+
     def add_avatar(self, avatar: Avatar, create_pylmgc: bool = True) -> int:
-        """
-        Ajoute un avatar au projet.
-        
-        Args:
-            avatar: Avatar à ajouter
-            
-        Returns:
-            Index de l'avatar créé
-            
-        Raises:
-            ValidationError: Si validation échoue
-            ValueError: Si matériau ou modèle introuvable
-        """
-        # Récupérer le modèle pour validation
         model = next((m for m in self.state.models if m.name == avatar.model_name), None)
         if not model:
             raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
-        
         AvatarValidator.validate_or_raise(avatar, model)
-        
-        # Récupérer les objets pylmgc90 uniquement si demandé
         if create_pylmgc:
             mat_obj = self._pylmgc_materials.get(avatar.material_name)
             mod_obj = self._pylmgc_models.get(avatar.model_name)
-
             if not mat_obj:
                 raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
             if not mod_obj:
                 raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
-
-            # Créer l'objet pylmgc90
             body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
             self._bodies_container.addAvatar(body_obj)
             self._pylmgc_bodies.append(body_obj)
         else:
-            # Ne pas créer l'objet pylmgc (optimisation pour génération massive)
-            # Conserver l'alignement des indices en ajoutant un placeholder
             self._pylmgc_bodies.append(None)
-
-        # Ajouter au modèle (toujours)
         self.state.avatars.append(avatar)
         if not self._batch_mode:
             self.state_changed.emit()
-
         return len(self.state.avatars) - 1
-    
+
     def update_avatar(self, index: int, avatar: Avatar) -> None:
-        """
-        Met à jour un avatar existant.
-        
-        Args:
-            index: Index de l'avatar
-            avatar: Nouvel avatar
-        
-        Raises:
-            ValueError: Si index invalide
-            ValidationError: Si validation échoue
-        """
         if not (0 <= index < len(self.state.avatars)):
             raise ValueError(f"Index {index} invalide")
-        
-        # Récupérer le modèle pour validation
         model = next((m for m in self.state.models if m.name == avatar.model_name), None)
         if not model:
             raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
-        
         AvatarValidator.validate_or_raise(avatar, model)
-        
-        # Vérifier que matériau et modèle existent
         mat_obj = self._pylmgc_materials.get(avatar.material_name)
         mod_obj = self._pylmgc_models.get(avatar.model_name)
-        
         if not mat_obj:
             raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
         if not mod_obj:
             raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
-        
-        # Supprimer ancien objet pylmgc90
         old_body = self._pylmgc_bodies[index]
         self._bodies_container.remove(old_body)
-        
-        # Créer nouveau
         body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
         self._bodies_container.addAvatar(body_obj)
         self._pylmgc_bodies[index] = body_obj
-        
-        # Mettre à jour état
         self.state.avatars[index] = avatar
 
     def get_avatar(self, index: int) -> Optional[Avatar]:
-        """Retourne un avatar par son index"""
         if 0 <= index < len(self.state.avatars):
             return self.state.avatars[index]
         return None
 
     def is_avatar_used(self, index: int) -> tuple[bool, list[str]]:
-        """Vérifie si un avatar est référencé (boucles, groupes)"""
+        """Vérifie si un avatar (par position) est référencé."""
         refs = []
-        
-        # Vérifier boucles
-        for i, loop in enumerate(self.state.loops):
-            if loop.model_avatar_index == index:
-                refs.append(f"Boucle #{i+1} ({loop.loop_type})")
-        
-        # Vérifier groupes
-        for group_name, indices in self.state.avatar_groups.items():
-            if index in indices:
-                refs.append(f"Groupe '{group_name}'")
-        
-        return len(refs) > 0, refs
-    
-    def remove_avatar(self, index: int) -> bool:
-        """Supprime un avatar par index"""
-        if 0 <= index < len(self.state.avatars):
-            # Retirer l'avatar du state
-            self.state.avatars.pop(index)
+        if not (0 <= index < len(self.state.avatars)):
+            return False, []
+        avatar = self.state.avatars[index]
+        aid = avatar.avatar_id
 
-            # Retirer l'objet pylmgc si présent
+        # Vérifier boucles (référence par avatar_id)
+        for i, loop in enumerate(self.state.loops):
+            if loop.model_avatar_id == aid:
+                refs.append(f"Boucle #{i + 1} ({loop.loop_type})")
+
+        # Vérifier groupes (contiennent des avatar_ids)
+        for group_name, avatar_ids in self.state.avatar_groups.items():
+            if aid in avatar_ids:
+                refs.append(f"Groupe '{group_name}'")
+
+        return len(refs) > 0, refs
+
+    def remove_avatar(self, index: int) -> bool:
+        if 0 <= index < len(self.state.avatars):
+            self.state.avatars.pop(index)
             body = None
             if index < len(self._pylmgc_bodies):
                 body = self._pylmgc_bodies.pop(index)
@@ -441,41 +322,17 @@ class ProjectController(QObject):
                     get_logger('controller').warning(f"Erreur suppression avatar #{index}: {e}")
             return True
         return False
-    
+
     def get_avatars(self, include_generated: bool = True) -> List[Avatar]:
-        """
-        Retourne les avatars.
-        
-        Args:
-            include_generated: Inclure les avatars générés (boucles, granulo)
-        """
         if include_generated:
             return self.state.avatars.copy()
         else:
             return [a for a in self.state.avatars if a.origin == AvatarOrigin.MANUAL]
 
-    def duplicate_avatar(self, index: int, n_copies: int, offset: list, group_name: str = None) -> list:
-        """
-        Duplique un avatar n_copies fois en décalant chaque copie de offset.
-
-        Args:
-            index:      Index de l'avatar source dans state.avatars.
-            n_copies:   Nombre de copies à créer (≥ 1).
-            offset:     Décalage appliqué à chaque copie, sous la forme
-                        [dx, dy] ou [dx, dy, dz].
-                        La k-ième copie est placée à center + k*offset.
-            group_name: Si fourni, toutes les nouvelles copies sont ajoutées
-                        à ce groupe (créé si inexistant).
-
-        Returns:
-            Liste des indices des copies créées dans state.avatars.
-
-        Raises:
-            IndexError: Si index est hors bornes.
-            ValueError: Si n_copies < 1 ou offset vide.
-        """
+    def duplicate_avatar(
+        self, index: int, n_copies: int, offset: list, group_name: str = None
+    ) -> list:
         import copy as _copy
-
         if not (0 <= index < len(self.state.avatars)):
             raise IndexError(f"Index avatar {index} hors bornes.")
         if n_copies < 1:
@@ -483,14 +340,14 @@ class ProjectController(QObject):
         if not offset:
             raise ValueError("offset ne peut pas être vide.")
 
-        source       = self.state.avatars[index]
-        new_indices  = []
-        dim          = len(source.center)
+        source = self.state.avatars[index]
+        new_indices = []
+        dim = len(source.center)
 
         self._batch_mode = True
         try:
             for k in range(1, n_copies + 1):
-                clone        = _copy.deepcopy(source)
+                clone = _copy.deepcopy(source)
                 clone.center = [
                     source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
                     for i in range(dim)
@@ -501,7 +358,9 @@ class ProjectController(QObject):
             self._batch_mode = False
 
         if group_name:
-            self.state.avatar_groups.setdefault(group_name, []).extend(new_indices)
+            # Stocker les avatar_ids stables (pas les positions)
+            new_ids = [self.state.avatars[i].avatar_id for i in new_indices]
+            self.state.avatar_groups.setdefault(group_name, []).extend(new_ids)
 
         self.state_changed.emit()
         return new_indices
@@ -511,30 +370,8 @@ class ProjectController(QObject):
         group_name: str,
         n_copies: int,
         offset: list,
-        new_group_prefix: str = None
+        new_group_prefix: str = None,
     ) -> dict:
-        """
-        Duplique tous les avatars d'un groupe n_copies fois.
-
-        Args:
-            group_name:        Nom du groupe source.
-            n_copies:          Nombre de séries de copies à créer (≥ 1).
-            offset:            Décalage appliqué à chaque série, sous la forme
-                               [dx, dy] ou [dx, dy, dz].
-                               La k-ième série est décalée de k*offset par
-                               rapport aux positions du groupe source.
-            new_group_prefix:  Si fourni, chaque série k est stockée dans un
-                               groupe nommé "{new_group_prefix}_{k}".
-                               Si None, les copies sont ajoutées dans
-                               "{group_name}_copie_{k}".
-
-        Returns:
-            Dictionnaire {nom_groupe: [indices]} pour chaque série créée.
-
-        Raises:
-            KeyError:   Si group_name est inconnu.
-            ValueError: Si n_copies < 1 ou offset vide.
-        """
         import copy as _copy
 
         if group_name not in self.state.avatar_groups:
@@ -544,20 +381,21 @@ class ProjectController(QObject):
         if not offset:
             raise ValueError("offset ne peut pas être vide.")
 
-        source_indices = self.state.avatar_groups[group_name]
-        prefix         = new_group_prefix or group_name
-        result         = {}
+        source_avatar_ids = self.state.avatar_groups[group_name]  # List[str]
+        prefix = new_group_prefix or group_name
+        result: Dict[str, list] = {}
 
         self._batch_mode = True
         try:
             for k in range(1, n_copies + 1):
                 serie_indices = []
-                for src_idx in source_indices:
-                    if not (0 <= src_idx < len(self.state.avatars)):
+                for aid in source_avatar_ids:
+                    res = self._find_avatar_by_id(aid)
+                    if res is None:
                         continue
-                    source       = self.state.avatars[src_idx]
-                    dim          = len(source.center)
-                    clone        = _copy.deepcopy(source)
+                    src_idx, source = res
+                    dim = len(source.center)
+                    clone = _copy.deepcopy(source)
                     clone.center = [
                         source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
                         for i in range(dim)
@@ -565,22 +403,18 @@ class ProjectController(QObject):
                     idx = self._add_avatar_no_validate(clone)
                     serie_indices.append(idx)
 
+                # Stocker les avatar_ids des copies
+                serie_ids = [self.state.avatars[i].avatar_id for i in serie_indices]
                 grp = f"{prefix}_copie_{k}"
-                self.state.avatar_groups.setdefault(grp, []).extend(serie_indices)
-                result[grp] = serie_indices
+                self.state.avatar_groups.setdefault(grp, []).extend(serie_ids)
+                result[grp] = serie_ids
         finally:
             self._batch_mode = False
 
         self.state_changed.emit()
         return result
-        
-    def _add_avatar_no_validate(
-        self, avatar: "Avatar", create_pylmgc: bool = True) -> int:
-        """
-        Ajoute un avatar SANS validation.
-        Utilise uniquement pour la duplication d'avatars deja valides
-        (ex: EMPTY_AVATAR maconnerie avec contactors=[]).
-        """
+
+    def _add_avatar_no_validate(self, avatar: Avatar, create_pylmgc: bool = True) -> int:
         if create_pylmgc:
             mat_obj = self._pylmgc_materials.get(avatar.material_name)
             mod_obj = self._pylmgc_models.get(avatar.model_name)
@@ -596,226 +430,184 @@ class ProjectController(QObject):
         if not self._batch_mode:
             self.state_changed.emit()
         return len(self.state.avatars) - 1
-    # ========== LOIS DE CONTACT ==========
-    
+
+    # =========================================================================
+    # LOIS DE CONTACT
+    # =========================================================================
+
     def add_contact_law(self, law: ContactLaw) -> None:
-        """Ajoute une loi de contact"""
-        if self._find_contact_law(law.name): 
+        if self._find_contact_law(law.name):
             raise ValidationError(f"Une loi nommée '{law.name}' existe déjà")
         ContactLawValidator.validate_or_raise(law)
-        
         law_obj = LMGC90Bridge.create_contact_law(law)
         self._contact_laws_container.addBehav(law_obj)
         self._pylmgc_laws[law.name] = law_obj
-        
         self.state.contact_laws.append(law)
         self.state_changed.emit()
-    
+
     def update_contact_law(self, old_name: str, law: ContactLaw) -> None:
-        """Met à jour une loi de contact"""
         ContactLawValidator.validate_or_raise(law)
-        
         old_law = self._find_contact_law(old_name)
         if not old_law:
             raise ValueError(f"Loi '{old_name}' introuvable")
-        
-        # Vérifier renommage
         if old_name != law.name:
             if self._find_contact_law(law.name):
                 raise ValueError(f"Une loi nommée '{law.name}' existe déjà")
-            
-            # Mettre à jour références dans visibilité
             for rule in self.state.visibility_rules:
                 if rule.behavior_name == old_name:
                     rule.behavior_name = law.name
-        
-        # Supprimer ancien
         self._contact_laws_container.pop(old_name)
         self._pylmgc_laws.pop(old_name, None)
-        
-        # Créer nouveau
         law_obj = LMGC90Bridge.create_contact_law(law)
         self._contact_laws_container.addBehav(law_obj)
         self._pylmgc_laws[law.name] = law_obj
-        
-        # Mettre à jour état
         idx = self.state.contact_laws.index(old_law)
         self.state.contact_laws[idx] = law
 
     def get_contact_law(self, name: str) -> Optional[ContactLaw]:
-        """Retourne une loi par son nom"""
         return self._find_contact_law(name)
 
     def is_contact_law_used(self, name: str) -> tuple[bool, list[str]]:
-        """Vérifie si une loi est utilisée"""
         refs = []
         for i, rule in enumerate(self.state.visibility_rules):
             if rule.behavior_name == name:
-                refs.append(f"Règle de visibilité #{i+1}")
-        
+                refs.append(f"Règle de visibilité #{i + 1}")
         return len(refs) > 0, refs
-    
+
     def remove_contact_law(self, name: str) -> bool:
-        """Supprime une loi de contact"""
         law = self._find_contact_law(name)
         if not law:
             return False
-        
         self.state.contact_laws.remove(law)
         self._contact_laws_container.pop(name)
         self._pylmgc_laws.pop(name, None)
         return True
-    
+
     def get_contact_laws(self) -> List[ContactLaw]:
-        """Retourne toutes les lois de contact"""
         return self.state.contact_laws.copy()
-    
+
     def _find_contact_law(self, name: str) -> Optional[ContactLaw]:
-        """Trouve une loi de contact par nom"""
         for law in self.state.contact_laws:
             if law.name == name:
                 return law
         return None
-    
-    # ========== VISIBILITÉ ==========
+
+    # =========================================================================
+    # VISIBILITÉ
+    # =========================================================================
+
     def add_visibility_rule(self, rule: VisibilityRule) -> None:
-        """Ajoute une règle de visibilité"""
         behavior_obj = self._pylmgc_laws.get(rule.behavior_name)
         if not behavior_obj:
             raise ValueError(f"Loi '{rule.behavior_name}' introuvable")
-        
         rule_obj = LMGC90Bridge.create_visibility_rule(rule, behavior_obj)
         self._visibility_container.addSeeTable(rule_obj)
-        
         self.state.visibility_rules.append(rule)
-    
+
     def update_visibility_rule(self, index: int, rule: VisibilityRule) -> None:
-        """Met à jour une règle de visibilité"""
         if not (0 <= index < len(self.state.visibility_rules)):
             raise ValueError(f"Index {index} invalide")
-        
-        # Vérifier que la loi existe
         behavior_obj = self._pylmgc_laws.get(rule.behavior_name)
         if not behavior_obj:
             raise ValueError(f"Loi '{rule.behavior_name}' introuvable")
-        
-        # Supprimer ancienne règle (pylmgc90 ne permet pas de modifier)
-        # Il faut reconstruire toute la table de visibilité
         self._visibility_container = pre.see_tables()
-        
-        # Mettre à jour état
         self.state.visibility_rules[index] = rule
-        
-        # Recréer toutes les règles
         for r in self.state.visibility_rules:
             behav = self._pylmgc_laws[r.behavior_name]
             rule_obj = LMGC90Bridge.create_visibility_rule(r, behav)
             self._visibility_container.addSeeTable(rule_obj)
 
     def get_visibility_rule(self, index: int) -> Optional[VisibilityRule]:
-        """Retourne une règle par son index"""
         if 0 <= index < len(self.state.visibility_rules):
             return self.state.visibility_rules[index]
         return None
-    
+
     def remove_visibility_rule(self, index: int) -> bool:
-        """Supprime une règle de visibilité"""
         if 0 <= index < len(self.state.visibility_rules):
             self.state.visibility_rules.pop(index)
             return True
         return False
-    
+
     def get_visibility_rules(self) -> List[VisibilityRule]:
-        """Retourne toutes les règles"""
         return self.state.visibility_rules.copy()
-    
-    # ========== OPÉRATIONS DOF ==========
+
+    # =========================================================================
+    # OPÉRATIONS DOF
+    # =========================================================================
+
     def apply_dof_operation(self, operation: DOFOperation) -> None:
-        """
-        Applique une opération DOF sur les avatars (sans sauvegarder).
-        """
+        """Applique une opération DOF sur les avatars (sans sauvegarder)."""
         if operation.target_type == 'avatar':
-            idx = operation.target_value
-            if 0 <= idx < len(self._pylmgc_bodies):
-                body = self._pylmgc_bodies[idx]
-                if body is not None:
-                    LMGC90Bridge.apply_dof_operation(operation, body)
-                    # synchroniser la position
-                    self._sync_avatar_position(idx, body)
-        
-        elif operation.target_type == 'group':
-            group_name = operation.target_value
-            indices = self.state.avatar_groups.get(group_name, [])
-            for idx in indices:
+            # target_value est désormais un avatar_id (str)
+            res = self._find_avatar_by_id(operation.target_value)
+            if res:
+                idx, _ = res
                 if 0 <= idx < len(self._pylmgc_bodies):
                     body = self._pylmgc_bodies[idx]
                     if body is not None:
                         LMGC90Bridge.apply_dof_operation(operation, body)
-                        # synchroniser la position
                         self._sync_avatar_position(idx, body)
 
+        elif operation.target_type == 'group':
+            group_name = operation.target_value
+            avatar_ids = self.state.avatar_groups.get(group_name, [])
+            for aid in avatar_ids:
+                res = self._find_avatar_by_id(aid)
+                if res:
+                    idx, _ = res
+                    if 0 <= idx < len(self._pylmgc_bodies):
+                        body = self._pylmgc_bodies[idx]
+                        if body is not None:
+                            LMGC90Bridge.apply_dof_operation(operation, body)
+                            self._sync_avatar_position(idx, body)
 
     def add_dof_operation(self, operation: DOFOperation) -> None:
-        """
-        Applique ET sauvegarde une opération DOF.
-        Utilisé lors de la création d'une nouvelle opération par l'utilisateur.
-        """
-        self.apply_dof_operation(operation)  # ← Applique
-        self.state.operations.append(operation)  # ← Sauvegarde
-            
+        """Applique ET sauvegarde une opération DOF."""
+        self.apply_dof_operation(operation)
+        self.state.operations.append(operation)
+
     def get_dof_operations(self) -> List[DOFOperation]:
-        """Retourne toutes les opérations DOF"""
         return self.state.operations.copy()
-    
+
     def get_dof_operation(self, index: int) -> DOFOperation:
-        """Retourne une opération DOF spécifique par index"""
         if index < 0 or index >= len(self.state.operations):
             raise IndexError(f"Index DOF invalide: {index}")
         return self.state.operations[index]
-    
-    def update_dof_operation(self, index: int, operation: DOFOperation):
-        """Met à jour une opération DOF existante"""
-        # Validation si nécessaire
+
+    def update_dof_operation(self, index: int, operation: DOFOperation) -> None:
         self.state.operations[index] = operation
-        # Réappliquer l'opération via pylmgc si besoin
         self.apply_dof_operation(operation)
 
-    def remove_dof_operation(self, index: int):
-        """Supprime une opération DOF"""
+    def remove_dof_operation(self, index: int) -> None:
         del self.state.operations[index]
 
-    def _sync_avatar_position(self, index: int, body):
-        """Synchronise la position d'un avatar depuis son objet pylmgc90"""
+    def _sync_avatar_position(self, index: int, body) -> None:
         if index >= len(self.state.avatars):
             return
-        
         try:
-            # Extraire la nouvelle position
             if hasattr(body, 'nodes') and len(body.nodes) > 0:
                 new_center = body.nodes[1].coor
                 self.state.avatars[index].center = new_center
         except Exception as e:
             print(f"⚠️ Erreur synchronisation position avatar {index}: {e}")
 
-    # ========== BOUCLES ==========
+    # =========================================================================
+    # BOUCLES
+    # =========================================================================
+
     def generate_loop(self, loop: Loop) -> List[int]:
-        """
-        Génère des avatars selon une boucle.
-        
-        Args:
-            loop: Configuration de la boucle
-        Returns:
-            Liste des indices des avatars créés
-        """
-        if loop.model_avatar_index >= len(self.state.avatars):
-            raise ValueError("Index du modèle d'avatar invalide")
-        
-        model_avatar = self.state.avatars[loop.model_avatar_index]
+        """Génère des avatars selon une boucle (référence par avatar_id)."""
+        res = self._find_avatar_by_id(loop.model_avatar_id)
+        if res is None:
+            raise ValueError(
+                f"Avatar modèle '{loop.model_avatar_id}' introuvable"
+            )
+        _, model_avatar = res
+
         centers = LoopGenerator.generate_positions(loop)
-        
+
         generated_indices = []
         for center in centers:
-            # Créer une copie de l'avatar avec nouveau centre
             new_avatar = Avatar(
                 avatar_type=model_avatar.avatar_type,
                 center=center,
@@ -830,84 +622,69 @@ class ProjectController(QObject):
                 generation_type=model_avatar.generation_type,
                 is_hollow=model_avatar.is_hollow,
                 wall_params=model_avatar.wall_params,
-                contactors=model_avatar.contactors
+                contactors=model_avatar.contactors,
             )
-            
             idx = self.add_avatar(new_avatar)
             generated_indices.append(idx)
-        
-        loop.generated_indices = generated_indices
+
+        # Stocker les ids stables (non les positions)
+        loop.generated_ids = [
+            self.state.avatars[idx].avatar_id for idx in generated_indices
+        ]
+
         if not self._is_loading:
             self.state.loops.append(loop)
-        
-        # Ajouter au groupe si spécifié
+
         if loop.group_name:
-            if loop.group_name not in self.state.avatar_groups:
-                self.state.avatar_groups[loop.group_name] = []
-            self.state.avatar_groups[loop.group_name].extend(generated_indices)
-        
+            self.state.avatar_groups.setdefault(loop.group_name, []).extend(
+                loop.generated_ids
+            )
+
         return generated_indices
-    
+
     def remove_loop(self, index: int) -> bool:
-        """
-        Supprime une boucle et ses avatars générés.
-        
-        Returns:
-            True si supprimé
-        """
         if not (0 <= index < len(self.state.loops)):
             return False
-        
         loop = self.state.loops[index]
-        
-        # Supprimer les avatars générés (en ordre inverse pour garder les indices)
-        for avatar_idx in sorted(loop.generated_indices, reverse=True):
-            self.remove_avatar(avatar_idx)
-        
-        # Supprimer la boucle
+        # Suppression par avatar_id (ordre quelconque, lookup frais à chaque fois)
+        for aid in loop.generated_ids:
+            res = self._find_avatar_by_id(aid)
+            if res:
+                self.remove_avatar(res[0])
         self.state.loops.pop(index)
         return True
 
     def get_loop(self, index: int) -> Optional[Loop]:
-        """Retourne une boucle par son index"""
         if 0 <= index < len(self.state.loops):
             return self.state.loops[index]
         return None
 
     def update_loop(self, index: int, loop: Loop) -> None:
-        """
-        Met à jour une boucle existante et régénère ses avatars.
-        
-        Args:
-            index: Index de la boucle
-            loop: Nouvelle configuration de boucle
-            
-        Raises:
-            ValueError: Si index invalide
-        """
         if not (0 <= index < len(self.state.loops)):
             raise ValueError(f"Index {index} invalide")
-        
-        # Récupérer l'ancienne boucle
+
         old_loop = self.state.loops[index]
-        
-        # Supprimer les anciens avatars générés (en ordre inverse)
-        for avatar_idx in sorted(old_loop.generated_indices, reverse=True):
-            self.remove_avatar(avatar_idx)
-        
-        # Mettre à jour la boucle
+
+        # Supprimer les avatars de l'ancienne boucle
+        old_generated_ids = list(old_loop.generated_ids)
+        for aid in old_generated_ids:
+            res = self._find_avatar_by_id(aid)
+            if res:
+                self.remove_avatar(res[0])
+
         self.state.loops[index] = loop
-        
-        # Régénérer les avatars avec la nouvelle configuration
-        if loop.model_avatar_index >= len(self.state.avatars):
-            raise ValueError("Index du modèle d'avatar invalide")
-        
-        model_avatar = self.state.avatars[loop.model_avatar_index]
+
+        # Trouver l'avatar modèle par id
+        res = self._find_avatar_by_id(loop.model_avatar_id)
+        if res is None:
+            raise ValueError(
+                f"Avatar modèle '{loop.model_avatar_id}' introuvable"
+            )
+        _, model_avatar = res
+
         centers = LoopGenerator.generate_positions(loop)
-        
         generated_indices = []
         for center in centers:
-            # Créer une copie de l'avatar avec nouveau centre
             new_avatar = Avatar(
                 avatar_type=model_avatar.avatar_type,
                 center=center,
@@ -922,51 +699,42 @@ class ProjectController(QObject):
                 generation_type=model_avatar.generation_type,
                 is_hollow=model_avatar.is_hollow,
                 wall_params=model_avatar.wall_params,
-                contactors=model_avatar.contactors
+                contactors=model_avatar.contactors,
             )
-            
             idx = self.add_avatar(new_avatar)
             generated_indices.append(idx)
-        
-        # Mettre à jour les indices générés
-        loop.generated_indices = generated_indices
-        
-        # Mettre à jour le groupe si spécifié
-        if old_loop.group_name and old_loop.group_name in self.state.avatar_groups:
-            # Retirer les anciens indices du groupe
-            self.state.avatar_groups[old_loop.group_name] = [
-                i for i in self.state.avatar_groups[old_loop.group_name]
-                if i not in old_loop.generated_indices
-            ]
-        
-        if loop.group_name:
-            if loop.group_name not in self.state.avatar_groups:
-                self.state.avatar_groups[loop.group_name] = []
-            self.state.avatar_groups[loop.group_name].extend(generated_indices)
 
-    # ========== GRANULOMÉTRIE ==========
+        loop.generated_ids = [
+            self.state.avatars[idx].avatar_id for idx in generated_indices
+        ]
+
+        # Mettre à jour les groupes
+        if old_loop.group_name and old_loop.group_name in self.state.avatar_groups:
+            old_ids = set(old_generated_ids)
+            self.state.avatar_groups[old_loop.group_name] = [
+                aid for aid in self.state.avatar_groups[old_loop.group_name]
+                if aid not in old_ids
+            ]
+
+        if loop.group_name:
+            self.state.avatar_groups.setdefault(loop.group_name, []).extend(
+                loop.generated_ids
+            )
+
+    # =========================================================================
+    # GRANULOMÉTRIE
+    # =========================================================================
+
     def generate_granulo(self, config: GranuloGeneration) -> List[int]:
-        """
-        Génère une distribution granulométrique.
-        
-        Args:
-            config: Configuration de la génération
-            
-        Returns:
-            Liste des indices des particules créées
-        """
-        # Génération des positions et rayons
         nb_particles, coordinates, radii = GranuloGenerator.generate(config)
 
-        from ..core.models import AvatarType
         generated_indices = []
         prev_batch = self._batch_mode
-        self._batch_mode = True          # inhibe state_changed pendant la création des avatars
+        self._batch_mode = True
         try:
             for i in range(nb_particles):
                 center = coordinates[i].tolist()
                 radius = float(radii[i])
-
                 avatar = Avatar(
                     avatar_type=AvatarType(config.avatar_type),
                     center=center,
@@ -979,57 +747,42 @@ class ProjectController(QObject):
                 idx = self.add_avatar(avatar)
                 generated_indices.append(idx)
         finally:
-            self._batch_mode = prev_batch   # restaurer l'état précédent
+            self._batch_mode = prev_batch
 
-        config.generated_indices = generated_indices
+        # Stocker les ids stables
+        config.generated_ids = [
+            self.state.avatars[idx].avatar_id for idx in generated_indices
+        ]
+
         if not self._is_loading:
             self.state.granulo_generations.append(config)
 
         if config.group_name:
-            if config.group_name not in self.state.avatar_groups:
-                self.state.avatar_groups[config.group_name] = []
-            self.state.avatar_groups[config.group_name].extend(generated_indices)
+            self.state.avatar_groups.setdefault(config.group_name, []).extend(
+                config.generated_ids
+            )
 
         return generated_indices
-    
+
     def remove_granulo(self, index: int) -> bool:
-        """Supprime une génération granulo ET ses avatars"""
         if not (0 <= index < len(self.state.granulo_generations)):
             return False
-        
         granulo = self.state.granulo_generations[index]
-        
-        # Supprimer avatars générés
-        for avatar_idx in sorted(granulo.generated_indices, reverse=True):
-            self.remove_avatar(avatar_idx)
-        
-        # Supprimer la génération
+        for aid in granulo.generated_ids:
+            res = self._find_avatar_by_id(aid)
+            if res:
+                self.remove_avatar(res[0])
         self.state.granulo_generations.pop(index)
         return True
 
     def get_granulo(self, index: int) -> Optional[GranuloGeneration]:
-        """Retourne une génération granulo par son index"""
         if 0 <= index < len(self.state.granulo_generations):
             return self.state.granulo_generations[index]
         return None
-    
-    
-    def create_granulo_avatar(self, center: list, radius: float, config: GranuloGeneration) -> int:
-        """
-        Crée un seul avatar pour la granulométrie (appelé depuis le worker thread).
-        Thread-safe car n'appelle que des méthodes qui créent des objets.
-        
-        Args:
-            center: Position [x, y] ou [x, y, z]
-            radius: Rayon de la particule
-            config: Configuration de la granulométrie
-            
-        Returns:
-            int: Index de l'avatar créé
-        """
-        from ..core.models import AvatarType
-        
-        # Créer l'avatar
+
+    def create_granulo_avatar(
+        self, center: list, radius: float, config: GranuloGeneration
+    ) -> int:
         avatar = Avatar(
             avatar_type=AvatarType(config.avatar_type),
             center=center,
@@ -1037,125 +790,66 @@ class ProjectController(QObject):
             model_name=config.model_name,
             color=config.color,
             origin=AvatarOrigin.GRANULO,
-            radius=radius
+            radius=radius,
         )
-        
-        # L'ajouter au state via add_avatar (thread-safe)
-        idx = self.add_avatar(avatar)
-        
-        return idx
-    
+        return self.add_avatar(avatar)
+
     def finalize_granulo(self, config: GranuloGeneration, indices: List[int]) -> None:
-        """
-        Finalise la génération granulo après que les avatars sont créés.
-        DOIT être appelé depuis le thread principal (UI thread).
-        
-        Args:
-            config: Configuration de la granulométrie
-            indices: Liste des indices d'avatars créés
-        """
-        # Mettre à jour les indices dans la config
-        config.generated_indices = indices
-        
-        # Ajouter la config aux granulo_generations
+        """Finalise la génération granulo (appelé depuis le thread UI)."""
+        config.generated_ids = [
+            self.state.avatars[i].avatar_id for i in indices
+        ]
         if not self._is_loading:
             self.state.granulo_generations.append(config)
-        
-        # Ajouter au groupe si spécifié
         if config.group_name:
-            if config.group_name not in self.state.avatar_groups:
-                self.state.avatar_groups[config.group_name] = []
-            self.state.avatar_groups[config.group_name].extend(indices)
+            self.state.avatar_groups.setdefault(config.group_name, []).extend(
+                config.generated_ids
+            )
 
-    # ========== FACTORY AVATARS ==========
-    def load_factory_avatars_from_json(self, json_path: str = 'factory_avatars_metadata.json') -> List[int]:
-        """
-        Charge les métadonnées des avatars de factory depuis le JSON généré
-        et les ajoute au projet.
-        
-        À appeler après que pre.py a été exécuté et que factory_avatars_metadata.json
-        a été créé.
-        
-        Args:
-            json_path: chemin du fichier JSON de métadonnées (défaut: factory_avatars_metadata.json)
-        
-        Returns:
-            Liste des indices des avatars créés dans state.avatars
-        
-        Raises:
-            FileNotFoundError: Si le fichier JSON n'existe pas
-            ValueError: Si un matériau ou modèle requis manque
-        """
-        from ..core.particle_factory import load_factory_avatars_from_json, create_avatars_from_factory_metadata
-        
-        # Charger le JSON
+    # =========================================================================
+    # FACTORY AVATARS
+    # =========================================================================
+
+    def load_factory_avatars_from_json(
+        self, json_path: str = 'factory_avatars_metadata.json'
+    ) -> List[int]:
+        from ..core.particle_factory import (
+            load_factory_avatars_from_json,
+            create_avatars_from_factory_metadata,
+        )
         try:
             metadata = load_factory_avatars_from_json(json_path)
         except FileNotFoundError as e:
             print(f"⚠ Impossible de charger factory avatars: {e}")
             return []
-        
-        # Créer des objets Avatar
+
         avatars_to_add = create_avatars_from_factory_metadata(metadata)
-        
         if not avatars_to_add:
             print("⚠ Aucun avatar à créer depuis le JSON de factory")
             return []
-        
-        # Ajouter tous les avatars au projet
-        # create_pylmgc=True : indispensable pour que pre.visuAvatars()
-        # (bouton "Visualiser Avatars") les affiche, puisqu'il ne lit que
-        # self._bodies_container (objets pylmgc90 réels), pas state.avatars.
-        # Le viewer 3D, lui, lit directement state.avatars — c'est pourquoi
-        # les avatars y apparaissaient déjà même avec create_pylmgc=False.
+
         was_batch = self._batch_mode
         self._batch_mode = True
-        
         try:
             indices = []
-            skipped = 0
             for avatar in avatars_to_add:
-                try:
-                    idx = self.add_avatar(avatar, create_pylmgc=True)
-                    indices.append(idx)
-                except Exception as exc:
-                    skipped += 1
-                    print(
-                        f"⚠ Avatar de factory ignoré "
-                        f"(matériau='{avatar.material_name}', modèle='{avatar.model_name}') : {exc}"
-                    )
-            
-            # Émettre un seul signal de changement pour tous
+                idx = self.add_avatar(avatar, create_pylmgc=False)
+                indices.append(idx)
             self.state_changed.emit()
-            
-            msg = f'✅ {len(indices)} factory avatar(s) créé(s) et ajouté(s) au projet'
-            if skipped:
-                msg += f' — {skipped} ignoré(s) (voir messages ci-dessus)'
-            print(msg)
+            print(f'✅ {len(indices)} factory avatar(s) créé(s)')
             return indices
         finally:
             self._batch_mode = was_batch
 
-    # ========== BOUCLES FOR ==========
+    # =========================================================================
+    # BOUCLES FOR
+    # =========================================================================
+
     def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
         """
         Génère des éléments selon une boucle For.
-
-        target_type supportés : avatar, material, model, contact_law,
-                                visibility, dof, granulo.
-
-        Pour 'granulo', le template_config doit contenir :
-            dist_idx    (int)  : indice dans state.granulo_generations
-            avatar_type (str)  : ex. "rigidDisk"
-            center      (str)  : expression Python avec 'i' et 'r'
-                                  ex. "[i * r * 2.5, 0.0]"
-            material_name (str)
-            model_name    (str)
-            color         (str, optionnel)
-        Les variables disponibles dans les expressions sont :
-            i  — indice courant (0-based)
-            r  — rayon issu de la distribution
-            + tout le contexte de base (math, sqrt, pi, …)
+        Les avatars produits sont référencés par avatar_id dans generated_refs.
+        Les matériaux/modèles restent référencés par position (inchangé).
         """
         from ..utils.safe_eval import SafeEvaluator
         from ..core.generators import GranuloGenerator
@@ -1165,53 +859,12 @@ class ProjectController(QObject):
         evaluator = SafeEvaluator()
 
         base_context = {
-            'math': math,
-            'sqrt': math.sqrt,
-            'pi':   math.pi,
-            'e':    math.e,
-            'abs':  abs,
-            'min':  min,
-            'max':  max,
-            'sum':  sum,
-            'len':  len,
-            'str':  str,
-            'int':  int,
-            'float': float,
+            'math': math, 'sqrt': math.sqrt, 'pi': math.pi, 'e': math.e,
+            'abs': abs, 'min': min, 'max': max, 'sum': sum, 'len': len,
+            'str': str, 'int': int, 'float': float,
         }
 
-        # ── Cas granulo : un dépôt complet par itération ─────────────────────
-        #
-        # Le template_config décrit un dépôt granulométrique.
-        # Le champ "origin" (expression Python avec 'i') définit le décalage
-        # appliqué à toutes les coordonnées du dépôt après génération pylmgc90.
-        # Les paramètres du conteneur (lx, ly, r, …) restent fixes.
-        #
-        # Champs reconnus :
-        #   nb_particles      int
-        #   radius_min        float
-        #   radius_max        float
-        #   container_type    str   "Box2D" | "Disk2D" | "Couette2D" | "Drum2D"
-        #   container_params  dict  ex. {"lx": 2.0, "ly": 1.0}  — valeurs fixes
-        #   origin            str   expression → liste [ox, oy] ou [ox, oy, oz]
-        #                           ex. "[i * 3.0, 0.0]"
-        #   material_name     str
-        #   model_name        str
-        #   avatar_type       str
-        #   color             str   (optionnel)
-        #   seed              int   (optionnel)
-        #
-        # Exemple :
-        #   {
-        #     "nb_particles": 500,
-        #     "radius_min": 0.01,
-        #     "radius_max": 0.05,
-        #     "container_type": "Box2D",
-        #     "container_params": {"lx": 2.0, "ly": 1.0},
-        #     "origin": "[i * 3.0, 0.0]",
-        #     "material_name": "TDURx",
-        #     "model_name": "rigid",
-        #     "avatar_type": "rigidDisk"
-        #   }
+        # ── Cas granulo ────────────────────────────────────────────────────────
         if for_loop.target_type == 'granulo':
             evaluator.allowed_names = base_context
             start = evaluator.eval_expression(for_loop.start_expr)
@@ -1222,7 +875,6 @@ class ProjectController(QObject):
             loop_var = for_loop.loop_var
 
             def _ev(val, ctx):
-                """Évalue val comme expr Python si c'est une str, sinon retourne tel quel."""
                 if not isinstance(val, str):
                     return val
                 evaluator.allowed_names = ctx
@@ -1231,14 +883,13 @@ class ProjectController(QObject):
                 except Exception:
                     return val
 
-            # Construire la config une seule fois (les params géométriques sont fixes)
             try:
                 base_config = GranuloGeneration(
                     nb_particles   = int(tc.get('nb_particles', 50)),
                     radius_min     = float(tc.get('radius_min', 0.01)),
                     radius_max     = float(tc.get('radius_max', 0.05)),
                     container_type = str(tc.get('container_type', 'Box2D')),
-                    container_params = {k: float(v) for k, v in tc.get('container_params', {}).items()},
+                    container_params={k: float(v) for k, v in tc.get('container_params', {}).items()},
                     material_name  = str(tc.get('material_name', '')),
                     model_name     = str(tc.get('model_name', '')),
                     avatar_type    = str(tc.get('avatar_type', 'rigidDisk')),
@@ -1249,28 +900,23 @@ class ProjectController(QObject):
             except Exception as exc:
                 raise ValueError(f"Erreur dans le template granulo : {exc}")
 
-            # Générer le dépôt de référence une seule fois via pylmgc90
             nb_p, coords_ref, radii_ref = GranuloGenerator.generate(base_config)
 
-            from ..core.models import AvatarType as _AvatarType
-            av_type_obj = _AvatarType(base_config.avatar_type)
+            av_type_obj = AvatarType(base_config.avatar_type)
 
-            prev_batch        = self._batch_mode
-            self._batch_mode  = True
+            prev_batch       = self._batch_mode
+            self._batch_mode = True
             try:
                 current = start
                 while (step > 0 and current < end) or (step < 0 and current > end):
-                    ctx = {**base_context, loop_var: current, 'i': current}
-
-                    # Évaluer l'origine du dépôt
-                    origin_raw = tc.get('origin', '[0.0, 0.0]')
-                    origin     = list(_ev(origin_raw, ctx))
-
-                    # Créer les avatars avec coordonnées décalées
+                    ctx    = {**base_context, loop_var: current, 'i': current}
+                    origin = list(_ev(tc.get('origin', '[0.0, 0.0]'), ctx))
                     for k in range(nb_p):
                         coord  = coords_ref[k].tolist()
-                        center = [coord[j] + (origin[j] if j < len(origin) else 0.0)
-                                  for j in range(len(coord))]
+                        center = [
+                            coord[j] + (origin[j] if j < len(origin) else 0.0)
+                            for j in range(len(coord))
+                        ]
                         avatar = Avatar(
                             avatar_type   = av_type_obj,
                             center        = center,
@@ -1282,22 +928,24 @@ class ProjectController(QObject):
                         )
                         idx = self.add_avatar(avatar)
                         generated_indices.append(idx)
-
                     current += step
             finally:
                 self._batch_mode = prev_batch
 
-            for_loop.generated_indices = generated_indices
+            # Stocker les ids stables
+            for_loop.generated_refs = [
+                self.state.avatars[idx].avatar_id for idx in generated_indices
+            ]
             if not self._is_loading:
                 self.state.for_loops.append(for_loop)
-
             if for_loop.group_name:
-                self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(generated_indices)
-
-            self.state_changed.emit()   # un seul emit pour toute la boucle
+                self.state.avatar_groups.setdefault(
+                    for_loop.group_name, []
+                ).extend(for_loop.generated_refs)
+            self.state_changed.emit()
             return generated_indices
 
-        # ── Boucle For classique (range) ──────────────────────────────────────
+        # ── Boucle For classique ───────────────────────────────────────────────
         evaluator.allowed_names = base_context
         start = evaluator.eval_expression(for_loop.start_expr)
         end   = evaluator.eval_expression(for_loop.end_expr)
@@ -1316,8 +964,10 @@ class ProjectController(QObject):
                     try:
                         evaluated_config[key] = evaluator.eval_expression(value)
                     except (ValueError, NameError, SyntaxError):
-                        if any(op in value for op in ['+', '-', '*', '/', '(', '[',
-                                                       'str(', 'int(', 'float(', 'math.']):
+                        if any(op in value for op in [
+                            '+', '-', '*', '/', '(', '[',
+                            'str(', 'int(', 'float(', 'math.',
+                        ]):
                             raise
                         else:
                             evaluated_config[key] = value
@@ -1326,20 +976,20 @@ class ProjectController(QObject):
 
             if for_loop.target_type == 'avatar':
                 avatar = Avatar(
-                    avatar_type=AvatarType(evaluated_config['avatar_type']),
-                    center=evaluated_config['center'],
-                    material_name=evaluated_config.get('material_name', 'TDURx'),
-                    model_name=evaluated_config.get('model_name', 'rigid'),
-                    color=evaluated_config.get('color', 'BLUEx'),
-                    origin=AvatarOrigin.LOOP,
-                    radius=evaluated_config.get('radius'),
-                    axis=evaluated_config.get('axis'),
-                    vertices=evaluated_config.get('vertices'),
-                    nb_vertices=evaluated_config.get('nb_vertices'),
-                    generation_type=evaluated_config.get('generation_type'),
-                    is_hollow=evaluated_config.get('is_hollow', False),
-                    wall_params=evaluated_config.get('wall_params'),
-                    contactors=evaluated_config.get('contactors')
+                    avatar_type   = AvatarType(evaluated_config['avatar_type']),
+                    center        = evaluated_config['center'],
+                    material_name = evaluated_config.get('material_name', 'TDURx'),
+                    model_name    = evaluated_config.get('model_name', 'rigid'),
+                    color         = evaluated_config.get('color', 'BLUEx'),
+                    origin        = AvatarOrigin.LOOP,
+                    radius        = evaluated_config.get('radius'),
+                    axis          = evaluated_config.get('axis'),
+                    vertices      = evaluated_config.get('vertices'),
+                    nb_vertices   = evaluated_config.get('nb_vertices'),
+                    generation_type = evaluated_config.get('generation_type'),
+                    is_hollow     = evaluated_config.get('is_hollow', False),
+                    wall_params   = evaluated_config.get('wall_params'),
+                    contactors    = evaluated_config.get('contactors'),
                 )
                 idx = self.add_avatar(avatar)
                 generated_indices.append(idx)
@@ -1347,311 +997,275 @@ class ProjectController(QObject):
             elif for_loop.target_type == 'material':
                 from ..core.models import Material, MaterialType
                 material = Material(
-                    name=evaluated_config['name'],
-                    material_type=MaterialType(evaluated_config.get('material_type', 'RIGID')),
-                    density=evaluated_config.get('density', 2800),
-                    properties=evaluated_config.get('properties', {})
+                    name          = evaluated_config['name'],
+                    material_type = MaterialType(evaluated_config.get('material_type', 'RIGID')),
+                    density       = evaluated_config.get('density', 2800),
+                    properties    = evaluated_config.get('properties', {}),
                 )
                 self.add_material(material)
-                idx = len(self.state.materials) - 1
-                generated_indices.append(idx)
+                generated_indices.append(len(self.state.materials) - 1)
 
             elif for_loop.target_type == 'model':
                 from ..core.models import Model
                 model = Model(
-                    name=evaluated_config['name'],
-                    physics=evaluated_config.get('physics', 'MECAx'),
-                    element=evaluated_config.get('element', 'Rxx2D'),
-                    dimension=evaluated_config.get('dimension', 2),
-                    options=evaluated_config.get('options', {})
+                    name      = evaluated_config['name'],
+                    physics   = evaluated_config.get('physics', 'MECAx'),
+                    element   = evaluated_config.get('element', 'Rxx2D'),
+                    dimension = evaluated_config.get('dimension', 2),
+                    options   = evaluated_config.get('options', {}),
                 )
                 self.add_model(model)
-                idx = len(self.state.models) - 1
-                generated_indices.append(idx)
+                generated_indices.append(len(self.state.models) - 1)
 
             current += step
 
-        for_loop.generated_indices = generated_indices
+        # Stocker refs : avatar_id pour 'avatar', position pour material/model
+        if for_loop.target_type == 'avatar':
+            for_loop.generated_refs = [
+                self.state.avatars[idx].avatar_id for idx in generated_indices
+            ]
+        else:
+            for_loop.generated_refs = generated_indices
+
         if not self._is_loading:
             self.state.for_loops.append(for_loop)
 
         if for_loop.group_name and for_loop.target_type in ('avatar', 'granulo'):
-            self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(generated_indices)
+            self.state.avatar_groups.setdefault(
+                for_loop.group_name, []
+            ).extend(for_loop.generated_refs)
 
         return generated_indices
-    
+
     def update_for_loop(self, index: int, for_loop: ForLoop) -> None:
-        """
-        Met à jour une boucle For existante et régénère ses éléments.
-        
-        Args:
-            index: Index de la boucle For
-            for_loop: Nouvelle configuration
-            
-        Raises:
-            ValueError: Si index invalide
-        """
         if not (0 <= index < len(self.state.for_loops)):
             raise ValueError(f"Index {index} invalide")
-        
-        # Récupérer l'ancienne boucle
+
         old_for_loop = self.state.for_loops[index]
-        
-        # Supprimer les anciens éléments générés (en ordre inverse)
-        for elem_idx in sorted(old_for_loop.generated_indices, reverse=True):
-            if old_for_loop.target_type == 'avatar':
-                self.remove_avatar(elem_idx)
-            elif old_for_loop.target_type == 'material':
+
+        # Supprimer les anciens éléments générés
+        if old_for_loop.target_type == 'avatar':
+            for aid in old_for_loop.generated_refs:
+                res = self._find_avatar_by_id(aid)
+                if res:
+                    self.remove_avatar(res[0])
+        elif old_for_loop.target_type == 'material':
+            for elem_idx in sorted(old_for_loop.generated_refs, reverse=True):
                 if elem_idx < len(self.state.materials):
-                    mat = self.state.materials[elem_idx]
-                    self.remove_material(mat.name)
-            elif old_for_loop.target_type == 'model':
+                    self.remove_material(self.state.materials[elem_idx].name)
+        elif old_for_loop.target_type == 'model':
+            for elem_idx in sorted(old_for_loop.generated_refs, reverse=True):
                 if elem_idx < len(self.state.models):
-                    mod = self.state.models[elem_idx]
-                    self.remove_model(mod.name)
-        
-        # Mettre à jour la boucle
+                    self.remove_model(self.state.models[elem_idx].name)
+
         self.state.for_loops[index] = for_loop
-        
-        # Régénérer les éléments avec la même logique que generate_for_loop
+
+        # Régénérer (copie de la logique de generate_for_loop, sans append)
         from ..utils.safe_eval import SafeEvaluator
         import math
-        
+
         generated_indices = []
-        
-        # Créer l'évaluateur
         evaluator = SafeEvaluator()
-        
-        # Contexte de base
         base_context = {
-            'math': math,
-            'sqrt': math.sqrt,
-            'pi': math.pi,
-            'e': math.e,
-            'abs': abs,
-            'min': min,
-            'max': max,
-            'sum': sum,
-            'len': len,
-            'str': str,
-            'int': int,
-            'float': float,
+            'math': math, 'sqrt': math.sqrt, 'pi': math.pi, 'e': math.e,
+            'abs': abs, 'min': min, 'max': max, 'sum': sum, 'len': len,
+            'str': str, 'int': int, 'float': float,
         }
-        
-        # Évaluer start, end, step
         evaluator.allowed_names = base_context
         start = evaluator.eval_expression(for_loop.start_expr)
-        end = evaluator.eval_expression(for_loop.end_expr)
-        step = evaluator.eval_expression(for_loop.step_expr)
-        
-        # Boucle For
+        end   = evaluator.eval_expression(for_loop.end_expr)
+        step  = evaluator.eval_expression(for_loop.step_expr)
         loop_var = for_loop.loop_var
-        current = start
-        
+        current  = start
+
         while (step > 0 and current < end) or (step < 0 and current > end):
-            # Contexte avec variable de boucle
             context = {**base_context, loop_var: current}
             evaluator.allowed_names = context
-            
-            # Évaluer le template
             evaluated_config = {}
             for key, value in for_loop.template_config.items():
                 if isinstance(value, str):
-                    # Évaluer l'expression
                     evaluated_config[key] = evaluator.eval_expression(value)
                 else:
                     evaluated_config[key] = value
-            
-            # Créer l'élément selon le type
+
             if for_loop.target_type == 'avatar':
                 avatar = Avatar(
-                    avatar_type=AvatarType(evaluated_config['avatar_type']),
-                    center=evaluated_config['center'],
-                    material_name=evaluated_config.get('material_name', 'TDURx'),
-                    model_name=evaluated_config.get('model_name', 'rigid'),
-                    color=evaluated_config.get('color', 'BLUEx'),
-                    origin=AvatarOrigin.LOOP,
-                    radius=evaluated_config.get('radius'),
-                    axis=evaluated_config.get('axis'),
-                    vertices=evaluated_config.get('vertices'),
-                    nb_vertices=evaluated_config.get('nb_vertices'),
-                    generation_type=evaluated_config.get('generation_type'),
-                    is_hollow=evaluated_config.get('is_hollow', False),
-                    wall_params=evaluated_config.get('wall_params'),
-                    contactors=evaluated_config.get('contactors')
+                    avatar_type   = AvatarType(evaluated_config['avatar_type']),
+                    center        = evaluated_config['center'],
+                    material_name = evaluated_config.get('material_name', 'TDURx'),
+                    model_name    = evaluated_config.get('model_name', 'rigid'),
+                    color         = evaluated_config.get('color', 'BLUEx'),
+                    origin        = AvatarOrigin.LOOP,
+                    radius        = evaluated_config.get('radius'),
+                    axis          = evaluated_config.get('axis'),
+                    vertices      = evaluated_config.get('vertices'),
+                    nb_vertices   = evaluated_config.get('nb_vertices'),
+                    generation_type = evaluated_config.get('generation_type'),
+                    is_hollow     = evaluated_config.get('is_hollow', False),
+                    wall_params   = evaluated_config.get('wall_params'),
+                    contactors    = evaluated_config.get('contactors'),
                 )
                 idx = self.add_avatar(avatar)
                 generated_indices.append(idx)
-            
             elif for_loop.target_type == 'material':
                 from ..core.models import Material, MaterialType
                 material = Material(
-                    name=evaluated_config['name'],
-                    material_type=MaterialType(evaluated_config.get('material_type', 'RIGID')),
-                    density=evaluated_config.get('density', 2800),
-                    properties=evaluated_config.get('properties', {})
+                    name          = evaluated_config['name'],
+                    material_type = MaterialType(evaluated_config.get('material_type', 'RIGID')),
+                    density       = evaluated_config.get('density', 2800),
+                    properties    = evaluated_config.get('properties', {}),
                 )
                 self.add_material(material)
-                # Pour les matériaux, on stocke l'index dans la liste
-                idx = len(self.state.materials) - 1
-                generated_indices.append(idx)
-            
+                generated_indices.append(len(self.state.materials) - 1)
             elif for_loop.target_type == 'model':
                 from ..core.models import Model
                 model = Model(
-                    name=evaluated_config['name'],
-                    physics=evaluated_config.get('physics', 'MECAx'),
-                    element=evaluated_config.get('element', 'Rxx2D'),
-                    dimension=evaluated_config.get('dimension', 2),
-                    options=evaluated_config.get('options', {})
+                    name      = evaluated_config['name'],
+                    physics   = evaluated_config.get('physics', 'MECAx'),
+                    element   = evaluated_config.get('element', 'Rxx2D'),
+                    dimension = evaluated_config.get('dimension', 2),
+                    options   = evaluated_config.get('options', {}),
                 )
                 self.add_model(model)
-                # Pour les modèles, on stocke l'index dans la liste
-                idx = len(self.state.models) - 1
-                generated_indices.append(idx)
-            
+                generated_indices.append(len(self.state.models) - 1)
+
             current += step
-        
-        for_loop.generated_indices = generated_indices
-        
-        # Mettre à jour le groupe si spécifié (uniquement pour avatars)
-        if old_for_loop.group_name and old_for_loop.group_name in self.state.avatar_groups:
-            # Retirer les anciens indices du groupe
-            self.state.avatar_groups[old_for_loop.group_name] = [
-                i for i in self.state.avatar_groups[old_for_loop.group_name]
-                if i not in old_for_loop.generated_indices
+
+        if for_loop.target_type == 'avatar':
+            for_loop.generated_refs = [
+                self.state.avatars[idx].avatar_id for idx in generated_indices
             ]
-        
+        else:
+            for_loop.generated_refs = generated_indices
+
+        # Mettre à jour les groupes
+        if old_for_loop.group_name and old_for_loop.group_name in self.state.avatar_groups:
+            if old_for_loop.target_type == 'avatar':
+                old_ids = set(old_for_loop.generated_refs)
+                self.state.avatar_groups[old_for_loop.group_name] = [
+                    aid for aid in self.state.avatar_groups[old_for_loop.group_name]
+                    if aid not in old_ids
+                ]
+
         if for_loop.group_name and for_loop.target_type == 'avatar':
-            if for_loop.group_name not in self.state.avatar_groups:
-                self.state.avatar_groups[for_loop.group_name] = []
-            self.state.avatar_groups[for_loop.group_name].extend(generated_indices)
-    
+            self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(
+                for_loop.generated_refs
+            )
+
     def remove_for_loop(self, index: int) -> bool:
-        """
-        Supprime une boucle For ET ses éléments générés.
-        
-        Args:
-            index: Index de la boucle For
-            
-        Returns:
-            True si supprimé
-        """
         if not (0 <= index < len(self.state.for_loops)):
             return False
-        
         for_loop = self.state.for_loops[index]
-        
-        # Supprimer les éléments générés (en ordre inverse)
-        for elem_idx in sorted(for_loop.generated_indices, reverse=True):
-            if for_loop.target_type == 'avatar':
-                self.remove_avatar(elem_idx)
-            elif for_loop.target_type == 'material':
+
+        if for_loop.target_type == 'avatar':
+            for aid in for_loop.generated_refs:
+                res = self._find_avatar_by_id(aid)
+                if res:
+                    self.remove_avatar(res[0])
+        elif for_loop.target_type == 'material':
+            for elem_idx in sorted(for_loop.generated_refs, reverse=True):
                 if elem_idx < len(self.state.materials):
-                    mat = self.state.materials[elem_idx]
-                    self.remove_material(mat.name)
-            elif for_loop.target_type == 'model':
+                    self.remove_material(self.state.materials[elem_idx].name)
+        elif for_loop.target_type == 'model':
+            for elem_idx in sorted(for_loop.generated_refs, reverse=True):
                 if elem_idx < len(self.state.models):
-                    mod = self.state.models[elem_idx]
-                    self.remove_model(mod.name)
-        
-        # Supprimer la boucle
+                    self.remove_model(self.state.models[elem_idx].name)
+
         self.state.for_loops.pop(index)
         return True
-    
+
     def get_for_loop(self, index: int) -> Optional[ForLoop]:
-        """Retourne une boucle For par son index"""
         if 0 <= index < len(self.state.for_loops):
             return self.state.for_loops[index]
         return None
-    # ========== POST-TRAITEMENT ==========
-    def add_postpro_command(self, command: PostProCommand) -> None:
-        """Ajoute une commande post-pro"""
-        # Créer l'objet pylmgc90
+
+    # =========================================================================
+    # POST-TRAITEMENT
+    # =========================================================================
+
+    def add_postpro_command(self, command) -> None:
         rigid_set = None
-        
+
         if command.target_type == 'avatar':
-            idx = command.target_value
-            if 0 <= idx < len(self._pylmgc_bodies):
-                body = self._pylmgc_bodies[idx]
-                if body is not None:
-                    rigid_set = [body]
-        
+            # target_value est un avatar_id
+            res = self._find_avatar_by_id(command.target_value)
+            if res:
+                idx, _ = res
+                if 0 <= idx < len(self._pylmgc_bodies):
+                    body = self._pylmgc_bodies[idx]
+                    if body is not None:
+                        rigid_set = [body]
+
         elif command.target_type == 'group':
             group_name = command.target_value
-            indices = self.state.avatar_groups.get(group_name, [])
-            rigid_set = [self._pylmgc_bodies[i] for i in indices
-                        if 0 <= i < len(self._pylmgc_bodies) and self._pylmgc_bodies[i] is not None]
-        
-        # Créer la commande
+            avatar_ids = self.state.avatar_groups.get(group_name, [])
+            rigid_set  = []
+            for aid in avatar_ids:
+                res = self._find_avatar_by_id(aid)
+                if res:
+                    idx, _ = res
+                    if (0 <= idx < len(self._pylmgc_bodies)
+                            and self._pylmgc_bodies[idx] is not None):
+                        rigid_set.append(self._pylmgc_bodies[idx])
+
         if rigid_set:
             cmd = pre.postpro_command(
-                name=command.name, 
-                step=command.step, 
-                rigid_set=rigid_set
+                name=command.name, step=command.step, rigid_set=rigid_set
             )
         else:
-            cmd = pre.postpro_command(
-                name=command.name, 
-                step=command.step
-            )
-        
+            cmd = pre.postpro_command(name=command.name, step=command.step)
+
         self._postpro_container.addCommand(cmd)
         self.state.postpro_commands.append(command)
-    
+
     def remove_postpro_command(self, index: int) -> bool:
-        """Supprime une commande post-pro"""
         if 0 <= index < len(self.state.postpro_commands):
             self.state.postpro_commands.pop(index)
             return True
         return False
-    def update_postpro_command(self, index: int, command: PostProCommand) -> None:
-        """Met à jour une commande post-pro"""
+
+    def update_postpro_command(self, index: int, command) -> None:
         if not (0 <= index < len(self.state.postpro_commands)):
             raise ValueError(f"Index {index} invalide")
-        
-        # Reconstruire toutes les commandes
         self._postpro_container = pre.postpro_commands()
-        
-        # Mettre à jour état
         self.state.postpro_commands[index] = command
-        
-        # Recréer toutes
         for cmd in self.state.postpro_commands:
             rigid_set = None
-            
             if cmd.target_type == 'avatar':
-                idx = cmd.target_value
-                if 0 <= idx < len(self._pylmgc_bodies):
-                    rigid_set = [self._pylmgc_bodies[idx]]
-            
+                res = self._find_avatar_by_id(cmd.target_value)
+                if res:
+                    idx, _ = res
+                    if 0 <= idx < len(self._pylmgc_bodies):
+                        rigid_set = [self._pylmgc_bodies[idx]]
             elif cmd.target_type == 'group':
                 group_name = cmd.target_value
-                indices = self.state.avatar_groups.get(group_name, [])
-                rigid_set = [self._pylmgc_bodies[i] for i in indices 
-                            if 0 <= i < len(self._pylmgc_bodies)]
-            
+                avatar_ids = self.state.avatar_groups.get(group_name, [])
+                rigid_set  = []
+                for aid in avatar_ids:
+                    res = self._find_avatar_by_id(aid)
+                    if res:
+                        idx, _ = res
+                        if (0 <= idx < len(self._pylmgc_bodies)
+                                and self._pylmgc_bodies[idx] is not None):
+                            rigid_set.append(self._pylmgc_bodies[idx])
             if rigid_set:
-                cmd_obj = pre.postpro_command(name=cmd.name, step=cmd.step, rigid_set=rigid_set)
+                cmd_obj = pre.postpro_command(
+                    name=cmd.name, step=cmd.step, rigid_set=rigid_set
+                )
             else:
                 cmd_obj = pre.postpro_command(name=cmd.name, step=cmd.step)
-            
             self._postpro_container.addCommand(cmd_obj)
 
-    def get_postpro_command(self, index: int) -> Optional[PostProCommand]:
-        """Retourne une commande post-pro par son index"""
+    def get_postpro_command(self, index: int):
         if 0 <= index < len(self.state.postpro_commands):
             return self.state.postpro_commands[index]
         return None
-    # ========== GÉNÉRATION SCRIPT/DATBOX ==========
-    
+
+    # =========================================================================
+    # GÉNÉRATION DATBOX
+    # =========================================================================
+
     def generate_datbox(self, output_path: Path) -> None:
-        """
-        Génère le fichier DATBOX.
-        
-        Args:
-            output_path: Chemin du fichier de sortie
-        """
         pre.writeDatbox(
             dim=self.state.dimension,
             mats=self._materials_container,
@@ -1660,108 +1274,156 @@ class ProjectController(QObject):
             tacts=self._contact_laws_container,
             sees=self._visibility_container,
             post=self._postpro_container,
-            datbox_path=str(output_path)
+            datbox_path=str(output_path),
         )
-    
-    # ========== UTILITAIRES PRIVÉS ==========
-    
+
+    # =========================================================================
+    # UTILITAIRES PRIVÉS
+    # =========================================================================
+
+    def _restore_factory_avatars(self) -> None:
+        """
+        Restaure les factory avatars sauvegardés après _rebuild_pylmgc_objects.
+
+        Pourquoi après et pas avant ?
+        ─────────────────────────────
+        _rebuild_pylmgc_objects reconstruit state.avatars + _pylmgc_bodies en
+        parallèle (1 entrée pylmgc par avatar). Si on ajoutait les factory
+        avatars avant le rebuild, les boucles/granulos ajoutés ensuite
+        décaleraient les indices et _pylmgc_bodies[i] ne correspondrait plus
+        à state.avatars[i] pour i > nombre d'avatars manuels.
+
+        En ajoutant les factory avatars APRÈS, on garantit :
+          state.avatars     = [manuels | loops | granulos | factory]
+          _pylmgc_bodies    = [manuels | loops | granulos | None…  ]
+        L'alignement 1:1 est maintenu. Les None sont gérés proprement par
+        toutes les méthodes du contrôleur (check `if body is not None`).
+        """
+        factory_avs = getattr(self.state, '_factory_avatars_staged', [])
+        if not factory_avs:
+            return
+
+        for av in factory_avs:
+            self.state.avatars.append(av)
+            # Pas d'objet pylmgc pour les factory avatars (ils viennent du
+            # DATBOX généré par pre.py) — placeholder None pour l'alignement
+            self._pylmgc_bodies.append(None)
+
+        # Nettoyer le champ temporaire
+        self.state._factory_avatars_staged = []
+
     def _reset_containers(self) -> None:
-        """Réinitialise tous les conteneurs"""
         self._materials_container = pre.materials()
-        self._models_container = pre.models()
-        self._bodies_container = pre.avatars()
+        self._models_container    = pre.models()
+        self._bodies_container    = pre.avatars()
         self._contact_laws_container = pre.tact_behavs()
         self._visibility_container = pre.see_tables()
-        self._postpro_container = pre.postpro_commands()
-        
+        self._postpro_container   = pre.postpro_commands()
         self._pylmgc_materials.clear()
         self._pylmgc_models.clear()
         self._pylmgc_bodies.clear()
         self._pylmgc_laws.clear()
-    
+
     def _rebuild_pylmgc_objects(self) -> None:
-        """Reconstruit tous les objets pylmgc90 depuis l'état"""
+        """Reconstruit tous les objets pylmgc90 depuis l'état chargé."""
         self._reset_containers()
-        
+
         # Recréer matériaux
         for mat in self.state.materials:
             mat_obj = LMGC90Bridge.create_material(mat)
             self._materials_container.addMaterial(mat_obj)
             self._pylmgc_materials[mat.name] = mat_obj
-        
+
         # Recréer modèles
         for mod in self.state.models:
             mod_obj = LMGC90Bridge.create_model(mod)
             self._models_container.addModel(mod_obj)
             self._pylmgc_models[mod.name] = mod_obj
-        
+
         # Recréer avatars manuels
         regeneration_errors = []
         manual_avatars = [av for av in self.state.avatars if av.origin == AvatarOrigin.MANUAL]
         for avatar in manual_avatars:
             mat_obj = self._pylmgc_materials.get(avatar.material_name)
             mod_obj = self._pylmgc_models.get(avatar.model_name)
-            
             if not mat_obj:
-                raise ValueError(f"Matériau '{avatar.material_name}' introuvable lors de la reconstruction")
+                raise ValueError(
+                    f"Matériau '{avatar.material_name}' introuvable lors de la reconstruction"
+                )
             if not mod_obj:
-                raise ValueError(f"Modèle '{avatar.model_name}' introuvable lors de la reconstruction")
-            
+                raise ValueError(
+                    f"Modèle '{avatar.model_name}' introuvable lors de la reconstruction"
+                )
             body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
             if body_obj is None:
-                # MESH_DEFORMABLE sans mesh_params (ancien fichier) — on l'ignore
                 self._pylmgc_bodies.append(None)
                 regeneration_errors.append(
                     f"Corps déformable '{avatar.material_name}/{avatar.model_name}' : "
-                    f"mesh_params absent (fichier créé avant la v2). "
-                    f"Recréez le corps via le wizard."
+                    f"mesh_params absent — recréez-le via le wizard."
                 )
                 continue
             self._bodies_container.addAvatar(body_obj)
             self._pylmgc_bodies.append(body_obj)
-        
-        # Régénérer boucles
+
+        # ── Nettoyer les groupes AVANT régénération ──────────────────────────
+        # On retire uniquement les ids d'avatars qui n'existent plus ET qui ne
+        # sont pas des factory avatars en attente de restauration.
+        # Sans ce filtre, les factory avatar_ids (ex: "factory_…") seraient
+        # supprimés des groupes car les factory avatars ne sont pas encore
+        # dans state.avatars à ce stade.
+        existing_ids    = {av.avatar_id for av in self.state.avatars}
+        staged_fac_ids  = {av.avatar_id
+                           for av in getattr(self.state, '_factory_avatars_staged', [])}
+        valid_ids = existing_ids | staged_fac_ids
+        for grp_name in list(self.state.avatar_groups.keys()):
+            self.state.avatar_groups[grp_name] = [
+                aid for aid in self.state.avatar_groups[grp_name]
+                if aid in valid_ids
+            ]
+
+        # Régénérer boucles (utilise model_avatar_id)
         for i, loop in enumerate(self.state.loops):
             try:
-                if loop.model_avatar_index >= len(self.state.avatars):
-                    raise ValueError(f"Index modèle {loop.model_avatar_index} invalide")
+                if not loop.model_avatar_id:
+                    raise ValueError("Avatar modèle non défini (model_avatar_id vide)")
                 self.generate_loop(loop)
             except Exception as e:
-                regeneration_errors.append(f"Boucle {i+1}: {str(e)}")
-        
+                regeneration_errors.append(f"Boucle {i + 1}: {e}")
+
         # Régénérer granulo
         for i, granulo in enumerate(self.state.granulo_generations):
             try:
                 self.generate_granulo(granulo)
             except Exception as e:
-                regeneration_errors.append(f"Granulo {i+1}: {str(e)}")
+                regeneration_errors.append(f"Granulo {i + 1}: {e}")
 
-        # Régénérer boucles For (template + éléments)
+        # Régénérer boucles For
         for i, for_loop in enumerate(self.state.for_loops):
             try:
                 self.generate_for_loop(for_loop)
             except Exception as e:
-                regeneration_errors.append(f"Boucle For {i+1}: {str(e)}")
+                regeneration_errors.append(f"Boucle For {i + 1}: {e}")
 
         if regeneration_errors:
-            # Stocker pour affichage ultérieur dans l'UI
-            self.state.load_warnings = regeneration_errors
+            existing = getattr(self.state, 'load_warnings', [])
+            self.state.load_warnings = existing + regeneration_errors
 
         # Recréer lois de contact
         for law in self.state.contact_laws:
             law_obj = LMGC90Bridge.create_contact_law(law)
             self._contact_laws_container.addBehav(law_obj)
             self._pylmgc_laws[law.name] = law_obj
-        
+
         # Recréer visibilité
         for rule in self.state.visibility_rules:
             behavior_obj = self._pylmgc_laws.get(rule.behavior_name)
             if not behavior_obj:
-                raise ValueError(f"Loi '{rule.behavior_name}' introuvable lors de la reconstruction")
-            
+                raise ValueError(
+                    f"Loi '{rule.behavior_name}' introuvable lors de la reconstruction"
+                )
             rule_obj = LMGC90Bridge.create_visibility_rule(rule, behavior_obj)
             self._visibility_container.addSeeTable(rule_obj)
-        
+
         # Réappliquer opérations DOF
         for op in self.state.operations:
             self.apply_dof_operation(op)

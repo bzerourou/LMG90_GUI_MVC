@@ -505,20 +505,21 @@ class LoopTab(BaseTab):
                 )
             
             else:
-                model_idx = self.avatar_combo.currentData()
-                if model_idx is None:
+                # avatar_combo stocke désormais un avatar_id (str)
+                model_avatar_id = self.avatar_combo.currentData()
+                if model_avatar_id is None:
                     raise ValidationError("Sélectionnez un avatar modèle")
-                
+
                 count = self.eval_int(self.count_input.text(), default=10, field_name="Nombre")
                 radius = self.eval_float(self.radius_input.text(), default=2.0, field_name="Rayon")
                 step = self.eval_float(self.step_input.text(), default=1.0, field_name="Pas")
                 spiral_factor = self.eval_float(self.spiral_input.text(), default=0.1, field_name="Facteur spirale")
                 offset_x = self.eval_float(self.offset_x_input.text(), default=0.0, field_name="Offset X")
                 offset_y = self.eval_float(self.offset_y_input.text(), default=0.0, field_name="Offset Y")
-                
+
                 loop = Loop(
                     loop_type=loop_type,
-                    model_avatar_index=model_idx,
+                    model_avatar_id=model_avatar_id,
                     count=count,
                     radius=radius,
                     step=step,
@@ -528,7 +529,7 @@ class LoopTab(BaseTab):
                     invert_axis=self.invert_check.isChecked(),
                     group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None
                 )
-                
+
                 indices = self.controller.generate_loop(loop)
                 self.loop_generated.emit()
                 QMessageBox.information(
@@ -719,20 +720,20 @@ class LoopTab(BaseTab):
             
             if self.current_edit_index < total_loops:
                 # Mise à jour boucle classique
-                model_idx = self.avatar_combo.currentData()
-                if model_idx is None:
+                model_avatar_id = self.avatar_combo.currentData()
+                if model_avatar_id is None:
                     raise ValidationError("Sélectionnez un avatar modèle")
-                
+
                 count = self.eval_int(self.count_input.text(), default=10, field_name="Nombre")
                 radius = self.eval_float(self.radius_input.text(), default=2.0, field_name="Rayon")
                 step = self.eval_float(self.step_input.text(), default=1.0, field_name="Pas")
                 spiral_factor = self.eval_float(self.spiral_input.text(), default=0.1, field_name="Facteur spirale")
                 offset_x = self.eval_float(self.offset_x_input.text(), default=0.0, field_name="Offset X")
                 offset_y = self.eval_float(self.offset_y_input.text(), default=0.0, field_name="Offset Y")
-                
+
                 loop = Loop(
                     loop_type=loop_type,
-                    model_avatar_index=model_idx,
+                    model_avatar_id=model_avatar_id,
                     count=count,
                     radius=radius,
                     step=step,
@@ -742,7 +743,7 @@ class LoopTab(BaseTab):
                     invert_axis=self.invert_check.isChecked(),
                     group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None
                 )
-                
+
                 self.controller.update_loop(self.current_edit_index, loop)
                 self.loop_updated.emit()
                 QMessageBox.information(self, "Succès", "✅ Boucle modifiée")
@@ -790,9 +791,9 @@ class LoopTab(BaseTab):
             self.type_combo.setCurrentText(loop.loop_type)
             self.count_input.setText(str(loop.count))
             
-            # Trouver l'avatar modèle
+            # Trouver l'avatar modèle par son avatar_id stable
             for i in range(self.avatar_combo.count()):
-                if self.avatar_combo.itemData(i) == loop.model_avatar_index:
+                if self.avatar_combo.itemData(i) == loop.model_avatar_id:
                     self.avatar_combo.setCurrentIndex(i)
                     break
             
@@ -939,9 +940,10 @@ class LoopTab(BaseTab):
         
         if index < total_loops:
             loop = self.controller.state.loops[index]
-            avatar_idx = loop.model_avatar_index
-            avatar_label = f"#{avatar_idx}" if avatar_idx < len(self.controller.state.avatars) else "Inconnu"
-            
+            _id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+            _av_idx    = _id_to_idx.get(loop.model_avatar_id)
+            avatar_label = f"#{_av_idx}" if _av_idx is not None else "Inconnu"
+
             info = f"<h3>Boucle #{index + 1}</h3>"
             info += f"<b>Type :</b> {loop.loop_type}<br>"
             info += f"<b>Nombre d'avatars :</b> {loop.count}<br>"
@@ -964,7 +966,7 @@ class LoopTab(BaseTab):
                 info += f"<b>Fin :</b> {for_loop.end_expr}<br>"
                 info += f"<b>Step :</b> {for_loop.step_expr}<br>"
                 info += f"<b>Type cible :</b> {for_loop.target_type}<br>"
-                info += f"<b>Éléments générés :</b> {len(for_loop.generated_indices)}<br>"
+                info += f"<b>Éléments générés :</b> {len(for_loop.generated_refs)}<br>"
                 info += f"<b>Groupe :</b> {for_loop.group_name or 'Aucun'}<br>"
                 info += f"<br><b>Template :</b><br><pre>{json.dumps(for_loop.template_config, indent=2)}</pre>"
         
@@ -1013,7 +1015,8 @@ class LoopTab(BaseTab):
         for i, avatar in enumerate(self.controller.state.avatars):
             if avatar.origin == AvatarOrigin.MANUAL:
                 label = f"#{i} — {avatar.avatar_type.value} ({avatar.color})"
-                self.avatar_combo.addItem(label, i)
+                # Stocker l'avatar_id stable (str) et non la position (int)
+                self.avatar_combo.addItem(label, avatar.avatar_id)
         if self.avatar_combo.count() == 0:
             self.avatar_combo.addItem("(Aucun avatar manuel disponible)", None)
 
@@ -1046,13 +1049,12 @@ class LoopTab(BaseTab):
         # ── Arbre ─────────────────────────────────────────────────────────────
         self.tree.clear()
 
+        # Table de résolution avatar_id → index pour l'affichage
+        _id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+
         for idx, loop in enumerate(self.controller.state.loops):
-            avatar_idx   = loop.model_avatar_index
-            avatar_label = (
-                f"#{avatar_idx}"
-                if avatar_idx < len(self.controller.state.avatars)
-                else "Inconnu"
-            )
+            _av_idx = _id_to_idx.get(loop.model_avatar_id)
+            avatar_label = f"#{_av_idx}" if _av_idx is not None else "Inconnu"
             item = QTreeWidgetItem([
                 str(idx + 1),
                 loop.loop_type,
@@ -1080,7 +1082,7 @@ class LoopTab(BaseTab):
                     item = QTreeWidgetItem([
                         str(global_idx + 1),
                         "For (granulo)",
-                        str(len(for_loop.generated_indices)),
+                        str(len(for_loop.generated_refs)),
                         detail,
                         for_loop.group_name or "—",
                     ])
@@ -1089,7 +1091,7 @@ class LoopTab(BaseTab):
                     item = QTreeWidgetItem([
                         str(global_idx + 1),
                         f"For ({for_loop.target_type})",
-                        str(len(for_loop.generated_indices)),
+                        str(len(for_loop.generated_refs)),
                         f"{for_loop.loop_var}: {for_loop.start_expr}→{for_loop.end_expr}",
                         for_loop.group_name or "—",
                     ])

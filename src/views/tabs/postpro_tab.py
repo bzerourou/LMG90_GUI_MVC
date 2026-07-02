@@ -172,15 +172,20 @@ class PostProTab(QWidget):
             self.command_deleted.emit()
     def _refresh_tree(self):
         """Rafraîchit l'arbre des commandes"""
+        # Table de résolution avatar_id → index pour l'affichage
+        _id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+
         self.tree.clear()
-        
+
         for cmd in self.controller.state.postpro_commands:
             target_text = "Global"
             if cmd.target_type == 'avatar':
-                target_text = f"Avatar #{cmd.target_value}"
+                # target_value est un avatar_id (str) — on résout vers l'index pour affichage
+                _av_idx = _id_to_idx.get(cmd.target_value)
+                target_text = f"Avatar #{_av_idx}" if _av_idx is not None else "Avatar inconnu"
             elif cmd.target_type == 'group':
-                indices = self.controller.state.avatar_groups.get(cmd.target_value, [])
-                target_text = f"Groupe: {cmd.target_value} ({len(indices)} avatars)"
+                avatar_ids  = self.controller.state.avatar_groups.get(cmd.target_value, [])
+                target_text = f"Groupe: {cmd.target_value} ({len(avatar_ids)} avatars)"
             
             item = QTreeWidgetItem([cmd.name, str(cmd.step), target_text])
             self.tree.addTopLevelItem(item)
@@ -206,7 +211,8 @@ class PostProTab(QWidget):
             elif avatar.origin == AvatarOrigin.GRANULO:
                 origin_mark = " [G]"
             label = f"Avatar #{i} - {avatar.avatar_type.value} {origin_mark}"
-            self.target_combo.addItem(label, ('avatar', i))
+            # Stocker avatar_id stable (str) et non la position (int)
+            self.target_combo.addItem(label, ('avatar', avatar.avatar_id))
         
         # Groupes
         for group_name, indices in self.controller.state.avatar_groups.items():

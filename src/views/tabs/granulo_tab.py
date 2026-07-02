@@ -831,7 +831,7 @@ class GranuloTab(BaseTab):
             
             granulos = self.controller.state.granulo_generations
             for i, gen in enumerate(granulos):
-                nb_generated = len(gen.generated_indices)
+                nb_generated = len(gen.generated_ids)
                 item = QTreeWidgetItem([
                     str(i + 1),
                     gen.container_type,
