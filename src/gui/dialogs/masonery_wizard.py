@@ -425,7 +425,16 @@ class MasonryWizard(QWizard):
                 self.controller.state.avatar_groups = {}
             if group_name not in self.controller.state.avatar_groups:
                 self.controller.state.avatar_groups[group_name] = []
-            self.controller.state.avatar_groups[group_name].extend(generated_indices)
+
+            # Convertir les positions entières (locales) en avatar_ids stables
+            # pour que le groupe reste cohérent si d'autres avatars sont
+            # supprimés ultérieurement.
+            generated_avatar_ids = [
+                self.controller.state.avatars[idx].avatar_id
+                for idx in generated_indices
+                if idx < len(self.controller.state.avatars)
+            ]
+            self.controller.state.avatar_groups[group_name].extend(generated_avatar_ids)
 
             # ── Paramètres du pattern — pour reconstituer la boucle dans le script
             if not hasattr(self.controller.state, 'masonry_patterns'):

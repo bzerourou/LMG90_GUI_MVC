@@ -254,8 +254,12 @@ class ProjectController(QObject):
             if not mod_obj:
                 raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
             body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
-            self._bodies_container.addAvatar(body_obj)
-            self._pylmgc_bodies.append(body_obj)
+            # create_avatar retourne None pour MESH_DEFORMABLE sans mesh_params.
+            # On ne crashe pas : on ajoute un placeholder None dans _pylmgc_bodies
+            # pour maintenir l'alignement avec state.avatars (1 entrée par avatar).
+            if body_obj is not None:
+                self._bodies_container.addAvatar(body_obj)
+            self._pylmgc_bodies.append(body_obj)  # None ou objet valide
         else:
             self._pylmgc_bodies.append(None)
         self.state.avatars.append(avatar)
@@ -277,10 +281,12 @@ class ProjectController(QObject):
         if not mod_obj:
             raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
         old_body = self._pylmgc_bodies[index]
-        self._bodies_container.remove(old_body)
+        if old_body is not None:
+            self._bodies_container.remove(old_body)
         body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
-        self._bodies_container.addAvatar(body_obj)
-        self._pylmgc_bodies[index] = body_obj
+        if body_obj is not None:
+            self._bodies_container.addAvatar(body_obj)
+        self._pylmgc_bodies[index] = body_obj  # None ou objet valide
         self.state.avatars[index] = avatar
 
     def get_avatar(self, index: int) -> Optional[Avatar]:
@@ -420,8 +426,9 @@ class ProjectController(QObject):
             mod_obj = self._pylmgc_models.get(avatar.model_name)
             if mat_obj and mod_obj:
                 body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
-                self._bodies_container.addAvatar(body_obj)
-                self._pylmgc_bodies.append(body_obj)
+                if body_obj is not None:
+                    self._bodies_container.addAvatar(body_obj)
+                self._pylmgc_bodies.append(body_obj)  # None ou objet valide
             else:
                 self._pylmgc_bodies.append(None)
         else:

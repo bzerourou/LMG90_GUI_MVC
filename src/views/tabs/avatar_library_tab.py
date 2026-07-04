@@ -1,4 +1,3 @@
-
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QPushButton, QMessageBox, QLabel, QFormLayout, QLineEdit, QGroupBox, QComboBox, 
@@ -519,7 +518,7 @@ class AvatarLibraryTab(QWidget):
         for i, avatar in enumerate(avatars):
             avatar_combo.addItem(
                 f"#{i} - {avatar.avatar_type.value} ({avatar.color})",
-                i
+                avatar.avatar_id   # stocker l'id stable, non la position
             )
         form.addRow("Avatar source:", avatar_combo)
         
@@ -551,8 +550,15 @@ class AvatarLibraryTab(QWidget):
         dialog.setLayout(layout)
         
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            avatar_idx = avatar_combo.currentData()
-            source_avatar = avatars[avatar_idx]
+            # currentData() retourne un avatar_id (str) — résoudre vers l'objet
+            selected_avatar_id = avatar_combo.currentData()
+            source_avatar = next(
+                (av for av in avatars if av.avatar_id == selected_avatar_id),
+                None
+            )
+            if source_avatar is None:
+                QMessageBox.warning(self, "Erreur", "Avatar source introuvable.")
+                return
             
             template_name = name_input.text().strip()
             if not template_name:
@@ -722,5 +728,3 @@ class AvatarLibraryTab(QWidget):
                     cat_item.addChild(item)
                 
                 self.tree.addTopLevelItem(cat_item)
-
-    
