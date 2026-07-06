@@ -1398,13 +1398,13 @@ def create_avatars_from_factory_metadata(metadata: dict) -> list:
 
             # Créer l'objet Avatar avec l'id stable
             avatar = Avatar(
-                avatar_id=stable_avatar_id,          # ← id stable, non aléatoire
+                avatar_id=stable_avatar_id,          # id stable, non aléatoire
                 avatar_type=avatar_type,
                 center=avatar_info.get('center', [0., 0., 0.]),
                 material_name=avatar_info.get('material', 'default'),
                 model_name=avatar_info.get('model', 'default'),
                 color=avatar_info.get('color', 'BLUEx'),
-                origin=AvatarOrigin.LOOP,            # marqué comme généré
+                origin=AvatarOrigin.FACTORY,          # ← origine explicite
                 radius=avatar_info.get('radius'),
             )
 

@@ -168,9 +168,10 @@ CONTACT_LAW_CATEGORIES: dict[str, list[str]] = {
 
 class AvatarOrigin(Enum):
     """Origine de création d'un avatar"""
-    MANUAL = "manual"      # Créé manuellement
-    LOOP = "loop"          # Généré par une boucle
-    GRANULO = "granulo"    # Généré par granulométrie
+    MANUAL  = "manual"   # Créé manuellement
+    LOOP    = "loop"     # Généré par une boucle géométrique ou For
+    GRANULO = "granulo"  # Généré par granulométrie
+    FACTORY = "factory"  # Généré par une Particle Factory (pre.py)
 
 
 class UnitSystem(Enum):
@@ -820,6 +821,11 @@ class ProjectState:
     factories: List[dict] = field(default_factory=list)  # FactoryConfig sérialisés
     avatar_groups: Dict[str, List[str]] = field(default_factory=dict)
     dynamic_vars: Dict[str, Any] = field(default_factory=dict)
+    # Patterns de maçonnerie générés par masonry_wizard — persistés pour que
+    # script_generator._write_masonry_pattern_loop() puisse reconstruire les
+    # boucles structurées (Standard, Running Bond, etc.) sans tomber en
+    # fallback "liste de centers".
+    masonry_patterns: Dict[str, Any] = field(default_factory=dict)
     # Avertissements non bloquants accumulés au chargement (régénération,
     # migration d'anciennes références positionnelles, etc.)
     load_warnings: List[str] = field(default_factory=list)
@@ -853,7 +859,8 @@ class ProjectState:
             'postpro_creations': [p.to_dict() for p in self.postpro_commands],
             'factories': self.factories,
             'avatar_groups': self.avatar_groups,
-            'dynamic_vars': self.dynamic_vars
+            'dynamic_vars': self.dynamic_vars,
+            'masonry_patterns': self.masonry_patterns,
         }
     
     @classmethod
@@ -897,6 +904,7 @@ class ProjectState:
             avatar_groups=data.get('avatar_groups', {}),
             custom_templates=data.get('custom_templates', {}),
             dynamic_vars=data.get('dynamic_vars', {}),
+            masonry_patterns=data.get('masonry_patterns', {}),
         )
         state.load_warnings = load_warnings
         return state
