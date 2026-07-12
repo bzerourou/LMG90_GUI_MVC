@@ -220,10 +220,11 @@ class ComputeScriptGenerator:
             Retourne les numéros de corps LMGC90 (1-based, en chaînes) pour
             les avatars du groupe donné.
 
-            avatar_groups contient désormais des avatar_ids (str) et non plus
-            des positions entières.  On résout chaque id vers sa position
-            courante dans state.avatars, puis on ajoute 1 pour obtenir le
-            numéro LMGC90.
+            Deux stratégies selon l'origine de l'avatar :
+            - Avatar NORMAL  → position dans state.avatars + 1
+            - Avatar FACTORY → body_index_start + i depuis FactoryConfig
+              (les parois de conteneur décalent les indices, l'index de position
+              serait faux ; seul body_collection.pkl / FactoryConfig est fiable)
             """
             if not grp_name or self.controller is None:
                 return []
@@ -234,9 +235,44 @@ class ComputeScriptGenerator:
             avatar_ids = groups.get(grp_name, [])
             if not avatar_ids:
                 return []
-            # Construire le mapping id → index en une seule passe
+
+            # ── Mapping factory avatar_id → numéro corps LMGC90 ─────────────
+            # Construit depuis FactoryConfig.body_index_start (calculé lors de
+            # la génération du pre.py, stocké dans state.factories).
+            factory_body_map: dict = {}
+            factories_raw = getattr(state, 'factories', []) or []
+            if factories_raw:
+                try:
+                    from ..core.particle_factory import ParticleFactory
+                    engine = ParticleFactory.from_list_of_dicts(factories_raw)
+                    for cfg in engine.configs:
+                        if not cfg.enabled or not cfg.body_index_start:
+                            continue
+                        vn    = cfg.name
+                        ptype = cfg.particle_type
+                        short = (
+                            'disk'   if 'Disk'   in ptype else
+                            'sphere' if 'Sphere' in ptype else
+                            'part'
+                        )
+                        for i in range(cfg.nb_particles):
+                            aid = f"factory_{vn}_{short}_{i}"
+                            factory_body_map[aid] = cfg.body_index_start + i
+                except Exception:
+                    pass  # Pas de factories configurées ou importation absente
+
+            # ── Mapping avatar_id → index dans state.avatars (avatars normaux) ─
             id_to_idx = {av.avatar_id: i for i, av in enumerate(state.avatars)}
-            return [str(id_to_idx[aid] + 1) for aid in avatar_ids if aid in id_to_idx]
+
+            result = []
+            for aid in avatar_ids:
+                if aid in factory_body_map:
+                    # Numéro exact depuis FactoryConfig
+                    result.append(str(factory_body_map[aid]))
+                elif aid in id_to_idx:
+                    # Position dans state.avatars + 1 (correct pour non-factory)
+                    result.append(str(id_to_idx[aid] + 1))
+            return result
 
         def _timing_guard(entry: dict):
             mode = entry.get('step_mode', '')

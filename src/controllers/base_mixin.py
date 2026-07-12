@@ -202,20 +202,37 @@ class BaseMixin:
 
     def _restore_factory_avatars(self) -> None:
         """
-        Ajoute les factory avatars après _rebuild_pylmgc_objects.
+        Restaure les factory avatars après _rebuild_pylmgc_objects.
 
-        Pourquoi après ? _rebuild construit state.avatars + _pylmgc_bodies en
-        parallèle. Ajouter les factory avatars avant décalerait les indices des
-        avatars régénérés (loops/granulos) et casserait l'alignement.
-
-        Résultat :
-          state.avatars   = [manuels | loops | granulos | factory]
-          _pylmgc_bodies  = [manuels | loops | granulos | None…  ]
+        Crée les objets pylmgc correspondants (contrairement au placeholder None),
+        ce qui permet d'appliquer des DOF/PostPro sans erreur silencieuse.
         """
         factory_avs = getattr(self.state, '_factory_avatars_staged', [])
         if not factory_avs:
             return
+
         for av in factory_avs:
+            # Créer l'objet pylmgc pour le factory avatar
+            # (exactement comme pour les avatars MANUAL)
+            mat_obj = self._pylmgc_materials.get(av.material_name)
+            mod_obj = self._pylmgc_models.get(av.model_name)
+
+            body_obj = None
+            if mat_obj and mod_obj:
+                try:
+                    body_obj = LMGC90Bridge.create_avatar(av, mod_obj, mat_obj)
+                    if body_obj is not None:
+                        self._bodies_container.addAvatar(body_obj)
+                except Exception as e:
+                    from ..core.app_logger import get_logger
+                    get_logger('controller').warning(
+                        f"Impossible de créer objet pylmgc pour factory avatar "
+                        f"'{av.avatar_id}': {e}"
+                    )
+
+            # Ajouter l'avatar à l'état
             self.state.avatars.append(av)
-            self._pylmgc_bodies.append(None)  # pas d'objet pylmgc pour la factory
+            # Ajouter l'objet pylmgc (peut être None si création échouée)
+            self._pylmgc_bodies.append(body_obj)
+
         self.state._factory_avatars_staged = []

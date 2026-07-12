@@ -1,62 +1,107 @@
 # ============================================================================
-#Thread pour Génération Granulométrique
+# granulo_worker.py  —  Worker thread pour le dépôt granulométrique
 # ============================================================================
 """
-Worker thread pour générer des distributions granulométriques sans bloquer l'UI.
+Worker QThread pour le calcul du dépôt granulométrique.
+
+Architecture thread-safe
+─────────────────────────
+  GranuloWorker (QThread secondaire)
+    └─ Calcule positions + rayons via GranuloGenerator.generate()
+    └─ Émet data_ready(particles_data) → main thread
+
+  GranuloTab (main thread)
+    └─ Reçoit data_ready via signal Qt (QueuedConnection automatique)
+    └─ Crée les avatars par batches via QTimer (intervalle=0)
+    └─ Appelle controller.add_avatar() — toujours sur main thread
+
+Principe : le worker NE TOUCHE PAS au contrôleur ni à state.avatars.
+Il ne fait que du calcul numérique (pylmgc90 deposit functions).
+Toutes les modifications d'état se font sur le main thread.
 """
-from PyQt6.QtCore import QThread, pyqtSignal, QMutex
-import numpy as np
-from typing import List, Dict, Any
+from PyQt6.QtCore import QThread, pyqtSignal
+
+from ..generators import GranuloGenerator
+from ..models import GranuloGeneration
 
 
 class GranuloWorker(QThread):
-    """Worker pour générer les particules en arrière-plan"""
-    
-    # Signaux
-    data_ready = pyqtSignal(list)  # Liste de {center, radius}
+    """
+    Thread secondaire pour le calcul du dépôt granulométrique.
+
+    Signaux
+    ───────
+    progress_updated(current, total, message)
+        Progression du calcul (0 ≤ current ≤ total).
+
+    data_ready(particles_data)
+        Calcul terminé. particles_data est une liste de dict :
+            [{'center': [x, y], 'radius': float}, ...]
+        Ce signal est reçu sur le main thread (QueuedConnection).
+
+    error_occurred(message)
+        Erreur pendant le calcul.
+    """
+
     progress_updated = pyqtSignal(int, int, str)
-    error_occurred = pyqtSignal(str)
-    
-    def __init__(self, config):
+    data_ready       = pyqtSignal(list)
+    error_occurred   = pyqtSignal(str)
+
+    def __init__(self, config: GranuloGeneration, parent=None):
+        super().__init__(parent)
+        self.config     = config
+        self._canceled  = False
+
+    # ── Thread principal ──────────────────────────────────────────────────────
+
+    def run(self) -> None:
         """
-        Args:
-            config: GranuloGeneration - configuration complète
+        Point d'entrée du thread secondaire.
+        UNIQUEMENT du calcul numérique — aucun accès au contrôleur.
         """
-        super().__init__()
-        self.config = config
-        self._is_running = True
-    
-    def run(self):
-        """Génère un VRAI dépôt avec GranuloGenerator"""
         try:
-            # Importer GranuloGenerator (dans le thread worker)
-            from src.core.generators import GranuloGenerator
-       
-            nb = self.config.nb_particles
-            
-            self.progress_updated.emit(0, nb, "Calcul du dépôt granulométrique...")
-            
-            # ===== GÉNÉRATEUR =====
-            nb_generated, coordinates, radii = GranuloGenerator.generate(self.config)
-            
-            self.progress_updated.emit(nb_generated, nb, "Dépôt calculé avec succès")
-            
-            # Convertir en format dict pour le thread principal
+            self.progress_updated.emit(0, 100, "Calcul du dépôt granulométrique…")
+
+            # Appel pylmgc90 — peut prendre plusieurs secondes pour >1000 part.
+            nb_particles, coordinates, radii = GranuloGenerator.generate(self.config)
+
+            if self._canceled:
+                return
+
+            # Convertir les tableaux numpy en liste de dicts Python
+            # (plus sûr pour la transmission inter-thread via signal Qt)
             particles_data = []
-            for i in range(nb_generated):
+            report_step    = max(1, nb_particles // 20)   # rapport tous les 5%
+
+            for i in range(nb_particles):
+                if self._canceled:
+                    return
+
                 particles_data.append({
-                    'center': coordinates[i].tolist(),  # numpy array -> list
-                    'radius': float(radii[i])
+                    'center': coordinates[i].tolist(),
+                    'radius': float(radii[i]),
                 })
-            
-            # Envoyer les données
+
+                if i % report_step == 0:
+                    self.progress_updated.emit(
+                        i, nb_particles,
+                        f"Traitement {i + 1}/{nb_particles} particules"
+                    )
+
+            self.progress_updated.emit(nb_particles, nb_particles, "Calcul terminé")
+
+            # Transmission au main thread — Qt garantit QueuedConnection
             self.data_ready.emit(particles_data)
-            
+
         except Exception as e:
-            import traceback
-            error_msg = f"Erreur génération dépôt:\n{str(e)}\n\n{traceback.format_exc()}"
-            self.error_occurred.emit(error_msg)
-    
-    def stop(self):
-        """Arrête le worker"""
-        self._is_running = False
+            self.error_occurred.emit(str(e))
+
+    # ── Annulation ────────────────────────────────────────────────────────────
+
+    def cancel(self) -> None:
+        """
+        Demande l'arrêt propre du worker.
+        Le thread s'arrête au prochain point de vérification (tous les 5%).
+        Thread-safe : _canceled est un bool Python (GIL protège l'accès).
+        """
+        self._canceled = True

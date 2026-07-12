@@ -162,32 +162,45 @@ class DynamicVarsDialog(QDialog):
     # =========================================================================
 
     def _build_context(self) -> Dict[str, Any]:
-        """Construit le contexte d'evaluation complet via safe_eval."""
+        """Construit le contexte de base (projet) via safe_eval."""
         return build_eval_context(self.controller)
+
+    def _build_full_context(self) -> Dict[str, Any]:
+        """
+        Construit le contexte COMPLET : projet + variables déjà définies.
+        Utilisé pour la validation et l'aperçu, afin qu'une variable puisse
+        référencer une variable précédemment définie (ex: radius = thickness * 2).
+        """
+        ctx       = self._build_context()
+        evaluated = self._evaluate_all_vars_in_ctx(ctx)
+        return {**ctx, **evaluated}
 
     def _evaluate_expression(self, expr: str) -> Any:
         """
-        Evalue une expression avec le contexte projet complet.
-        Utilise SafeEvaluator (check AST) — aucun eval() nu.
+        Evalue une expression avec le contexte COMPLET
+        (projet + variables déjà définies dans current_vars).
         """
-        ev = SafeEvaluator(allowed_names=self._build_context())
+        ev = SafeEvaluator(allowed_names=self._build_full_context())
         return ev.eval_expression(expr)
 
-    def _evaluate_all_vars(self) -> Dict[str, Any]:
-        """Evalue toutes les variables dans l'ordre de definition."""
-        ctx = self._build_context()
+    def _evaluate_all_vars_in_ctx(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
+        """Evalue toutes les variables dans l'ordre de définition."""
         evaluated: Dict[str, Any] = {}
         ev = SafeEvaluator(allowed_names=ctx)
         for name, expr in self.current_vars.items():
             try:
                 if isinstance(expr, str):
                     ev.allowed_names = {**ctx, **evaluated}
-                    evaluated[name] = ev.eval_expression(expr)
+                    evaluated[name]  = ev.eval_expression(expr)
                 else:
                     evaluated[name] = expr
             except Exception:
                 evaluated[name] = expr
         return evaluated
+
+    def _evaluate_all_vars(self) -> Dict[str, Any]:
+        """Evalue toutes les variables (contexte projet complet)."""
+        return self._evaluate_all_vars_in_ctx(self._build_context())
 
     # =========================================================================
     # Slots

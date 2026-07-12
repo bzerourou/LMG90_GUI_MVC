@@ -757,7 +757,13 @@ class ScriptGenerator:
                 exclude_r = True
 
         if avatar.radius and not has_r_in_wall_params and not exclude_r:
-            args.append(f"radius={avatar.radius}")
+            # pylmgc90 API :
+            #   rigidPolygon / rigidPolyhedron → radius=
+            #   tous les autres (rigidDisk, rigidSphere, rigidCylinder…) → r=
+            if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
+                args.append(f"radius={avatar.radius}")
+            else:
+                args.append(f"r={avatar.radius}")
 
         if avatar.axis:
             args.append(f"axe1={avatar.axis['axe1']}")

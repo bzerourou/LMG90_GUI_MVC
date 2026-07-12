@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
         self._script_log_dialog = None
         
         # Configuration fenêtre
-        self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.4.6 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
@@ -534,7 +534,7 @@ class MainWindow(QMainWindow):
         if ok and name.strip():
             name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name.strip())
             self.controller.new_project(name)
-            self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.4.6 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
@@ -552,7 +552,7 @@ class MainWindow(QMainWindow):
         if filepath:
             try:
                 self.controller.load_project(Path(filepath))
-                self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.4.6 - {self.controller.state.name}")
                 self.project_loaded.emit()
                 self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
@@ -701,7 +701,7 @@ class MainWindow(QMainWindow):
         """Affiche À propos"""
         QMessageBox.information(
             self, "À propos",
-            "LMGC90_GUI v0.4.5\n"
+            "LMGC90_GUI v0.4.6\n"
             "UI pour LMGC90\n"
             "par Zerourou B.\n"
             "bachir.zerourou@yahoo.fr\n"
@@ -789,7 +789,7 @@ class MainWindow(QMainWindow):
         """Ouvre un projet récent"""
         try:
             self.controller.load_project(filepath)
-            self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.4.6 - {self.controller.state.name}")
             self.project_loaded.emit()
             self.statusBar().showMessage(f"Projet chargé", 5000)
             
@@ -837,7 +837,7 @@ class MainWindow(QMainWindow):
         
         wizard = ProjectSetupWizard(self.controller, self)
         if wizard.exec():
-            self.setWindowTitle(f"LMGC90_GUI v0.4.5 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.4.6 - {self.controller.state.name}")
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
 
