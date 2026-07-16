@@ -163,7 +163,7 @@ class GranuloWizard(QWizard):
         deposit_fn   = self._DEPOSIT_FUNC.get(container_type, "depositInBox2D")
         deposit_keys = self._DEPOSIT_PARAMS.get(container_type, ["lx", "ly"])
         deposit_kwargs = {k: container_params[k] for k in deposit_keys if k in container_params}
-        nb_particles, coords = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
+        nb_particles, coords, dradii = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
 
        # Reshape coordinates
         #nb_remaining = np.shape(coor)[0] // 2
@@ -225,7 +225,7 @@ class GranuloWizard(QWizard):
             group_name=group_name,
             color=color,
         )
-        config.generated_indices = generated_indices
+        config.generated_ids = generated_indices
         ctrl.state.granulo_generations.append(config)
 
         if group_name:

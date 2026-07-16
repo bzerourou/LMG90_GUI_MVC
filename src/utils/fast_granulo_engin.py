@@ -516,14 +516,14 @@ class GranuloStateIntegrator:
 
         # Batch unique dans state
         controller.state.avatars.extend(new_avatars)
-        indices = list(range(start_idx, start_idx + len(new_avatars)))
+        idx = list(range(start_idx, start_idx + len(new_avatars)))
 
         # Groupe
         if result.group_name:
             grp = controller.state.avatar_groups
             if result.group_name not in grp:
                 grp[result.group_name] = []
-            grp[result.group_name].extend(indices)
+            grp[result.group_name].extend(idx)
 
         # GranuloGeneration
         gen = GranuloGeneration(
@@ -538,11 +538,11 @@ class GranuloStateIntegrator:
             color=result.color,
             seed=result.seed,
             group_name=result.group_name,
-            generated_indices=indices,
+            generated_ids=idx,
         )
         controller.state.granulo_generations.append(gen)
 
         # Un seul signal à la fin
         controller.state_changed.emit()
 
-        return indices
+        return idx

@@ -406,7 +406,7 @@ class GranuloTab(BaseTab):
             color="",
             seed=seed,
             group_name=group_name,
-            generated_indices=[],
+            generated_ids=[],
         )
 
         try:
@@ -576,14 +576,24 @@ class GranuloTab(BaseTab):
         
         # Finaliser
         if self.current_config:
-            self.current_config.generated_indices = self.created_indices
+            # Convertir les positions (int) en avatar_ids stables (str)
+            avatars = self.controller.state.avatars
+            created_avatar_ids = [
+                avatars[idx].avatar_id
+                for idx in self.created_indices
+                if idx < len(avatars)
+            ]
+
+            self.current_config.generated_ids = created_avatar_ids
             self.controller.state.granulo_generations.append(self.current_config)
-            
-            # Ajouter au groupe
+
+            # Ajouter les avatar_ids (str) au groupe — plus des positions entières
             if self.current_config.group_name:
                 if self.current_config.group_name not in self.controller.state.avatar_groups:
                     self.controller.state.avatar_groups[self.current_config.group_name] = []
-                self.controller.state.avatar_groups[self.current_config.group_name].extend(self.created_indices)
+                self.controller.state.avatar_groups[self.current_config.group_name].extend(
+                    created_avatar_ids
+                )
             
             # Émettre le signal UNE SEULE FOIS
             self.granulo_generated.emit()
@@ -744,7 +754,7 @@ class GranuloTab(BaseTab):
         if not granulo:
             return
         
-        nb_avatars = len(granulo.generated_indices)
+        nb_avatars = len(granulo.generated_ids)
         reply = QMessageBox.question(
             self, "Confirmer",
             f"Supprimer le dépôt #{granulo_idx + 1} ?\n\n"
@@ -772,7 +782,7 @@ class GranuloTab(BaseTab):
         info = f"<h3>Dépôt Granulométrique #{granulo_idx + 1}</h3>"
         info += f"<b>Conteneur:</b> {granulo.container_type}<br>"
         info += f"<b>Particules demandées:</b> {granulo.nb_particles}<br>"
-        info += f"<b>Particules générées:</b> {len(granulo.generated_indices)}<br>"
+        info += f"<b>Particules générées:</b> {len(granulo.generated_ids)}<br>"
         info += f"<b>Rayons:</b> [{granulo.radius_min}, {granulo.radius_max}]<br>"
         info += f"<b>Type d'avatar:</b> {granulo.avatar_type}<br>"
         info += f"<b>Matériau:</b> {granulo.material_name}<br>"
