@@ -11,6 +11,46 @@ from typing import List, Tuple, Dict, Any
 from .models import Avatar, Loop, GranuloGeneration, AvatarType, AvatarOrigin
 
 
+# adapter à la version pylmgc90
+def _call_deposit(func, *args, **kwargs):
+    """
+    Appelle une fonction de dépôt pylmgc90 (depositInBox2D, depositInDisk2D, ...)
+    en s'adaptant au nombre de valeurs retournées selon la version installée :
+      - pylmgc90 (ancien, ~2023)  : (nb_remaining, coor)
+      - pylmgc90 (récent, ~2025) : (nb_remaining, coor, <valeur additionnelle>)
+
+    Retourne toujours (nb_remaining, coor). Toute valeur supplémentaire
+    (3e, 4e...) est journalisée mais ignorée, sans faire planter l'appel.
+    """
+    result = func(*args, **kwargs)
+
+    if isinstance(result, tuple):
+        raise RuntimeError(
+            f"{func.__name__} : retour inattendu ({type(result).__name__!r}), "
+            f"un tuple était attendu. Vérifiez la version de pylmgc90 installée."
+        )
+
+    if len(result) < 2:
+        raise RuntimeError(
+            f"{func.__name__} : seulement {len(result)} valeur(s) retournée(s), "
+            f"au moins 2 attendues (nb_remaining, coor)."
+        )
+
+    nb_remaining, coor = result[0], result[1]
+
+    if len(result) > 2:
+        try:
+            from .app_logger import get_logger
+            get_logger('generators').debug(
+                f"{func.__name__} a retourné {len(result)} valeurs "
+                f"(version pylmgc90 récente détectée) — "
+                f"{len(result) - 2} valeur(s) additionnelle(s) ignorée(s)."
+            )
+        except Exception:
+            pass  # le logging ne doit jamais faire échouer le dépôt
+
+    return nb_remaining, coor
+
 class LoopGenerator:
     """Génère des positions selon différents motifs"""
     
@@ -379,24 +419,21 @@ class GranuloGenerator:
         params = config.container_params
         
         if ctype == "Box2D":
-            nb_remaining, coor, dradii= pre.depositInBox2D(radii, params['lx'], params['ly'])
+            nb_remaining, coor = _call_deposit(pre.depositInBox2D, radii, params['lx'], params['ly'])
         elif ctype == "Disk2D":
-            nb_remaining, coor, dradii = pre.depositInDisk2D(radii, params['r'])
+            nb_remaining, coor = _call_deposit(pre.depositInDisk2D, radii, params['r'])
         elif ctype == "Couette2D":
-            nb_remaining, coor, dradii = pre.depositInCouette2D(radii, params['rint'], params['rext'])
+            nb_remaining, coor = _call_deposit(pre.depositInCouette2D, radii, params['rint'], params['rext'])
         elif ctype == "Drum2D":
-            nb_remaining, coor, dradii = pre.depositInDrum2D(radii, params['r'])
+            nb_remaining, coor = _call_deposit(pre.depositInDrum2D, radii, params['r'])
         else:
             raise ValueError(f"Type de conteneur inconnu: {ctype}")
         
-        if coor is None:
-            raise ValueError("Échec du dépôt. Réduisez le nombre de particules.")
-        
         # Reshape coordinates
         #nb_remaining = np.shape(coor)[0] // 2
-        #coor.shape = [coor.size//2,2]
+        coor.shape = [coor.size//2,2]
         
         # Tronquer les rayons au nombre effectif
-        #radii = radii[:nb_remaining]
+        radii = radii[:nb_remaining]
         
-        return nb_remaining, coor, dradii
+        return nb_remaining, coor, radii

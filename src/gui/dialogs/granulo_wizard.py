@@ -163,7 +163,14 @@ class GranuloWizard(QWizard):
         deposit_fn   = self._DEPOSIT_FUNC.get(container_type, "depositInBox2D")
         deposit_keys = self._DEPOSIT_PARAMS.get(container_type, ["lx", "ly"])
         deposit_kwargs = {k: container_params[k] for k in deposit_keys if k in container_params}
-        nb_particles, coords, dradii = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
+
+        _deposit_result = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
+        if isinstance(_deposit_result, tuple) or len(_deposit_result) < 2:
+            raise RuntimeError(
+                f"{deposit_fn} : retour inattendu ({_deposit_result!r}). "
+                f"Vérifiez la version de pylmgc90 installée."
+            )
+        nb_particles, coords = _deposit_result[0], _deposit_result[1]
 
        # Reshape coordinates
         #nb_remaining = np.shape(coor)[0] // 2
