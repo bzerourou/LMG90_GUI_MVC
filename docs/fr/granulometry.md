@@ -2,7 +2,7 @@
 
 L'onglet **Granulométrie** (`Ctrl+7`) permet de créer, gérer et supprimer des distributions granulaires directement depuis l'interface, sans passer par l'assistant. Il est adapté pour des générations rapides à partir d'avatars et de matériaux déjà définis dans le projet.
 
-![Exemple de dépôt granulaire disques et joncs](captures/depot_granulo_disk_jonc.JPG)
+![Exemple de dépôt granulaire disques et joncs](../captures/depot_granulo_disk_jonc.JPG)
 
 ---
 
@@ -120,7 +120,7 @@ Sélectionner et cliquer sur **🗑️ Supprimer**. Tous les avatars générés 
 | Couleur | `BLUEx` |
 | Groupe | `granulo_box2d` |
 
-![Rendu du dépôt granulaire](captures/rendu_depot_granulo_disk_jonc.JPG)
+![Rendu du dépôt granulaire](../captures/rendu_depot_granulo_disk_jonc.JPG)
 
 ---
 
@@ -166,7 +166,7 @@ Présente le principe de l'algorithme en deux étapes :
 1. **`pre.granulo_Random(nb, r_min, r_max, seed)`** — génère aléatoirement `nb` rayons dans [r_min, r_max] selon une distribution uniforme.
 2. **`pre.depositInXxx(radii, ...)`** — effectue un dépôt gravitaire des particules dans le conteneur choisi, sans chevauchement.
 
-![](captures/assistant_granulo_page1.JPG)
+![](../captures/assistant_granulo_page1.JPG)
 
 Cliquer sur **Suivant ➡️** pour commencer.
 
@@ -183,7 +183,7 @@ La valeur **2D** est sélectionnée par défaut.
 
 > La dimension conditionne le type d'avatar créé, la liste des conteneurs disponibles à la page 5 et l'élément du modèle (`Rxx2D` ou `Rxx3D`).
 
-![Choix de la dimension](captures/assistant_granulo_page2.JPG)
+![Choix de la dimension](../captures/assistant_granulo_page2.JPG)
 
 ---
 
@@ -204,7 +204,7 @@ Liste déroulante de tous les matériaux du projet.
 
 > Le type est toujours `RIGID` — les particules granulaires sont des corps rigides.
 
-![Création du matériau](captures/assistant_granulo_page3.JPG)
+![Création du matériau](../captures/assistant_granulo_page3.JPG)
 
 ---
 
@@ -224,7 +224,7 @@ Liste déroulante des modèles du projet.
 | **Physique** | `MECAx` (automatique) |
 | **Élément** | `Rxx2D` (2D) ou `Rxx3D` (3D) — adapté automatiquement |
 
-![Création du modèle](captures/assistant_granulo_page4.JPG)
+![Création du modèle](../captures/assistant_granulo_page4.JPG)
 
 ---
 
@@ -258,7 +258,7 @@ Un **histogramme en temps réel** (20 classes, 200 rayons de prévisualisation) 
 | **Utiliser une graine** | Case à cocher. Rend la génération reproductible. | décoché |
 | **Valeur de la graine** | Entier de 0 à 999 999. Transmis à `pre.granulo_Random(seed=...)`. | `12345` |
 
-![Distribution des rayons](captures/assistant_granulo_page5.JPG)
+![Distribution des rayons](../captures/assistant_granulo_page5.JPG)
 
 ---
 
@@ -350,7 +350,7 @@ Espace annulaire entre un cylindre intérieur de rayon `rint` et un cylindre ext
 **Fonction pylmgc90 :** `pre.depositInCylinder3D(radii, r)`  
 **Usage :** colonne cylindrique, silo, essai œdométrique 3D.
 
-![Sélection du conteneur Box3D](captures/assistant_granulo_page6.JPG)
+![Sélection du conteneur Box3D](../captures/assistant_granulo_page6.JPG)
 
 ---
 
@@ -371,7 +371,7 @@ Cliquer sur **✅ Générer** pour lancer. Un message de confirmation indique le
 
 > **En cas d'erreur :** l'état du projet (nom, chemin, dimension) est entièrement restauré.
 
-![Récapitulatif](captures/assistant_granulo_page7.JPG)
+![Récapitulatif](../captures/assistant_granulo_page7.JPG)
 
 ---
 
@@ -414,7 +414,7 @@ La **génération granulométrie numpy** est un mode de génération rapide adap
 
 Cliquer sur le menu **Assistants** puis **⚡ Génération granulométrie numpy… (bêta)**. Le dialogue s'ouvre directement — aucun assistant par étapes.
 
-![Dialogue génération granulométrie numpy](captures/assistant_granulo_numpy.JPG)
+![Dialogue génération granulométrie numpy](../captures/assistant_granulo_numpy.JPG)
 
 ---
 

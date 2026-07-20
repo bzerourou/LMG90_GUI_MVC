@@ -2,7 +2,7 @@
 
 L'onglet **Visibilité** (`Ctrl+9`) permet de définir les **tables de visibilité** (`see_table`) de pylmgc90 : chaque règle déclare quels contacteurs peuvent se détecter mutuellement et avec quelle loi de contact. C'est une étape **obligatoire** avant de générer la DATBOX — sans table de visibilité, aucune interaction de contact n'est calculée.
 
-![](captures/table_visibilite.JPG)
+![](../captures/table_visibilite.JPG)
 
 ---
 

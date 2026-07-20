@@ -206,7 +206,7 @@ elas='standard', young=2.1e11, nu=0.3, anisotropy='isotropic'
 5. Saisir un nom : `steel` ou `ACIEx`.
 6. Cliquer sur **✅ Créer Matériau**.
  
-![Création d'un matériau acier](captures/materiau_steel.JPG)
+![Création d'un matériau acier](../captures/materiau_steel.JPG)
  
 ---
  
@@ -218,7 +218,7 @@ Dans le tableau de la liste des matériaux, sélectionnez le matériau à modifi
 - Cliquez sur **💾 Enregistrer Modifications** pour valider.
 - Cliquez sur **❌ Annuler** pour ignorer les changements et revenir au mode normal.
  
-![Modification d'un matériau](captures/materiau_steel_modification.JPG)
+![Modification d'un matériau](../captures/materiau_steel_modification.JPG)
  
 > **Suppression :** un matériau utilisé par au moins un avatar ne peut pas être supprimé directement. Un message d'avertissement indique les avatars concernés. Il faut d'abord réassigner ces avatars à un autre matériau, ou les supprimer.
  
@@ -230,7 +230,7 @@ Les variables dynamiques permettent de définir des valeurs ou expressions réut
  
 Ouvrez la boîte de dialogue via **Outils → Variables dynamiques** ou le raccourci `Ctrl+V`.
  
-![Variables dynamiques](captures/variables.JPG)
+![Variables dynamiques](../captures/variables.JPG)
  
 ### Comment créer une variable
  

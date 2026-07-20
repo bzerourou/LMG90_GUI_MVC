@@ -3,7 +3,7 @@
 **Onglet Avatar vide** Permet de créer des **avatars à contacteurs personnalisés** : soit un corps vide (`emptyAvatar`) entièrement défini par ses contacteurs, soit l'ajout de contacteurs à un **corps déformable existant** (maillage FEM).  
 C'est l'outil le plus flexible de LMGC90_GUI pour les cas avancés qui ne rentrent pas dans les types d'avatars rigides standards.
 
-![](captures/avatar_vide_2disques.JPG)
+![](../captures/avatar_vide_2disques.JPG)
 
 ---
 

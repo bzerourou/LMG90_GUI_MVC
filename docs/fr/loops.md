@@ -7,7 +7,7 @@ L'onglet **Boucles** (`Ctrl+6`) permet de créer automatiquement des séries d'a
 
 Les boucles créées sont sauvegardées dans le projet et reconstituées lors du rechargement. Elles sont également exportées dans le script Python généré.
 
-![](captures/boucle_disk_ligne.JPG)
+![](../captures/boucle_disk_ligne.JPG)
 
 ---
 
@@ -73,7 +73,7 @@ Aligne `count` avatars en ligne droite, séparés d'un pas `step`, dans la direc
 
 **Usage typique :** rangée de poteaux, file de particules, mur simple.
 
-![](captures/rendu_boucle_disk_ligne.JPG)
+![](../captures/rendu_boucle_disk_ligne.JPG)
 
 ---
 
@@ -115,7 +115,7 @@ Sélectionner une boucle dans la liste et cliquer sur **🗑️ Supprimer**. Tou
 
 Les boucles `for` génériques permettent de créer des séries d'éléments en faisant varier une **variable de boucle** sur un intervalle défini par des expressions Python. Le **type d'élément** à créer est choisi parmi : avatar, matériau, modèle, loi de contact, table de visibilité, ou opération DOF.
 
-![](captures/for_generique.JPG)
+![](../captures/for_generique.JPG)
 
 À chaque itération, le **template de configuration** est évalué avec la variable de boucle injectée dans le contexte d'évaluation.
 

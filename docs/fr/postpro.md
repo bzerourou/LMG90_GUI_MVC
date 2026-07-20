@@ -2,7 +2,7 @@
 
 L'onglet **Post-Pro**  définit les **commandes de post-traitement** qui seront incluses dans la DATBOX et exécutées par LMGC90 pendant le calcul. Chaque commande demande à LMGC90 d'écrire des fichiers de sortie à une fréquence donnée, permettant ensuite l'analyse et la visualisation des résultats.
 
-![](captures/postpro.JPG)
+![](../captures/postpro.JPG)
 
 ---
 
@@ -237,7 +237,7 @@ Pour une simulation de bielle-manivelle, configurer les commandes suivantes :
 | 3 | `BODY TRACKING` | `10` | Avatar #2 (coulisseau) | Déplacement linéaire |
 | 4 | `KINETIC ENERGY` | `1` | Global | Bilan énergétique |
 
-![Exemple onglet PostPro](captures/postpro.JPG)
+![Exemple onglet PostPro](../captures/postpro.JPG)
 
 ---
 
@@ -274,4 +274,4 @@ Définition des sorties pour LMGC90 qui vont à extraire et analyser vos calculs
 
 ## Exemple : 
 Pour rajouter une commande du postpro, il faut se rendre dans l'onglet "PostPro", puis de choisir la commande voulue dans mon cas "BODY TRACKING", puis de renseigner l'étape, et de cliquer sur le bouton **"Ajouter la Commande"** 
-![](captures/postpro.JPG)
+![](../captures/postpro.JPG)

@@ -4,7 +4,7 @@ L'onglet **Bibliothèque** (`📚`) met à disposition un catalogue d'avatars pr
 
 Cet onglet se **rafraîchit automatiquement** à chaque changement de dimension dans l'onglet Modèle : les templates disponibles s'adaptent à la dimension courante du projet (2D ou 3D).
 
-![Vue générale de l'onglet Bibliothèque](captures/templates.JPG)
+![Vue générale de l'onglet Bibliothèque](../captures/templates.JPG)
 
 ---
 
@@ -165,7 +165,7 @@ Crée une trémie conique composée de **2 parois inclinées** (`rigidPolygon` a
 
 L'avatar est ajouté à la liste du projet et apparaît dans l'arbre du modèle.
 
-![Création d'un avatar depuis un template](captures/templates_pt_avatar.JPG)
+![Création d'un avatar depuis un template](../captures/templates_pt_avatar.JPG)
 
 ---
 
@@ -179,7 +179,7 @@ Il est possible d'enregistrer un avatar existant comme nouveau template pour le 
 4. Les paramètres géométriques de l'avatar sélectionné sont repris automatiquement.
 5. Valider pour ajouter le template à la bibliothèque.
 
-![Création d'un nouveau template](captures/templates_new.JPG)
+![Création d'un nouveau template](../captures/templates_new.JPG)
 
 ---
 

@@ -40,7 +40,7 @@ Présentation des 8 étapes à venir. Aucune saisie requise. Cliquer sur **Suiva
 
 > Le maillage généré est un avatar `MESH_DEFORMABLE` de couleur `CYANx` ajouté automatiquement à la liste des avatars du projet. Ses paramètres de reconstruction sont sauvegardés dans `mesh_params` pour permettre le rechargement du projet.
 
-![](captures/assistant_defor_page1.JPG)
+![](../captures/assistant_defor_page1.JPG)
 
 ---
 
@@ -57,7 +57,7 @@ La valeur **2D** est sélectionnée par défaut.
 
 > **Effet sur les étapes suivantes :** la dimension conditionne les types d'éléments disponibles à la page Modèle, les formes disponibles à la page Géométrie, les paramètres de raffinement, et les groupes de surface (`down/up/left/right` en 2D, avec `front/rear` en plus en 3D).
 
-![](captures/assistant_defor_page2.JPG)
+![](../captures/assistant_defor_page2.JPG)
 
 ---
 
@@ -96,7 +96,7 @@ Cocher **Créer un nouveau matériau à la place** pour afficher le formulaire. 
 
 > **Propriétés générées automatiquement :** `elas='standard'` et `anisotropy='isotropic'` sont toujours ajoutés. Pour `ELAS_PLAS`, le critère est toujours `Von-Mises`, l'écrouissage `isoh='linear'`, et les paramètres `cinh='none'`, `visc='none'`.
 
-![](captures/assistant_defor_page3.JPG)
+![](../captures/assistant_defor_page3.JPG)
 
 ---
 
@@ -146,7 +146,7 @@ Seuls les modèles dont la dimension correspond à celle choisie à la page 1 so
 
 > Les options `material='elas_'` et `external_model='no___'` sont ajoutées automatiquement dans les options du modèle lors de la génération.
 
-![](captures/assistant_defor_page4.JPG)
+![](../captures/assistant_defor_page4.JPG)
 
 ---
 
@@ -225,7 +225,7 @@ Génère un maillage de cylindre plein via **gmsh** (`addCylinder`), d'axe Z, ce
 
 Importe un maillage 3D via `pre.readMesh(filepath, 3)`. Formats acceptés : `.msh`, `.vtk`, `.mesh`.
 
-![](captures/assistant_defor_page5.JPG)
+![](../captures/assistant_defor_page5.JPG)
 
 ---
 
@@ -265,7 +265,7 @@ Définit la finesse du maillage. Les paramètres affichés dépendent de la géo
 | `nz` | Nombre d'éléments dans la direction axiale Z. |
 | `nx`, `ny`, `nz` | Nombre d'éléments dans les directions cartésiennes X, Y, Z. |
 
-![](captures/assistant_defor_page6.JPG)
+![](../captures/assistant_defor_page6.JPG)
 
 > **Conseil :** commencer avec les valeurs par défaut pour vérifier la géométrie, puis augmenter `nx`/`ny`/`nr`/`ntheta` pour améliorer la précision du calcul.
 
@@ -315,7 +315,7 @@ Cliquer sur **+ Ajouter une condition DOF** pour créer une ligne. Chaque ligne 
 | Valeur initiale nulle | `component=[1,2], value=0.0` |
 | Blocage en X uniquement | `component=[1], dofty="vlocy"` |
 
-![](captures/assistant_defor_page7.JPG)
+![](../captures/assistant_defor_page7.JPG)
 
 > **Traitement des paramètres :** le champ Paramètres est analysé via `SafeEvaluator.eval_dict()` — les expressions Python simples sont autorisées (`[1,2]`, `0.001`, `"vlocy"`). Chaque condition est convertie en `DOFOperation` et transmise à `controller.add_dof_operation()`, qui applique la condition ET la sauvegarde dans `state.operations` (visible dans l'onglet DOF pour modification ultérieure).
 
@@ -336,7 +336,7 @@ Affiche un résumé complet de la configuration avant génération.
 | **Modèle EF** | Nom, physique, élément, anisotropie, cinématique, formulation, stockage masse |
 | **Conditions DOF** | Liste des conditions : type, groupe, paramètres |
 
-![](captures/assistant_defor_page8.JPG)
+![](../captures/assistant_defor_page8.JPG)
 
 Cliquer sur **✅ Générer le maillage** pour lancer la génération. Un message de confirmation indique le nombre de nœuds et d'éléments créés.
 
@@ -357,7 +357,7 @@ Cliquer sur **✅ Générer le maillage** pour lancer la génération. Un messag
 
 Le corps déformable peut ensuite être enrichi via l'onglet **Avatar vide** (mode « Corps déformable existant ») pour y ajouter des contacteurs de surface permettant les interactions avec des corps rigides.
 
-![](captures/assistant_defor_page9.JPG)
+![](../captures/assistant_defor_page9.JPG)
 
 ---
 

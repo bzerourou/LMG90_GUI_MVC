@@ -3,7 +3,7 @@
 **Onglet Avatar** Permet de créer, modifier et supprimer les corps rigides du projet : disques, sphères, joncs, polygones, murs, cylindres, polyèdres et plus encore.  
 Chaque avatar est défini par un **type**, un **centre**, un **matériau**, un **modèle** et des **paramètres géométriques** spécifiques à son type.
 
-![](captures/avatar_disque.JPG)
+![](../captures/avatar_disque.JPG)
 
 ---
 

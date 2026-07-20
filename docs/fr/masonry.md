@@ -30,7 +30,7 @@ L'assistant est composé de **8 pages** parcourues séquentiellement.
 | 6 | Transformations | Translation, rotation, copie décalée post-génération |
 | 7 | Récapitulatif | Vérification avant génération 
 
-![](captures/assistant_maçon_page1.JPG)
+![](../captures/assistant_maçon_page1.JPG)
 
 
 **API pylmgc90 utilisée :**
@@ -51,7 +51,7 @@ L'assistant est composé de **8 pages** parcourues séquentiellement.
 
 La valeur **2D** est sélectionnée par défaut.
 
-![](captures/assistant_maçon_page2.JPG)
+![](../captures/assistant_maçon_page2.JPG)
 
 > **Effet sur les étapes suivantes :** la dimension conditionne le label de `ly` (hauteur en 2D / profondeur en 3D), la visibilité de `lz` et de l'offset Z, l'élément du modèle (`Rxx2D` ou `Rxx3D`), et les axes disponibles pour la rotation.
 
@@ -74,7 +74,7 @@ Deux modes disponibles :
 
 Liste déroulante de tous les matériaux déjà définis dans l'onglet Matériau. Tous les types sont acceptés, mais `RIGID` est recommandé pour les briques.
 
-![](captures/assistant_granulo_page3.JPG)
+![](../captures/assistant_granulo_page3.JPG)
 
 > **Validation :** le bouton Suivant est bloqué si le nom est vide (mode A) ou si aucun matériau valide n'est disponible (mode B).
 
@@ -96,7 +96,7 @@ Deux modes disponibles :
 
 Liste déroulante des modèles définis dans l'onglet Modèle.
 
-![](captures/assistant_maçon_page4.JPG)
+![](../captures/assistant_maçon_page4.JPG)
 
 > **Validation :** le bouton Suivant est bloqué si le nom est vide (mode A) ou si aucun modèle valide n'est disponible (mode B).
 
@@ -117,7 +117,7 @@ Définit la géométrie de la brique de référence passée à `brick2D()` ou `b
 > **Brique standard française :** lx = 0,20 m · ly = 0,10 m · lz = 0,065 m (format NF EN 771-1).  
 > **Convention pylmgc90 :** `brick2D(name, lx, ly)` avec ly = hauteur. `brick3D(name, lx, ly, lz)` avec ly = profondeur, lz = hauteur.
 
-![](captures/assistant_maçon_page5.JPG)
+![](../captures/assistant_maçon_page5.JPG)
 
 ---
 
@@ -265,7 +265,7 @@ Coordonnées du **coin inférieur gauche** du mur (en mètres). Les centres des 
 | **Stocker dans un groupe** | Si coché, enregistre tous les avatars générés dans un groupe nommé (`state.avatar_groups`). Le groupe est aussi sauvegardé dans `masonry_patterns` pour la reconstruction du script. | coché |
 | **Nom du groupe** | Identifiant du groupe d'avatars. | `mur_briques` |
 
-![](captures/assistant_maçon_page6.JPG)
+![](../captures/assistant_maçon_page6.JPG)
 
 ---
 
@@ -344,7 +344,7 @@ bodies_copy.translate(dx=dx_copy, dy=dy_copy)   # ou dz en 3D
 
 > **Usage typique :** créer deux murs parallèles d'un seul coup (dx = épaisseur de la pièce), ou, combinée avec la rotation, créer l'angle d'un bâtiment.
 
-![](captures/assistant_maçon_page7.JPG)
+![](../captures/assistant_maçon_page7.JPG)
 
 ---
 

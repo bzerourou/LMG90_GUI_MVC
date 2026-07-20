@@ -290,7 +290,7 @@ for av in group_granulo_box2d:
 
 L'exemple fourni dans les exemples du projet illustre l'application de quatre conditions aux limites sur les avatars du mécanisme bielle-manivelle :
 
-![Exemple slider_crank](captures/exemple_slider_crank.JPG)
+![Exemple slider_crank](../captures/exemple_slider_crank.JPG)
 
 | Opération | Type | Cible | Paramètres typiques |
 |-----------|------|-------|---------------------|
@@ -299,7 +299,7 @@ L'exemple fourni dans les exemples du projet illustre l'application de quatre co
 | Pivot bielle-manivelle | `imposeInitValue` | Avatar bielle | `component=[1,2], value=0.` |
 | Position initiale | `translate` | Avatar manivelle | `dx=x0, dy=y0` |
 
-![](captures/exemple_slider_crank.JPG)
+![](../captures/exemple_slider_crank.JPG)
 
 ---
 

@@ -13,7 +13,7 @@ La vidéo suivante présente une vue d'ensemble des différentes parties de l'in
 
 ## Fenêtre principale
 
-![Vue globale de l'interface](captures/interface_sections.jpg)
+![Vue globale de l'interface](../captures/interface_sections.jpg)
 
 L'interface est divisée en **Six zones principales** :
 
@@ -43,13 +43,13 @@ L'interface est divisée en **Six zones principales** :
 
 Cliquez sur le bouton **Nouveau** de la barre d'outils, utilisez le menu **Fichier → Nouveau**, ou appuyez sur `Ctrl+N`. Une boîte de dialogue s'ouvre pour renseigner le nom du projet
 
-  ![](captures/nouveau_projet.JPG)
+  ![](../captures/nouveau_projet.JPG)
 
 **Ouvrir un projet**
  
 Cliquez sur le bouton **Ouvrir** de la barre d'outils, utilisez le menu **Fichier → Ouvrir**, ou appuyez sur `Ctrl+O`. Il vous suffira ensuite de spécifier le chemin et le nom de votre projet
 
-  ![](captures/ouvrir_projet.JPG)
+  ![](../captures/ouvrir_projet.JPG)
 
 **Sauvegarder**
   Sert à sauvegarder vos projets dans votre disque dur, cliquez sur le bouton **sauvegarder** de la barre d'outils, ou de cliquez sur le menu **Fichier-> Sauvegarder**, ou avec le raccourci clavier `Ctrl+S`,
@@ -69,15 +69,15 @@ Les assistants guident l'utilisateur étape par étape dans les tâches les plus
 | **Maçonnerie** | `Ctrl+Shift+M` | Spécialisé dans la création d'empilements de briques 2D et 3D (`brick2D` / `brick3D`) selon différents appareillages (standard, running bond, paneresse simple, paneresse double, etc.). |
 | **Factory** | `Ctrl+Shift+F` | Spécialisé dans la Factrory d'avatars 2D/3D, les faire apparaitre visuellement ou dans le calcul. |
 
-  ![](captures/assistant_projet.JPG)
+  ![](../captures/assistant_projet.JPG)
 
-  ![](captures/assistant_granulo_pylmgc90.JPG)
+  ![](../captures/assistant_granulo_pylmgc90.JPG)
 
-  ![](captures/assistant_granulo_numpy.JPG) 
+  ![](../captures/assistant_granulo_numpy.JPG) 
 
-  ![](captures/assistant_defor_page1.JPG) 
+  ![](../captures/assistant_defor_page1.JPG) 
 
-  ![](captures/assistant_maçon_page1.JPG)
+  ![](../captures/assistant_maçon_page1.JPG)
 
 > **Remarque :** les assistants peuvent être relancés à tout moment pendant la session. Chaque exécution ajoute les éléments générés à la suite du projet existant, sans effacer ce qui a été créé auparavant. 
 La duplication des éléments qui portent le même nom entraîne des erreurs, pensez à nommer différemment vos éléments.
@@ -106,7 +106,7 @@ La duplication des éléments qui portent le même nom entraîne des erreurs, pe
 | **Voir logs LMGC90** | `F6` | Affiche en temps réel les sorties console du calcul en cours. |
 | **Journal de l'application** | `F7` | Affiche le journal interne de LMGC90_GUI : erreurs non gérées, avertissements Python, appels pylmgc90 échoués. Utile pour diagnostiquer les problèmes qui ne génèrent pas de message visible dans l'interface. |
   
-![](captures/journal_app.JPG)
+![](../captures/journal_app.JPG)
 
 ---
 
@@ -172,7 +172,7 @@ Zone fixe affichant l'**arborescence complète du modèle en cours**. Elle se me
  
 Zone principale de travail. Chaque onglet est dédié à une étape de modélisation. Pour ouvrir un onglet, utilisez le menu **Onglets → Ouvrir** et choisissez l'onglet souhaité.
 
-![](captures/onglets.jpg)
+![](../captures/onglets.jpg)
 
 | Onglet | Raccourci | Description |
 |--------|-----------|-------------|
@@ -221,7 +221,7 @@ Les vues rapides **XY**, **XZ**, **YZ** et **Iso** sont accessibles depuis la ba
 
 Accessible via **Outils → Préférences** ou le raccourci `Ctrl+,`. La boîte de dialogue de préférences regroupe les paramètres de configuration de l'application.
 
-![](captures/preferences.JPG)
+![]../captures/preferences.JPG)
 
 | Paramètre | Description |
 |-----------|-------------|
@@ -236,7 +236,7 @@ Accessible via **Outils → Préférences** ou le raccourci `Ctrl+,`. La boîte 
 LMGC90_GUI inclut un convertisseur bétâ (script python) vers un .lmgc (JSON).
 Il vous suffit seulement de donner le chemin de votre script puis le nom de votre fichier et de cliquer sur le bouton "Convertir".
 
-![](captures/convert.JPG)
+![](../captures/convert.JPG)
 
 > **Remarque** : traduit selon la complexité de votre script.
 

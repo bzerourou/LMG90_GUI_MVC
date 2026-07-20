@@ -18,7 +18,7 @@ Trois façons d'ouvrir l'assistant :
 | Barre d'outils | Bouton dédié (selon la configuration de la barre) |
 | Raccourci clavier | `Ctrl+Shift+N` |
 
-![Ouverture de l'assistant](captures/projet_assistant.JPG)
+![Ouverture de l'assistant](../captures/projet_assistant.JPG)
 
 > **Annulation possible à tout moment** : cliquer sur **❌ Annuler** à n'importe quelle étape ferme l'assistant sans modifier le projet. L'état du projet (nom, dimension, chemin) est entièrement restauré.
 
@@ -52,7 +52,7 @@ Cliquer sur **Suivant ➡️** pour commencer.
 
 ## Page 1 — Informations du projet
 
-![Page nom du projet](captures/projet_assistant_nom.JPG)
+![Page nom du projet](../captures/projet_assistant_nom.JPG)
 
 | Champ | Description | Contraintes |
 |-------|-------------|-------------|
@@ -65,7 +65,7 @@ Cliquer sur **Suivant ➡️** pour commencer.
 
 ## Page 2 — Dimension du problème
 
-![Page dimension](captures/projet_assistant_dimension.JPG)
+![Page dimension](../captures/projet_assistant_dimension.JPG)
 
 Choisir entre deux options exclusives (boutons radio) :
 
@@ -85,7 +85,7 @@ La valeur **2D** est sélectionnée par défaut.
 
 ## Page 3 — Matériau
 
-![Page matériau](captures/projet_assistant_materiau.JPG)
+![Page matériau](../captures/projet_assistant_materiau.JPG)
 
 Cette page propose deux modes selon l'état du projet :
 
@@ -109,7 +109,7 @@ Cocher **Créer un nouveau matériau à la place** pour afficher le formulaire d
 
 ## Page 4 — Modèle physique
 
-![Page modèle](captures/projet_assistant_modele.JPG)
+![Page modèle](../captures/projet_assistant_modele.JPG)
 
 Même logique que la page Matériau : réutiliser un modèle existant ou en créer un nouveau.
 
@@ -131,7 +131,7 @@ Liste déroulante des modèles déjà définis dans l'onglet Modèle.
 
 ## Page 5 — Premier avatar _(optionnel)_
 
-![Page avatar](captures/projet_assistant_avatar.JPG)
+![Page avatar](../captures/projet_assistant_avatar.JPG)
 
 Cette page est **optionnelle**. Elle permet de créer un avatar de test positionné à l'origine (centre = `[0, 0]` en 2D ou `[0, 0, 0]` en 3D).
 
@@ -151,7 +151,7 @@ Cocher **Créer un avatar de test** pour afficher le formulaire :
 
 ## Page 6 — Loi de contact _(optionnelle)_
 
-![Page loi de contact](captures/projet_assistant_contact.JPG)
+![Page loi de contact](../captures/projet_assistant_contact.JPG)
 
 Définit le comportement mécanique lors des contacts entre avatars. Cocher **Créer une loi de contact** (coché par défaut) pour afficher le formulaire :
 
@@ -191,7 +191,7 @@ Définit le comportement mécanique lors des contacts entre avatars. Cocher **Cr
 
 ## Page 7 — Table de visibilité _(optionnelle)_
 
-![Page visibilité](captures/projet_assistant_visibilite.JPG)
+![Page visibilité](../captures/projet_assistant_visibilite.JPG)
 
 La table de visibilité définit **quels contacteurs peuvent se détecter mutuellement** et avec quelle loi de contact. Cocher **Créer une table de visibilité** (coché par défaut) pour afficher le formulaire :
 
@@ -217,7 +217,7 @@ La table de visibilité définit **quels contacteurs peuvent se détecter mutuel
 
 ## Page 8 — Récapitulatif
 
-![Page récapitulatif](captures/projet_assistant_recap.JPG)
+![Page récapitulatif](../captures/projet_assistant_recap.JPG)
 
 La dernière page affiche un résumé complet de tous les éléments qui seront créés. Vérifier les informations avant de valider.
 

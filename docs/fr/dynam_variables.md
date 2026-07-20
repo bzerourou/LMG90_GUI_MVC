@@ -1,7 +1,7 @@
 # Variables dynamiques
 Les **variables dynamiques** de LMGC90_GUI permettent d'écrire des expressions Python directement dans les champs de saisie de l'interface, en utilisant les données du projet (avatars, matériaux, modèles, groupes) comme des variables. Elles remplacent les valeurs numériques figées par des expressions calculées à la volée, et se propagent automatiquement dans tous les onglets.
 
-![](captures/variables.JPG)
+![](../captures/variables.JPG)
 
 ---
 

@@ -5,7 +5,7 @@
 L'onglet `calcul` gère la configuration et le lancement des simulations LMGC90. Il génère automatiquement le DATBOX et le script `command.py`, puis exécute ce script.
 ## Paramètres de calcul
 
-![](captures/calcul.JPG)
+![](../captures/calcul.JPG)
 
 | Paramètre | Champ UI | Valeur par défaut | Description |
 |---|---|---|---|
@@ -36,7 +36,7 @@ L'onglet `calcul` gère la configuration et le lancement des simulations LMGC90.
 ### Paramétrer vos calculs 
 Il est possible de paramétrer vos scripts calculs via au bouton "Configurer les routines chipy", une boite de dialogue s'ouvrira sur votre interface, 
 
-![](captures/config_calculs.JPG)
+![](../captures/config_calculs.JPG)
 
 #### 1.Onglet Modèle 
 Le premier onglet fait l'objet d'une détéection automatique sur l'hypothèse de votre modèle, et charge tous les paramètres se lon vos avatars, 
@@ -58,7 +58,7 @@ Le premier onglet fait l'objet d'une détéection automatique sur l'hypothèse d
 #### 2.Routines
 Cet onglet sélectionne les routines chipy à inclure dans la boucle de calcul. Chaque case à cocher correspond à un appel de la famille NewStep / ComputeStep / WriteOut dans le script généré.
 
-![](captures/config_calculs_routines.JPG)
+![](../captures/config_calculs_routines.JPG)
 
 **Corps rigides 2D — RBDY2**
 
@@ -120,7 +120,7 @@ de structures maçonnées avec blocs déformables.
 #### 3.Extraction
 Cet onglet configure toutes les sorties du calcul : fichiers de visualisation, visibilité des avatars, extraction de vecteurs d'état, forces de contact, énergie et champs FEM.
 
-![](captures/config_calculs_extraction.JPG)
+![](../captures/config_calculs_extraction.JPG)
 
 **Messages chipy (logs)**
 
@@ -205,7 +205,7 @@ Vecteurs disponibles :
 
 Cet onglet contrôle des fonctions avancées du déroulement du calcul : reprise depuis un état sauvegardé, arrêt anticipé sur critère de convergence et séquençage multi-pas.
 
-![](captures/config_pilotage.JPG)
+![](../captures/config_pilotage.JPG)
 
 **Restart — Reprise de calcul**
 Permet de reprendre un calcul à partir d'un état précédemment sauvegardé dans les fichiers .dat.last.
@@ -238,7 +238,7 @@ Permet de définir plusieurs phases de calcul avec des pas de temps différents.
 
 Cet onglet permet d'ajouter des appels d'inspection sur les contacteurs 2D du modèle. Chaque ligne correspond à un appel chipy.XXXX_GetYYYY() inséré dans la boucle de calcul ou après celle-ci.
 
-![](captures/config_inspect2D.JPG)
+![](../captures/config_inspect2D.JPG)
 
 Cliquer sur « + Ajouter une inspection 2D » pour créer une ligne. Chaque ligne contient cinq colonnes :
 
@@ -289,7 +289,7 @@ Les fonctions sont regroupées par type de contacteur :
 
 ### 6. Inspection 3D
 
-![](captures/config_inspect3D.JPG)
+![](../captures/config_inspect3D.JPG)
 
 Fonctionnement identique à l'onglet Inspection 2D, mais pour les contacteurs 3D. Les familles disponibles sont :
 
@@ -318,7 +318,7 @@ Fonctionnement identique à l'onglet Inspection 2D, mais pour les contacteurs 3D
 
 Cet onglet inspecte les paires de contacteurs actives (interactions en cours de simulation). L'ID utilisé est l'index de la paire dans la liste chipy (numérotation 1-based).
 
-![](captures/config_interac.JPG)
+![](../captures/config_interac.JPG)
 
 Les fonctions sont regroupées par type d'interaction :
 

@@ -244,7 +244,7 @@ Ces options s'affichent pour tous les éléments thermiques non rigides.
 5. Sélectionner l'élément : `Rxx2D` — la section Options disparaît (aucune option pour les éléments rigides).
 6. Cliquer sur **✅ Créer Modèle**.
  
-![Création d'un modèle rigide 2D](captures/modele_rigid.JPG)
+![Création d'un modèle rigide 2D](../captures/modele_rigid.JPG)
  
 ---
  
