@@ -110,8 +110,8 @@ class VisibilityTab(BaseTab):
         self.behavior_combo = QComboBox()
         params_form.addRow("Loi de contact :", self.behavior_combo)
         
-        self.alert_input = QLineEdit("0.1")
-        params_form.addRow("Alert (distance) :", self.alert_input)
+        self.alert_input = self.make_unit_field(default="0.1", unit_key="length")
+        params_form.addRow("Alert :", self.alert_input)
         
         layout.addLayout(params_form)
         
@@ -395,3 +395,4 @@ class VisibilityTab(BaseTab):
         
         self._update_antagonist_contactors(self.antagonist_body_combo.currentText())
         self._update_candidate_contactors(self.candidate_body_combo.currentText())
+        self.refresh_units()

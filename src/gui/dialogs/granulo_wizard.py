@@ -159,6 +159,8 @@ class GranuloWizard(QWizard):
             granu_kwargs["seed"] = seed
         radii = pre.granulo_Random(**granu_kwargs)
 
+        use_particle_population = dist_page.use_particle_population_check.isChecked()
+
         # ── Dépôt dans le conteneur ──────────────────────────────────────────
         deposit_fn   = self._DEPOSIT_FUNC.get(container_type, "depositInBox2D")
         deposit_keys = self._DEPOSIT_PARAMS.get(container_type, ["lx", "ly"])
@@ -193,52 +195,73 @@ class GranuloWizard(QWizard):
         group_name       = f"granulo_{container_type.lower()}"
         color            = "BLUEx"
 
-        generated_indices = []
-        for j in range(nb_particles):
-            center = coords[j].tolist()  # Convertir en liste pour compatibilité avec Avatar
-            radius = radii[j]
-
-            # Modèle Avatar (state) — sans signal
-            av_model = Avatar(
-                avatar_type=avatar_type_enum,
-                center=center,
-                material_name=mat_name,
+        if use_particle_population:
+            config = GranuloGeneration(
+                nb_particles=len(radii),
+                radius_min=radius_min,
+                radius_max=radius_max,
+                container_type=container_type,
+                container_params=container_params,
                 model_name=mod_name,
+                material_name=mat_name,
+                avatar_type=avatar_type_str,
+                seed=seed,
+                group_name=group_name,
                 color=color,
-                origin=AvatarOrigin.GRANULO,
-                radius=radius
+                use_particle_population=True,
             )
-            ctrl.state.avatars.append(av_model)
-            idx = len(ctrl.state.avatars) - 1
+            ctrl.create_granulo_population_from_arrays(
+                config,
+                coords.astype(float),
+                radii.astype(float),
+            )
+        else:
+            generated_indices = []
+            for j in range(nb_particles):
+                center = coords[j].tolist()  # Convertir en liste pour compatibilité avec Avatar
+                radius = radii[j]
 
-            # Objet pylmgc90 direct
-            body_obj = LMGC90Bridge.create_avatar(av_model, mod_obj, mat_obj)
-            ctrl._bodies_container.addAvatar(body_obj)
-            ctrl._pylmgc_bodies.append(body_obj)
+                # Modèle Avatar (state) — sans signal
+                av_model = Avatar(
+                    avatar_type=avatar_type_enum,
+                    center=center,
+                    material_name=mat_name,
+                    model_name=mod_name,
+                    color=color,
+                    origin=AvatarOrigin.GRANULO,
+                    radius=radius
+                )
+                ctrl.state.avatars.append(av_model)
+                idx = len(ctrl.state.avatars) - 1
 
-            generated_indices.append(idx)
+                # Objet pylmgc90 direct
+                body_obj = LMGC90Bridge.create_avatar(av_model, mod_obj, mat_obj)
+                ctrl._bodies_container.addAvatar(body_obj)
+                ctrl._pylmgc_bodies.append(body_obj)
 
-        # ── Enregistrer la config granulo dans le state ───────────────────────
-        config = GranuloGeneration(
-            nb_particles=len(radii),
-            radius_min=radius_min,
-            radius_max=radius_max,
-            container_type=container_type,
-            container_params=container_params,
-            model_name=mod_name,
-            material_name=mat_name,
-            avatar_type=avatar_type_str,
-            seed=seed,
-            group_name=group_name,
-            color=color,
-        )
-        config.generated_ids = generated_indices
-        ctrl.state.granulo_generations.append(config)
+                generated_indices.append(idx)
 
-        if group_name:
-            if group_name not in ctrl.state.avatar_groups:
-                ctrl.state.avatar_groups[group_name] = []
-            ctrl.state.avatar_groups[group_name].extend(generated_indices)
+            # ── Enregistrer la config granulo dans le state ───────────────────────
+            config = GranuloGeneration(
+                nb_particles=len(radii),
+                radius_min=radius_min,
+                radius_max=radius_max,
+                container_type=container_type,
+                container_params=container_params,
+                model_name=mod_name,
+                material_name=mat_name,
+                avatar_type=avatar_type_str,
+                seed=seed,
+                group_name=group_name,
+                color=color,
+            )
+            config.generated_ids = generated_indices
+            ctrl.state.granulo_generations.append(config)
+
+            if group_name:
+                if group_name not in ctrl.state.avatar_groups:
+                    ctrl.state.avatar_groups[group_name] = []
+                ctrl.state.avatar_groups[group_name].extend(generated_indices)
 
         # Un seul signal à la fin pour rafraîchir l'UI
         ctrl.state_changed.emit()
@@ -454,7 +477,7 @@ class DistributionPage(QWizardPage):
         nb_form = QFormLayout()
         
         self.nb_particles_spin = QSpinBox()
-        self.nb_particles_spin.setRange(10, 10000)
+        self.nb_particles_spin.setRange(10, 300000)
         self.nb_particles_spin.setValue(200)
         self.nb_particles_spin.valueChanged.connect(self._update_info)
         nb_form.addRow("Nombre demandé :", self.nb_particles_spin)
@@ -501,6 +524,14 @@ class DistributionPage(QWizardPage):
         
         self.use_seed_check = QCheckBox("Utiliser une graine aléatoire")
         seed_layout.addWidget(self.use_seed_check)
+
+        self.use_particle_population_check = QCheckBox(
+            "Créer comme ParticlePopulation (SoA, plus adapté aux gros volumes)"
+        )
+        self.use_particle_population_check.setToolTip(
+            "Utilise une Population SoA au lieu d’ajouter un avatar individuel par particule."
+        )
+        seed_layout.addWidget(self.use_particle_population_check)
         
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(0, 999999)
@@ -825,6 +856,8 @@ class GranuloSummaryPage(QWizardPage):
         <li><b>Ratio Rmax/Rmin :</b>{dist_page.radius_min_spin.value()}m</li>"""
         if dist_page.use_seed_check.isChecked():
                 summary += f"<li><b>Seed :</b> {dist_page.seed_spin.value()}</li>"
+        if dist_page.use_particle_population_check.isChecked():
+                summary += "<li><b>Mode :</b> ParticlePopulation (SoA)</li>"
             
         summary += "</ul>"
             

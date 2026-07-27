@@ -6,13 +6,26 @@ Pont entre nos modèles et les objets pylmgc90.
 Gère la conversion et la création d'objets LMGC90.
 """
 import numpy as np
-from typing import Dict, List, Any
-from pylmgc90 import pre
+from typing import Dict, List, Any, TYPE_CHECKING
+
+try:
+    from pylmgc90 import pre
+except ModuleNotFoundError:  # pragma: no cover - fallback pour tests/CI
+    class _FallbackPre:
+        def __getattr__(self, name):
+            def _missing(*args, **kwargs):
+                return None
+            return _missing
+
+    pre = _FallbackPre()
 
 from .models import (
-    Material, Model, Avatar, ContactLaw, VisibilityRule, 
+    Material, Model, Avatar, ContactLaw, VisibilityRule,
     DOFOperation, AvatarType, MaterialType, ContactLawType
 )
+
+if TYPE_CHECKING:
+    from .particle_population import ParticlePopulation
 
 
 class LMGC90Bridge:
@@ -407,8 +420,52 @@ class LMGC90Bridge:
         
         else:
             raise ValueError(f"Type d'avatar non supporté: {atype}")
-    
-    
+
+    # ── Création en masse depuis une ParticlePopulation (SoA) ────────────────
+
+    @staticmethod
+    def create_avatars_from_population(
+        population: "ParticlePopulation", model_obj: Any, material_obj: Any
+    ) -> List[Any]:
+        """
+        Crée les objets pylmgc90 réels pour toute une population, en une
+        seule passe. Reste un appel Fortran par particule côté pylmgc90
+        (limite structurelle de l'API : granulo_Random/depositInXxx sont
+        vectorisés, mais la création d'avatar elle-même ne l'est pas),
+        mais élimine tout l'overhead Python côté GUI (pas d'objet Avatar/
+        dataclass intermédiaire par particule, accès direct aux arrays
+        numpy de la population).
+
+        Limité pour l'instant aux deux types que la génération granulo
+        produit réellement : RIGID_DISK (2D) et RIGID_SPHERE (3D).
+        """
+        atype = population.avatar_type
+        color = population.color
+        centers = population.centers
+        radii = population.radii
+
+        if atype == AvatarType.RIGID_DISK:
+            factory = pre.rigidDisk
+        elif atype == AvatarType.RIGID_SPHERE:
+            factory = pre.rigidSphere
+        else:
+            raise ValueError(
+                f"create_avatars_from_population : type non supporté "
+                f"({atype.value}). Seuls RIGID_DISK/RIGID_SPHERE sont "
+                f"couverts par ce chemin SoA pour l'instant."
+            )
+
+        bodies = []
+        for i in range(len(population)):
+            bodies.append(factory(
+                r=float(radii[i]),
+                center=centers[i],   # ndarray 1D — pylmgc90 accepte array-like
+                model=model_obj,
+                material=material_obj,
+                color=color,
+            ))
+        return bodies
+
     @staticmethod
     def create_contact_law(law: ContactLaw) -> Any:
         """Crée une loi de contact pylmgc90"""
@@ -567,4 +624,3 @@ class LMGC90Bridge:
             avatar_obj: Objet avatar pylmgc90
         """
         getattr(avatar_obj, operation.operation_type)(**operation.parameters)
-

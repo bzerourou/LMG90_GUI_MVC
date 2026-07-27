@@ -731,6 +731,8 @@ class MainWindow(QMainWindow):
             
             # Appliquer les changements
             self._apply_preferences()
+            # rafraichir tout
+            self._refresh_all()
             
             QMessageBox.information(
                 self, "Préférences",

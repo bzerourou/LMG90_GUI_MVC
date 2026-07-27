@@ -24,6 +24,11 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 from .models import ProjectState, Avatar, AvatarOrigin
+from .particle_population import ParticlePopulation
+from .particle_population_io import (load_populations_sidecar, 
+                                    save_populations_sidecar,
+                                    sidecar_path_for
+                                    )
 
 # Version courante du schéma
 _SCHEMA_VERSION = 2
@@ -38,6 +43,7 @@ class ProjectSerializer:
     def save(state: ProjectState, filepath: Path) -> None:
         """
         Sauvegarde l'état du projet dans un fichier JSON (schéma v2).
+        + Sauvegarde les populations de particules dans un sidecar .npz compressé.
         """
         data = state.to_dict()
 
@@ -62,6 +68,16 @@ class ProjectSerializer:
             for grp, aids in data.get('avatar_groups', {}).items()
             if aids
         }
+        # ----Population sidecar (arrays séparés du JSON) ----
+        populations = getattr(state, 'particle_populations', []) or []
+        #data['particle_populations'] = [p.to_meta_dict() for p in populations]
+        npz_path = sidecar_path_for(filepath)
+        save_populations_sidecar(populations, npz_path)
+        if populations:
+            data['particle_populations_sidecar'] = npz_path.name  # nom relatif
+        else:
+            data.pop('particle_populations_sidecar', None)
+
 
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -84,6 +100,38 @@ class ProjectSerializer:
         version = data.get('schema_version', 1)
         if version < 2:
             data = _migrate_v1_to_v2(data)
+
+        # ── Résoudre les populations AVANT ProjectState.from_dict() ──────
+        # (ProjectState.from_dict() sait déjà lire des populations
+        #  "autonomes" avec arrays inline pour la rétrocompat — ici on lui
+        #  prépare des dicts qui contiennent centers/radii, en les
+        #  récupérant soit du sidecar, soit du JSON directement.)
+        raw_populations = data.get('particle_populations', [])
+        sidecar_name = data.get('particle_populations_sidecar')
+        load_warnings: List[str] = []
+
+        if sidecar_name and raw_populations:
+            npz_path = filepath.parent / sidecar_name
+            sidecar_arrays = load_populations_sidecar(npz_path)
+
+            merged_populations = []
+            for meta in raw_populations:
+                pop_id = meta.get('population_id')
+                if pop_id in sidecar_arrays:
+                    centers, radii = sidecar_arrays[pop_id]
+                    merged = dict(meta)
+                    merged['centers'] = centers.tolist()
+                    merged['radii'] = radii.tolist()
+                    merged_populations.append(merged)
+                else:
+                    load_warnings.append(
+                        f"Population '{pop_id}' introuvable dans le sidecar "
+                        f"'{sidecar_name}' — population ignorée."
+                    )
+            data['particle_populations'] = merged_populations
+        # Sinon : raw_populations contient déjà centers/radii inline
+        # (format étape 2, ou projet sans sidecar) — rien à faire, laissé
+        # tel quel pour que ProjectState.from_dict() le lise directement.
 
         state = ProjectState.from_dict(data)
 

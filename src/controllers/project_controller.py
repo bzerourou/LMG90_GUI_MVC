@@ -90,4 +90,5 @@ class ProjectController(
         self._pylmgc_materials: Dict[str, Any] = {}
         self._pylmgc_models:    Dict[str, Any] = {}
         self._pylmgc_bodies:    List[Any]       = []
+        self._pylmgc_population_bodies : Dict[str, List[Any]] = {} 
         self._pylmgc_laws:      Dict[str, Any] = {}

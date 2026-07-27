@@ -111,14 +111,15 @@ class AvatarTab(BaseTab):
         
         # Champs spécifiques
         self.radius_label = QLabel("Rayon :")
-        self.radius_input = QLineEdit("0.1")
+        self.radius_input = self.make_unit_field(default="0.1", unit_key="length")
         form.addRow(self.radius_label, self.radius_input)
         
         self.hollow_check = QCheckBox("Disque creux (hollow)")
         form.addRow("", self.hollow_check)
         
+
         self.axes_label = QLabel("Axes (axe1, axe2) :")
-        self.axes_input = QLineEdit("2.0, 0.05")
+        self.axes_input = self.make_unit_field(default="2.0, 0.05", unit_key="length")
         form.addRow(self.axes_label, self.axes_input)
         
         self.gen_type_label = QLabel("Type génération :")
@@ -127,27 +128,27 @@ class AvatarTab(BaseTab):
         form.addRow(self.gen_type_label, self.gen_type_combo)
         
         self.nb_vertices_label = QLabel("Nb vertices :")
-        self.nb_vertices_input = QLineEdit("5")
+        self.nb_vertices_input = self.make_unit_field(default="5", unit_key="length")
         form.addRow(self.nb_vertices_label, self.nb_vertices_input)
         
         self.vertices_label = QLabel("Vertices (liste) :")
-        self.vertices_input = QLineEdit("[[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]]")
+        self.vertices_input = self.make_unit_field(default="[[−0.5,−0.5],[0.5,−0.5],[0.5,0.5],[−0.5,0.5]]", unit_key="length")
         form.addRow(self.vertices_label, self.vertices_input)
         
         self.ovoid_label = QLabel("Rayons (ra, rb) :")
-        self.ovoid_input = QLineEdit("1.0, 0.5")
+        self.ovoid_input = self.make_unit_field(default="1.0, 0.5", unit_key="length"  )
         form.addRow(self.ovoid_label, self.ovoid_input)
         
         self.wall_length_label = QLabel("Longueur :")
-        self.wall_length_input = QLineEdit("2.0")
+        self.wall_length_input = self.make_unit_field(default="2.0", unit_key="length")
         form.addRow(self.wall_length_label, self.wall_length_input)
         
         self.wall_height_label = QLabel("Hauteur/Rayon :")
-        self.wall_height_input = QLineEdit("0.15")
+        self.wall_height_input = self.make_unit_field(default="0.15", unit_key="length")
         form.addRow(self.wall_height_label, self.wall_height_input)
         
-        self.wall_nb_label = QLabel("Nb vertices/polyg :")
-        self.wall_nb_input = QLineEdit("10")
+        self.wall_nb_label = QLabel("Nb vertices/polyg :") #normalement pas d'unité pour ce champ, 
+        self.wall_nb_input = self.make_unit_field(default="10", unit_key="")
         form.addRow(self.wall_nb_label, self.wall_nb_input)
         
         layout.addLayout(form)
@@ -799,3 +800,4 @@ class AvatarTab(BaseTab):
                 item.setForeground(0, QBrush(QColor(100, 100, 100)))
             
             self.tree.addTopLevelItem(item)
+        self.refresh_units()

@@ -97,7 +97,7 @@ class LoopTab(BaseTab):
         classic_form.addRow("Nombre d'avatars :", self.count_input)
 
         self.radius_label = QLabel("Rayon :")
-        self.radius_input = QLineEdit("2.0")
+        self.radius_input = self.make_unit_field(default="2.0", unit_key="length")
         classic_form.addRow(self.radius_label, self.radius_input)
 
         self.step_label = QLabel("Pas :")
@@ -1099,3 +1099,4 @@ class LoopTab(BaseTab):
 
                 item.setData(0, Qt.ItemDataRole.UserRole, global_idx)
                 self.tree.addTopLevelItem(item)
+        self.refresh_units()

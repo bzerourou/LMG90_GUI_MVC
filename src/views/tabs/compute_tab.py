@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from ...core.validators import ValidationError
+from ...views.tabs.base_tab import BaseTab
 import sys
 import os
 from pathlib import Path
@@ -110,11 +111,11 @@ class ComputeWorker(QThread):
                 self._process.kill()
 
 
-class ComputeTab(QWidget):
+class ComputeTab(BaseTab):
     """Onglet paramètres de calcul"""
     
     def __init__(self, controller):
-        super().__init__()
+        super().__init__(controller)
         self.controller = controller
         self.worker = None
         self._chipy_params : dict = {}
@@ -142,8 +143,8 @@ class ComputeTab(QWidget):
         time_group = QGroupBox("⏱️ Paramètres Temporels")
         time_form = QFormLayout()
         
-        self.dt_input = QLineEdit("1e-3")
-        time_form.addRow("Pas de temps (dt):", self.dt_input)
+        self.dt_input = self.make_unit_field(default="1e-3", unit_key="time")
+        time_form.addRow("Pas de temps (dt) :", self.dt_input)
         
         self.nb_steps_input = QLineEdit("1000")
         time_form.addRow("Nombre d'itérations:", self.nb_steps_input)
@@ -492,4 +493,4 @@ class ComputeTab(QWidget):
     
     def refresh(self):
         """Rafraîchit (appelé par main_window)"""
-        pass
+        self.refresh_units()

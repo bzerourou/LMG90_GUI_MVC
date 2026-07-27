@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSignal, Qt
 
 from ...core.models import Avatar, AvatarType, AvatarOrigin
+from ...core.particle_population import ParticlePopulation
 
 
 # ============================================================================
@@ -815,6 +816,18 @@ def build_avatar_mesh(avatar: Avatar) -> Optional[pv.PolyData]:
         return None
 
 
+def _expand_renderables(renderables) -> List[Tuple[int, Avatar]]:
+    """Transforme les avatars et les populations en une séquence d'avatars rendables."""
+    expanded: List[Tuple[int, Avatar]] = []
+    for item in renderables or []:
+        if isinstance(item, ParticlePopulation):
+            for i in range(len(item)):
+                expanded.append((len(expanded), item.as_avatar_view(i)))
+        elif isinstance(item, Avatar):
+            expanded.append((len(expanded), item))
+    return expanded
+
+
 # ============================================================================
 # Utilitaires couleur et style
 # ============================================================================
@@ -1402,9 +1415,11 @@ class Viewer3D(QWidget):
         if not avatars:
             return
 
+        renderables = _expand_renderables(avatars)
+
         # ── Mode pylmgc90 : rendu via visuAvatars ────────────────────────────
         if self._pylmgc90_mode:
-            self._render_with_pylmgc90(avatars)
+            self._render_with_pylmgc90([av for _, av in renderables])
             return
 
         # ── Mode paramétrique ────────────────────────────────────────────────
@@ -1412,7 +1427,7 @@ class Viewer3D(QWidget):
         batches: Dict = {}
         singles = []
 
-        for i, av in enumerate(avatars):
+        for i, av in renderables:
             if av.avatar_type in _BATCH_TYPES:
                 color = _color_for_avatar(av, self._color_mode)
                 key   = (av.avatar_type, color)
@@ -1454,7 +1469,7 @@ class Viewer3D(QWidget):
 
         # DOF hints si activés
         if self._dof_check.isChecked():
-            self._draw_dof_hints(avatars)
+            self._draw_dof_hints([av for _, av in renderables])
 
         self._refresh_group_combo()
         self._update_info()

@@ -637,6 +637,8 @@ class GranuloGeneration:
     seed: Optional[int] = None
     group_name: Optional[str] = None
     generated_ids: List[str] = field(default_factory=list)
+    use_particle_population: bool = False
+    population_id: Optional[str] = None
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire"""
@@ -655,6 +657,8 @@ class GranuloGeneration:
             'seed': self.seed,
             'stored_in_group': self.group_name,
             'avatar_ids': self.generated_ids,
+            'use_particle_population': self.use_particle_population,
+            'population_id': self.population_id,
         }
     
     @classmethod
@@ -678,7 +682,9 @@ class GranuloGeneration:
             color=data.get('color', 'BLUEx'),
             seed=data.get('seed'),
             group_name=data.get('stored_in_group'),
-            generated_ids=data.get('avatar_ids', [])
+            generated_ids=data.get('avatar_ids', []),
+            use_particle_population=data.get('use_particle_population', False),
+            population_id=data.get('population_id'),
         )
 
 
@@ -802,6 +808,12 @@ class ProjectState:
 
     `avatar_groups` : Dict[str, List[str]] — les listes contiennent
     désormais des avatar_id (str) et non plus des positions (int).
+        `particle_populations` : populations de particules générées en masse
+    (SoA — granulo, factory, boucles massives), en complément de `avatars`
+    (AoS) qui reste réservé aux éléments peu nombreux et édités
+    individuellement. Introduit à l'étape 2 du refactor ParticlePopulation
+    — pas encore utilisé par les mixins existants (granulo_mixin.py continue
+    de peupler `avatars` pour l'instant, migration prévue à l'étape 4).
     """
     name: str
     dimension: int = 2
@@ -810,6 +822,8 @@ class ProjectState:
     materials: List[Material] = field(default_factory=list)
     models: List[Model] = field(default_factory=list)
     avatars: List[Avatar] = field(default_factory=list)
+    particle_populations: List[Any] = field(default_factory=list)  # List[ParticlePopulation]
+    populations_groups: Dict[str, List[str]] = field(default_factory=dict)  # group_name -> list of population_ids
     custom_templates: Dict[int, Dict[str, Dict[str, Any]]] = field(default_factory=dict)
     contact_laws: List[ContactLaw] = field(default_factory=list)
     visibility_rules: List[VisibilityRule] = field(default_factory=list)
@@ -849,6 +863,8 @@ class ProjectState:
             'materials': [m.to_dict() for m in self.materials],
             'models': [m.to_dict() for m in self.models],
             'avatars': [a.to_dict() for a in manual_avatars],
+            'particle_populations': [p.to_dict() for p in self.particle_populations],
+            'populations_groups': self.populations_groups,
             'custom_templates': self.custom_templates,
             'contact_laws': [c.to_dict() for c in self.contact_laws],
             'visibility_rules': [v.to_dict() for v in self.visibility_rules],
@@ -866,6 +882,8 @@ class ProjectState:
     @classmethod
     def from_dict(cls, data: Dict) -> 'ProjectState':
         """Crée un état complet depuis un dictionnaire."""
+
+        from .particle_population import ParticlePopulation  # Importer ici pour éviter les dépendances circulaires
         prefs_data = data.get('preferences', {})
         preferences = ProjectPreferences.from_dict(prefs_data) if prefs_data else ProjectPreferences()
 
@@ -885,6 +903,19 @@ class ProjectState:
             data, extra_warnings = cls._migrate_legacy_avatar_refs(data, avatars)
             load_warnings.extend(extra_warnings)
 
+        # Chargement défensif des populations : un fichier corrompu sur UNE
+        # population ne doit pas empêcher le chargement du reste du projet
+        # (cohérent avec la philosophie load_warnings déjà en place).
+        particle_populations = []
+        for i, pop_data in enumerate(data.get('particle_populations', [])):
+            try:
+                particle_populations.append(ParticlePopulation.from_dict(pop_data))
+            except Exception as e:
+                load_warnings.append(
+                    f"Population de particules #{i + 1} : chargement échoué "
+                    f"({e}) — population ignorée."
+                )
+
         state = cls(
             name=data.get('project_name', 'Projet'),
             dimension=data.get('dimension', 2),
@@ -893,6 +924,8 @@ class ProjectState:
             materials=[Material.from_dict(m) for m in data.get('materials', [])],
             models=[Model.from_dict(m) for m in data.get('models', [])],
             avatars=avatars,
+            particle_populations=particle_populations,
+            populations_groups=data.get('populations_groups', data.get('population_groups', {})),
             contact_laws=[ContactLaw.from_dict(c) for c in data.get('contact_laws', [])],
             visibility_rules=[VisibilityRule.from_dict(v) for v in data.get('visibility_rules', [])],
             operations=[DOFOperation.from_dict(o) for o in data.get('operations', [])],

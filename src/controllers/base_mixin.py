@@ -14,7 +14,17 @@ from pathlib import Path
 
 from ..core.models import Avatar, AvatarOrigin
 from ..core.pylmgc_bridge import LMGC90Bridge
-from pylmgc90 import pre
+
+try:
+    from pylmgc90 import pre
+except ModuleNotFoundError:  # pragma: no cover - fallback pour tests/CI
+    class _FallbackPre:
+        def __getattr__(self, name):
+            def _missing(*args, **kwargs):
+                return None
+            return _missing
+
+    pre = _FallbackPre()
 
 
 class BaseMixin:
@@ -66,7 +76,7 @@ class BaseMixin:
             if hasattr(body, 'nodes') and len(body.nodes) > 0:
                 self.state.avatars[index].center = body.nodes[1].coor
         except Exception as e:
-            from ...core.app_logger import get_logger
+            from ..core.app_logger import get_logger
             get_logger('controller').warning(
                 f"Erreur synchronisation position avatar {index}: {e}"
             )
@@ -84,6 +94,7 @@ class BaseMixin:
         self._pylmgc_models.clear()
         self._pylmgc_bodies.clear()
         self._pylmgc_laws.clear()
+        self._pylmgc_population_bodies.clear()
 
     # ── Reconstruction complète depuis l'état chargé ──────────────────────────
 
@@ -166,6 +177,27 @@ class BaseMixin:
                 self.generate_granulo(granulo)
             except Exception as e:
                 regeneration_errors.append(f"Granulo {i + 1}: {e}")
+        # 6bis. Régénération des populations SoA (ParticlePopulation)
+        for i, population in enumerate(list(self.state.particle_populations)):
+            try:
+                mat_obj = self._pylmgc_materials.get(population.material_name)
+                mod_obj = self._pylmgc_models.get(population.model_name)
+                if not mat_obj or not mod_obj:
+                    raise ValueError(
+                        f"matériau/modèle introuvable ({population.material_name}/"
+                        f"{population.model_name})"
+                    )
+                bodies = LMGC90Bridge.create_avatars_from_population(
+                    population, mod_obj, mat_obj
+                )
+                for body in bodies:
+                    self._bodies_container.addAvatar(body)
+                self._pylmgc_population_bodies[population.population_id] = bodies
+            except Exception as e:
+                regeneration_errors.append(
+                    f"Population de particules #{i + 1} "
+                    f"({population.population_id}) : {e}"
+                )
 
         # 7. Régénération boucles For
         for i, for_loop in enumerate(self.state.for_loops):

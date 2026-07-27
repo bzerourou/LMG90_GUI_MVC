@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QWidget, QLabel
 from PyQt6.QtCore import pyqtSignal
 from ...controllers.project_controller import ProjectController
 from ...utils.safe_eval import SafeEvaluator, build_eval_context
+from ...views.widgets.unit_field import UnitField, apply_unit
 
 import math
 import numpy as np
@@ -221,6 +222,19 @@ class BaseTab(QWidget):
         
         QMessageBox.critical(self, "Erreur d'Évaluation", error_msg)
     
+
+    # =====
+    # unifié les unités
+    # =====
+
+    def make_unit_field(self, default: str = "", unit_key: str = None) -> UnitField:
+        field = UnitField(default=default, unit_key=unit_key)
+        apply_unit(field, self.controller)
+        return field
+
+    def refresh_units(self):
+        for field in self.findChildren(UnitField):
+            apply_unit(field, self.controller)
     # =========================================================================
     # Label d'aide
     # =========================================================================

@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import pyqtSignal
 
+from ...core.particle_population import ParticlePopulation
 from ...gui.dialogs.viewer_3d import Viewer3D
 
 
@@ -87,9 +88,10 @@ class ViewerTab(QWidget):
         Ne déclenche PAS le rendu — l'utilisateur doit cliquer sur le bouton.
         """
         self._dirty = True
-        n = len(self.controller.state.avatars)
+        items = [*self.controller.state.avatars, *self.controller.state.particle_populations]
+        n = sum(len(item) if isinstance(item, ParticlePopulation) else 1 for item in items)
         self._pending_label.setText(
-            f"⚠️ Scène non à jour — {n} avatar{'s' if n != 1 else ''} dans le projet"
+            f"⚠️ Scène non à jour — {n} objet{'s' if n != 1 else ''} à afficher"
         )
         self._refresh_btn.setStyleSheet(
             "QPushButton { font-weight: bold; padding: 3px 10px; "
@@ -102,9 +104,9 @@ class ViewerTab(QWidget):
     # =========================================================================
 
     def _do_refresh(self):
-        """Recharge la scène 3D depuis state.avatars."""
-        avatars = self.controller.state.avatars
-        self.viewer.update_avatars(avatars)
+        """Recharge la scène 3D depuis les avatars et les populations de particules."""
+        renderables = [*self.controller.state.avatars, *self.controller.state.particle_populations]
+        self.viewer.update_avatars(renderables)
         self._dirty = False
         self._pending_label.setText("")
         self._refresh_btn.setStyleSheet(

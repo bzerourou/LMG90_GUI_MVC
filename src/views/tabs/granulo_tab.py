@@ -5,6 +5,8 @@
 Onglet pour générer des distributions granulométriques.
 Version avec support threading pour éviter les plantages avec >1000 particules.
 """
+import numpy as np
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QPushButton, QMessageBox, QCheckBox, QLabel, QGroupBox,
@@ -93,10 +95,10 @@ class GranuloTab(BaseTab):
         self.nb_input = QLineEdit("200")
         dist_form.addRow("Nombre de particules :", self.nb_input)
         
-        self.rmin_input = QLineEdit("0.05")
+        self.rmin_input = self.make_unit_field(default="0.05", unit_key="length")
         dist_form.addRow("Rayon min :", self.rmin_input)
-        
-        self.rmax_input = QLineEdit("0.15")
+
+        self.rmax_input = self.make_unit_field(default="0.15", unit_key="length")
         dist_form.addRow("Rayon max :", self.rmax_input)
         
         self.seed_input = QLineEdit()
@@ -133,11 +135,11 @@ class GranuloTab(BaseTab):
         self.params_widget.setLayout(self.params_layout)
         container_layout.addWidget(self.params_widget)
         
-        self.lx_input = QLineEdit("4.0")
-        self.ly_input = QLineEdit("4.0")
-        self.r_input = QLineEdit("2.0")
-        self.rint_input = QLineEdit("2.0")
-        self.rext_input = QLineEdit("4.0")
+        self.lx_input = self.make_unit_field(default="4.0", unit_key="length")
+        self.ly_input = self.make_unit_field(default="4.0", unit_key="length")
+        self.r_input = self.make_unit_field(default="2.0", unit_key="length")
+        self.rint_input = self.make_unit_field(default="2.0", unit_key="length")
+        self.rext_input = self.make_unit_field(default="4.0", unit_key="length")
         
         container_group.setLayout(container_layout)
         layout.addWidget(container_group)
@@ -164,6 +166,15 @@ class GranuloTab(BaseTab):
         self.store_check = QCheckBox("Stocker le dépôt dans un groupe nommé")
         self.store_check.setChecked(True)
         layout.addWidget(self.store_check)
+
+        self.use_population_check = QCheckBox(
+            "Créer comme ParticlePopulation (SoA, stockage compact)"
+        )
+        self.use_population_check.setToolTip(
+            "Remplace la création d'avatars individuels par une ParticlePopulation "
+            "unique, plus adaptée aux grands volumes."
+        )
+        layout.addWidget(self.use_population_check)
         
         group_form = QFormLayout()
         self.group_name_input = QLineEdit("depot_granulo")
@@ -275,8 +286,8 @@ class GranuloTab(BaseTab):
                 return
 
             # ── Mode dépôt complet ────────────────────────────────────────────
-            if nb > 2000:
-                QMessageBox.information(self, "Attention", "⚠️ Actuellement LMGC90_GUI ne peut générer plus de 1500 particules ")
+            if nb > 8000:
+                QMessageBox.information(self, "Attention", "⚠️ Actuellement LMGC90_GUI ne peut générer plus de 8000 particules ")
                 return
 
             material = self.material_combo.currentText()
@@ -331,7 +342,8 @@ class GranuloTab(BaseTab):
                 avatar_type=model,
                 color=self.color_input.text().strip(),
                 seed=seed,
-                group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None
+                group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None,
+                use_particle_population=self.use_population_check.isChecked(),
             )
             
             # Stocker la config
@@ -486,10 +498,63 @@ class GranuloTab(BaseTab):
         else:
             self.batch_size = 100     # Gros volume : batches de 100
         
+        if self.current_config and self.current_config.use_particle_population:
+            self._create_particle_population_from_particles(particles_data)
+            return
+
         # Démarrer le timer de création par batches
         # Intervalle 0 = aussi rapide que possible mais UI reste réactive
         self.creation_timer.start(0)
     
+    def _create_particle_population_from_particles(self, particles_data):
+        """Crée une ParticlePopulation directement à partir des données calculées."""
+        self.creation_timer.stop()
+        self.progress_label.setText("⚡ Création de la ParticlePopulation...")
+        try:
+            centers = np.array([p['center'] for p in particles_data], dtype=np.float64)
+            radii = np.array([p['radius'] for p in particles_data], dtype=np.float64)
+            self.controller.create_granulo_population_from_arrays(
+                self.current_config,
+                centers,
+                radii,
+            )
+        except Exception as e:
+            self._on_error(f"Erreur création ParticlePopulation: {str(e)}")
+            return
+
+        self._on_particle_population_completed()
+
+    def _on_particle_population_completed(self):
+        """Finalise la génération sous forme de ParticlePopulation."""
+        if hasattr(self, 'progress_label'):
+            self.progress_label.hide()
+
+        if hasattr(self, '_old_updates_enabled'):
+            self.setUpdatesEnabled(self._old_updates_enabled)
+
+        self.controller._batch_mode = False
+        self.gen_btn.setEnabled(True)
+
+        if self.current_config:
+            self.granulo_generated.emit()
+            self.refresh(full_refresh=True)
+            if hasattr(self, 'progress_label'):
+                self.progress_label.setStyleSheet(
+                    "QLabel { background-color: #C8E6C9; border: 2px solid #4CAF50; "
+                    "border-radius: 5px; padding: 10px; font-weight: bold; }"
+                )
+                msg = f"✅ Population SoA créée ({len(self.pending_particles)} particules)"
+                if self.current_config.group_name:
+                    msg += f"\nGroupe: {self.current_config.group_name}"
+                self.progress_label.setText(msg)
+                self.progress_label.show()
+                QTimer.singleShot(3000, self.progress_label.hide)
+
+        self.pending_particles = []
+        self.created_indices = []
+        self.current_config = None
+        gc.collect()
+
     def _create_next_avatar(self):
         """Crée un BATCH d'avatars (au lieu d'un seul) pour accélérer"""
         if self.current_particle_index >= len(self.pending_particles):
@@ -738,6 +803,7 @@ class GranuloTab(BaseTab):
         self.color_input.setText(granulo.color)
         if granulo.seed:
             self.seed_input.setText(str(granulo.seed))
+        self.use_population_check.setChecked(getattr(granulo, 'use_particle_population', False))
         if granulo.group_name:
             self.store_check.setChecked(True)
             self.group_name_input.setText(granulo.group_name)
@@ -807,6 +873,7 @@ class GranuloTab(BaseTab):
         self.color_input.setText("BLUEx")
         self.group_name_input.setText("depot_granulo")
         self.store_check.setChecked(True)
+        self.use_population_check.setChecked(False)
     
     def refresh(self, full_refresh=False):
         """
@@ -841,7 +908,7 @@ class GranuloTab(BaseTab):
             
             granulos = self.controller.state.granulo_generations
             for i, gen in enumerate(granulos):
-                nb_generated = len(gen.generated_ids)
+                nb_generated = len(gen.generated_ids) if not getattr(gen, 'use_particle_population', False) else gen.nb_particles
                 item = QTreeWidgetItem([
                     str(i + 1),
                     gen.container_type,
@@ -884,6 +951,8 @@ class GranuloTab(BaseTab):
         finally:
             self.tree.setUpdatesEnabled(old_tree_updates)
             self.tree.blockSignals(old_block_tree)
+
+        self.refresh_units()
     
     def closeEvent(self, event):
         """Nettoyage à la fermeture"""

@@ -75,9 +75,8 @@ class MaterialTab(BaseTab):
         self.type_combo.addItems([mt.value for mt in MaterialType])
         form.addRow("Type :", self.type_combo)
         
-        self.density_input = QLineEdit()
-        self.density_input.setText("2800")
-        form.addRow("Densité (kg/m³) :", self.density_input)
+        self.density_input = self.make_unit_field(default="2800", unit_key="density")
+        form.addRow("Densité :", self.density_input)
         
         self.props_input = QLineEdit()
         self.props_input.setPlaceholderText("ex: young=1e9, nu=0.3")
@@ -389,3 +388,4 @@ class MaterialTab(BaseTab):
                 item.setForeground(0, QBrush(QColor(0, 100, 0)))
             
             self.tree.addTopLevelItem(item)
+        self.refresh_units()
