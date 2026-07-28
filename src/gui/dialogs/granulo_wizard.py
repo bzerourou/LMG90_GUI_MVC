@@ -167,19 +167,26 @@ class GranuloWizard(QWizard):
         deposit_kwargs = {k: container_params[k] for k in deposit_keys if k in container_params}
 
         _deposit_result = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
-        if isinstance(_deposit_result, tuple) or len(_deposit_result) < 2:
+        if not isinstance(_deposit_result, (tuple, list)):
             raise RuntimeError(
                 f"{deposit_fn} : retour inattendu ({_deposit_result!r}). "
                 f"Vérifiez la version de pylmgc90 installée."
             )
-        nb_particles, coords = _deposit_result[0], _deposit_result[1]
+        if len(_deposit_result) < 2:
+            raise RuntimeError(
+                f"{deposit_fn} : retour inattendu ({_deposit_result!r}). "
+                f"Vérifiez la version de pylmgc90 installée."
+            )
 
-       # Reshape coordinates
+        nb_particles, coords = _deposit_result[0], _deposit_result[1]
+        deposit_radii = _deposit_result[2] if len(_deposit_result) > 2 else radii
+
+        # Reshape coordinates
         #nb_remaining = np.shape(coor)[0] // 2
         coords.shape = [coords.size//2,2]
         
         # Tronquer les rayons au nombre effectif
-        radii = radii[:nb_particles]
+        radii = deposit_radii[:nb_particles]
 
         # ── Objets pylmgc90 matériau / modèle ────────────────────────────────
         mat_obj = ctrl._pylmgc_materials.get(mat_name)

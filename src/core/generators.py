@@ -19,15 +19,15 @@ def _call_deposit(func, *args, **kwargs):
       - pylmgc90 (ancien, ~2023)  : (nb_remaining, coor)
       - pylmgc90 (récent, ~2025) : (nb_remaining, coor, <valeur additionnelle>)
 
-    Retourne toujours (nb_remaining, coor). Toute valeur supplémentaire
-    (3e, 4e...) est journalisée mais ignorée, sans faire planter l'appel.
+    Retourne toujours (nb_remaining, coor, radii). Si la version installée ne
+    renvoie pas de valeur supplémentaire, on réutilise les rayons fournis en entrée.
     """
     result = func(*args, **kwargs)
 
-    if isinstance(result, tuple):
+    if not isinstance(result, (tuple, list)):
         raise RuntimeError(
             f"{func.__name__} : retour inattendu ({type(result).__name__!r}), "
-            f"un tuple était attendu. Vérifiez la version de pylmgc90 installée."
+            f"une séquence était attendue. Vérifiez la version de pylmgc90 installée."
         )
 
     if len(result) < 2:
@@ -36,7 +36,9 @@ def _call_deposit(func, *args, **kwargs):
             f"au moins 2 attendues (nb_remaining, coor)."
         )
 
-    nb_remaining, coor = result[0], result[1]
+    nb_remaining = result[0]
+    coor = result[1]
+    dradii = result[2] if len(result) > 2 else (args[0] if args else None)
 
     if len(result) > 2:
         try:
@@ -49,7 +51,7 @@ def _call_deposit(func, *args, **kwargs):
         except Exception:
             pass  # le logging ne doit jamais faire échouer le dépôt
 
-    return nb_remaining, coor
+    return nb_remaining, coor, dradii
 
 class LoopGenerator:
     """Génère des positions selon différents motifs"""
@@ -419,13 +421,14 @@ class GranuloGenerator:
         params = config.container_params
         
         if ctype == "Box2D":
-            nb_remaining, coor = _call_deposit(pre.depositInBox2D, radii, params['lx'], params['ly'])
+            nb_remaining, coor, dradii = _call_deposit(pre.depositInBox2D, radii, params['lx'], params['ly'])
+            print(nb_remaining, coor)
         elif ctype == "Disk2D":
-            nb_remaining, coor = _call_deposit(pre.depositInDisk2D, radii, params['r'])
+            nb_remaining, coor, dradii = _call_deposit(pre.depositInDisk2D, radii, params['r'])
         elif ctype == "Couette2D":
-            nb_remaining, coor = _call_deposit(pre.depositInCouette2D, radii, params['rint'], params['rext'])
+            nb_remaining, coor, dradii = _call_deposit(pre.depositInCouette2D, radii, params['rint'], params['rext'])
         elif ctype == "Drum2D":
-            nb_remaining, coor = _call_deposit(pre.depositInDrum2D, radii, params['r'])
+            nb_remaining, coor, dradii = _call_deposit(pre.depositInDrum2D, radii, params['r'])
         else:
             raise ValueError(f"Type de conteneur inconnu: {ctype}")
         
@@ -434,6 +437,6 @@ class GranuloGenerator:
         coor.shape = [coor.size//2,2]
         
         # Tronquer les rayons au nombre effectif
-        radii = radii[:nb_remaining]
+        radii = dradii[:nb_remaining]
         
         return nb_remaining, coor, radii
