@@ -64,13 +64,13 @@ class LoopWizardAdvanced(QWizard):
     def _generate_avatar_loop(self):
         avatar_page = self.page(self.PAGE_AVATAR_LOOP)
         
-        model_idx = avatar_page.avatar_combo.currentData()
-        if model_idx is None:
+        model_avatar_id = avatar_page.avatar_combo.currentData()
+        if model_avatar_id is None:
             raise ValueError("Sélectionnez un avatar modèle")
         
         loop = Loop(
             loop_type=avatar_page.loop_type_combo.currentText(),
-            model_avatar_index=model_idx,
+            model_avatar_id=model_avatar_id,
             count=avatar_page.count_spin.value(),
             radius=avatar_page.radius_spin.value() if avatar_page.radius_spin.isVisible() else 0.0,
             step=avatar_page.step_spin.value() if avatar_page.step_spin.isVisible() else 0.0,
@@ -364,7 +364,7 @@ class AvatarLoopPage(QWizardPage):
         for i, avatar in enumerate(wizard.controller.state.avatars):
             if avatar.origin == AvatarOrigin.MANUAL:
                 label = f"#{i} — {avatar.avatar_type.value} ({avatar.color})"
-                self.avatar_combo.addItem(label, i)
+                self.avatar_combo.addItem(label, avatar.avatar_id)
         
         if self.avatar_combo.count() == 0:
             self.avatar_combo.addItem("(Aucun avatar manuel)", None)

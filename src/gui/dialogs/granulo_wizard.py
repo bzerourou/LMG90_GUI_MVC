@@ -248,6 +248,10 @@ class GranuloWizard(QWizard):
 
                 generated_indices.append(idx)
 
+            generated_avatar_ids = [
+                ctrl.state.avatars[i].avatar_id for i in generated_indices
+            ]
+
             # ── Enregistrer la config granulo dans le state ───────────────────────
             config = GranuloGeneration(
                 nb_particles=len(radii),
@@ -262,13 +266,13 @@ class GranuloWizard(QWizard):
                 group_name=group_name,
                 color=color,
             )
-            config.generated_ids = generated_indices
+            config.generated_ids = generated_avatar_ids
             ctrl.state.granulo_generations.append(config)
 
             if group_name:
                 if group_name not in ctrl.state.avatar_groups:
                     ctrl.state.avatar_groups[group_name] = []
-                ctrl.state.avatar_groups[group_name].extend(generated_indices)
+                ctrl.state.avatar_groups[group_name].extend(generated_avatar_ids)
 
         # Un seul signal à la fin pour rafraîchir l'UI
         ctrl.state_changed.emit()

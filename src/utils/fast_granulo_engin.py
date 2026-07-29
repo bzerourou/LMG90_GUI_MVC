@@ -518,12 +518,17 @@ class GranuloStateIntegrator:
         controller.state.avatars.extend(new_avatars)
         idx = list(range(start_idx, start_idx + len(new_avatars)))
 
+        # generated_avatar_ids.
+        generated_avatar_ids = [
+            controller.state.avatars[i].avatar_id for i in idx
+        ]
+
         # Groupe
         if result.group_name:
             grp = controller.state.avatar_groups
             if result.group_name not in grp:
                 grp[result.group_name] = []
-            grp[result.group_name].extend(idx)
+            grp[result.group_name].extend(generated_avatar_ids)
 
         # GranuloGeneration
         gen = GranuloGeneration(
@@ -538,7 +543,7 @@ class GranuloStateIntegrator:
             color=result.color,
             seed=result.seed,
             group_name=result.group_name,
-            generated_ids=idx,
+            generated_ids=generated_avatar_ids,
         )
         controller.state.granulo_generations.append(gen)
 
