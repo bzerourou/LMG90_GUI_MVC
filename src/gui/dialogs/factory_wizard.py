@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+from matplotlib.pylab import Enum
 
 from ...core.particle_factory import (
     FactoryConfig, FactoryType, ZoneShape, ContainerShape,
@@ -141,6 +142,9 @@ def _spin(value: int, minimum: int = 0, maximum: int = 100_000) -> QSpinBox:
     sb.setValue(value)
     return sb
 
+
+class FactoryType(Enum):
+    PERIODIC = "periodic"  # Injection périodique
 
 # ============================================================================
 # Dialogues de création rapide — Matériau / Modèle
@@ -356,7 +360,7 @@ class FactoryIntroPage(QWizardPage):
     @property
     def factory_type(self) -> str:
         checked = self._type_group.checkedButton()
-        return checked.property('factory_type') if checked else FactoryType.RAIN.value
+        return checked.property('factory_type') if checked else FactoryType.PERIODIC.value
 
     @property
     def name(self) -> str:
