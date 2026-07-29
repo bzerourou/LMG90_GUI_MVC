@@ -353,10 +353,31 @@ class ModelTab(QWidget):
     def _on_dimension_changed(self, dim_text):
         """Quand la dimension change"""
         dim = int(dim_text)
+
+        ok, reasons = self.controller.can_change_dimension(dim)
+        if not ok:
+            reply = QMessageBox.question(
+                self, "⚠️ Changement de dimension",
+                "Changer la dimension du projet peut invalider des "
+                "éléments déjà créés :\n\n• " + "\n• ".join(reasons) +
+                "\n\nContinuer quand même ?\n"
+                "(les éléments incompatibles ne seront PAS supprimés "
+                "automatiquement — vérifiez-les manuellement après ce changement)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                # Revenir à l'ancienne valeur dans le combo sans redéclencher le signal
+                self.dimension_combo.blockSignals(True)
+                self.dimension_combo.setCurrentText(str(self.controller.state.dimension))
+                self.dimension_combo.blockSignals(False)
+                return
+            self.controller.set_dimension(dim, force=True)
+        else:
+            self.controller.set_dimension(dim)
+
         self._update_elements()
-        self.controller.state.dimension = int(dim_text)    
-        self.dimension_changed.emit(int(dim_text))
-        
+        self.dimension_changed.emit(dim)
  
     def _on_physics_changed(self, _):
         """Quand la physique change — recharge la liste d'éléments."""

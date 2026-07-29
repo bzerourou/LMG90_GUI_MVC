@@ -88,7 +88,21 @@ class ProjectSetupWizard(QWizard):
         # Page Dimension
         dim_page = self.page(self.PAGE_DIMENSION)
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        self.controller.state.dimension = dimension
+        ok, reasons = self.controller.can_change_dimension(dimension)
+        if not ok:
+            reply = QMessageBox.question(
+                self, "⚠️ Changement de dimension",
+                "Ce projet contient déjà des éléments incompatibles avec "
+                "la dimension choisie :\n\n• " + "\n• ".join(reasons) +
+                "\n\nContinuer quand même ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                raise ValueError("Génération annulée : dimension incompatible avec le projet existant.")
+            self.controller.set_dimension(dimension, force=True)
+        else:
+            self.controller.set_dimension(dimension)
         
         # Page Matériau
         mat_page = self.page(self.PAGE_MATERIAL)

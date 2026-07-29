@@ -268,3 +268,78 @@ class BaseMixin:
             self._pylmgc_bodies.append(body_obj)
 
         self.state._factory_avatars_staged = []
+
+    def can_change_dimension(self, new_dimension: int) -> Tuple[bool, List[str]]:
+        """
+        Vérifie si state.dimension peut être changée vers new_dimension sans
+        laisser le projet dans un état incohérent.
+
+        Un changement de dimension est bloquant si des avatars, modèles ou
+        générateurs (boucles/granulo/factories) existants dépendent de
+        l'ancienne dimension : leurs centres, éléments (Rxx2D/Rxx3D) et
+        types (rigidDisk vs rigidSphere, etc.) deviendraient invalides.
+
+        Retourne (ok, liste_de_raisons_de_blocage). Si ok est False, la
+        liste contient au moins une raison lisible pour l'utilisateur.
+        """
+        if new_dimension == self.state.dimension:
+            return True, []
+
+        reasons: List[str] = []
+
+        if self.state.avatars:
+            reasons.append(
+                f"{len(self.state.avatars)} avatar(s) déjà créé(s) "
+                f"(dimension {self.state.dimension}D)."
+            )
+        if self.state.particle_populations:
+            reasons.append(
+                f"{len(self.state.particle_populations)} population(s) de "
+                f"particules déjà générée(s)."
+            )
+        if self.state.models:
+            incompatible = [
+                m.name for m in self.state.models
+                if m.dimension == self.state.dimension
+            ]
+            if incompatible:
+                reasons.append(
+                    f"{len(incompatible)} modèle(s) défini(s) pour la "
+                    f"dimension {self.state.dimension}D : "
+                    f"{', '.join(incompatible[:5])}"
+                    + ('...' if len(incompatible) > 5 else '')
+                )
+        if self.state.loops:
+            reasons.append(f"{len(self.state.loops)} boucle(s) géométrique(s) définie(s).")
+        if self.state.granulo_generations:
+            reasons.append(
+                f"{len(self.state.granulo_generations)} dépôt(s) granulométrique(s) défini(s)."
+            )
+        if self.state.factories:
+            reasons.append(f"{len(self.state.factories)} particle factory(ies) définie(s).")
+        if getattr(self.state, 'masonry_patterns', None):
+            reasons.append(
+                f"{len(self.state.masonry_patterns)} structure(s) de maçonnerie définie(s)."
+            )
+
+        return len(reasons) == 0, reasons
+
+    def set_dimension(self, new_dimension: int, force: bool = False) -> Tuple[bool, List[str]]:
+        """
+        Change state.dimension après vérification via can_change_dimension().
+
+        force=True bypass la vérification (réservé aux cas où l'appelant a
+        déjà obtenu confirmation explicite de l'utilisateur, ex: reset
+        complet du projet). Retourne (ok, raisons) — ok=False signifie que
+        rien n'a été modifié.
+        """
+        if new_dimension not in (2, 3):
+            return False, [f"Dimension invalide : {new_dimension} (2 ou 3 attendu)."]
+
+        ok, reasons = self.can_change_dimension(new_dimension)
+        if not ok and not force:
+            return False, reasons
+
+        self.state.dimension = new_dimension
+        self.state_changed.emit()
+        return True, []
