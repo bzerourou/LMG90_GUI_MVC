@@ -272,6 +272,8 @@ class ModelTreeView(QObject):
                 origin_mark = " [L]"
             elif avatar.origin == AvatarOrigin.GRANULO:
                 origin_mark = " [G]"
+            elif avatar.origin == AvatarOrigin.FACTORY:
+                origin_mark = " [F]"
 
             item = QTreeWidgetItem([
                 f"{avatar.avatar_type.value} — {avatar.color} — ({center_str}){origin_mark}",

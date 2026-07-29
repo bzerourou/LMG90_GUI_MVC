@@ -783,6 +783,8 @@ class AvatarTab(BaseTab):
                 origin_str = "Boucle"
             elif avatar.origin == AvatarOrigin.GRANULO:
                 origin_str = "Granulo"
+            elif avatar.origin == AvatarOrigin.FACTORY:
+                origin_str = "Factory"
             else:
                 origin_str = "Manuel"
             

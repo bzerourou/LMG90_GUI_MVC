@@ -283,6 +283,8 @@ class DOFTab(BaseTab):
                 origin_mark = " [Boucle]"
             elif avatar.origin == AvatarOrigin.GRANULO:
                 origin_mark = " [Granulo]"
+            elif avatar.origin == AvatarOrigin.FACTORY:
+                origin_mark = " [Factory]"
             label = f"Avatar #{i} — {avatar.avatar_type.value} ({avatar.color}){origin_mark}"
             # Stocker avatar_id stable (str) et non la position (int)
             self.target_combo.addItem(label, ('avatar', avatar.avatar_id))
