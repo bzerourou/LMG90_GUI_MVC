@@ -892,8 +892,16 @@ class ProjectState:
         #    d'origine au moment de la sauvegarde (cf. to_dict()).
         avatars = [Avatar.from_dict(a) for a in data.get('avatars', [])]
 
+        # 1bis. Réparer d'éventuels avatar_id dupliqués hérités d'anciennes
+        #       versions (bug duplicate_avatar/duplicate_group corrigé —
+        #       voir _repair_duplicate_avatar_ids). Doit tourner AVANT toute
+        #       résolution de référence (migration legacy ou non), sinon les
+        #       références utilisant l'ancien id dupliqué pointeraient de
+        #       façon ambiguë vers plusieurs avatars.
+        avatars, dup_warnings = cls._repair_duplicate_avatar_ids(avatars, data)
+
         file_version = data.get('file_format_version', 1)
-        load_warnings: List[str] = []
+        load_warnings: List[str] = list(dup_warnings)
 
         if file_version < cls.FILE_FORMAT_VERSION:
             # Fichier "legacy" : les références (avatar_groups, loops,
@@ -1077,3 +1085,62 @@ class ProjectState:
                     target_info['value'] = aid
 
         return data, warnings
+
+    # =========================================================================
+    # Réparation des avatar_id dupliqués (héritage duplicate_avatar/duplicate_group)
+    # =========================================================================
+
+    @staticmethod
+    def _repair_duplicate_avatar_ids(
+        avatars: List['Avatar'], data: Dict
+    ) -> tuple[List['Avatar'], List[str]]:
+        """
+        Détecte et répare les avatar_id dupliqués parmi les avatars MANUAL
+        chargés depuis un fichier .lmgc90.
+
+        Contexte : avant correctif, AvatarsMixin.duplicate_avatar() et
+        duplicate_group() faisaient un copy.deepcopy(source) sans réassigner
+        avatar_id — chaque clone héritait donc du MÊME id que son original
+        (default_factory=new_avatar_id ne s'exécute qu'à la construction
+        initiale, pas lors d'un deepcopy). Les fichiers .lmgc90 sauvegardés
+        avant ce correctif peuvent donc contenir des avatars MANUAL distincts
+        partageant le même avatar_id.
+
+        Pour chaque id dupliqué : on conserve l'avatar rencontré en premier
+        tel quel, et on assigne un NOUVEL id stable aux occurrences
+        suivantes. Toute référence à l'ancien id dupliqué DANS CE MÊME
+        FICHIER (avatar_groups, loops, operations, postpro_creations,
+        granulo_generations, for_loops) reste donc valide pour la première
+        occurrence, mais peut désigner un avatar différent de celui visé à
+        l'origine par les copies suivantes — c'est un compromis inévitable :
+        le fichier source ne permet pas de distinguer laquelle des
+        occurrences dupliquées était réellement visée par chaque référence
+        historique. Un avertissement explicite est ajouté par id réparé
+        pour que l'utilisateur puisse vérifier les groupes concernés.
+
+        Retourne (avatars_corrigés, avertissements).
+        """
+        seen: Dict[str, int] = {}   # avatar_id -> index de la première occurrence
+        warnings: List[str] = []
+
+        for i, av in enumerate(avatars):
+            if av.avatar_id not in seen:
+                seen[av.avatar_id] = i
+                continue
+
+            # Doublon détecté : réassigner un nouvel id stable
+            old_id = av.avatar_id
+            new_id = new_avatar_id()
+            av.avatar_id = new_id
+
+            warnings.append(
+                f"Avatar #{i} ({av.avatar_type.value}) partageait le même "
+                f"identifiant que l'avatar #{seen[old_id]} — corrigé "
+                f"automatiquement (nouvel id assigné). Si cet avatar avait "
+                f"été dupliqué via 'Dupliquer avatar/groupe' avant une "
+                f"mise à jour de l'application, vérifiez que les groupes et "
+                f"conditions aux limites qui le concernent sont toujours "
+                f"corrects."
+            )
+
+        return avatars, warnings
