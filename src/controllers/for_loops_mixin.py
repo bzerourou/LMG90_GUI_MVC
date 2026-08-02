@@ -2,11 +2,14 @@
 import math
 from typing import Optional, List
 
+import numpy as np
+
 from ..core.models import (
     Avatar, AvatarOrigin, AvatarType,
     ForLoop, GranuloGeneration,
 )
 from ..core.generators import GranuloGenerator
+from ..core.particle_population import ParticlePopulation
 from ..utils.safe_eval import SafeEvaluator
 
 
@@ -24,6 +27,16 @@ _BASE_CONTEXT = {
     'int':   int,
     'float': float,
 }
+
+# Types d'avatars supportés par le chemin rapide SoA — mêmes types que
+# LMGC90Bridge.create_avatars_from_population (rigidDisk/rigidSphere).
+_POPULATION_ELIGIBLE_TYPES = {'rigidDisk', 'rigidSphere'}
+
+# Clé interne du template_config portant le choix explicite de
+# l'utilisateur (case à cocher dans loop_tab.py). Absente ou False ->
+# chemin Avatar classique (AoS) ; True -> chemin ParticlePopulation (SoA)
+# si les autres conditions d'éligibilité sont remplies.
+_SOA_FLAG_KEY = '_use_soa'
 
 
 class ForLoopsMixin:
@@ -47,6 +60,14 @@ class ForLoopsMixin:
         end   = evaluator.eval_expression(for_loop.end_expr)
         step  = evaluator.eval_expression(for_loop.step_expr)
 
+        # ── Chemin rapide SoA — activé explicitement par l'utilisateur ────────
+        if for_loop.target_type == 'avatar' and self._for_loop_eligible_for_population(
+            for_loop
+        ):
+            return self._generate_for_loop_avatar_population(
+                for_loop, evaluator, start, end, step
+            )
+
         generated_indices = []
         current           = start
         loop_var          = for_loop.loop_var
@@ -57,6 +78,8 @@ class ForLoopsMixin:
 
             evaluated = {}
             for key, value in for_loop.template_config.items():
+                if key == _SOA_FLAG_KEY:
+                    continue  # meta-champ, pas un paramètre d'avatar
                 if isinstance(value, str):
                     try:
                         evaluated[key] = evaluator.eval_expression(value)
@@ -134,136 +157,145 @@ class ForLoopsMixin:
 
         return generated_indices
 
-    def _generate_for_granulo(
-        self, for_loop: ForLoop, evaluator: SafeEvaluator
-    ) -> List[int]:
-        """Génère un dépôt granulométrique par itération de boucle For."""
+    # ── Chemin rapide SoA (ParticlePopulation) ────────────────────────────────
+
+    def _for_loop_eligible_for_population(self, for_loop: ForLoop) -> bool:
+        """
+        Détermine si une boucle For d'avatars peut être générée via
+        ParticlePopulation plutôt qu'un Avatar individuel par itération.
+
+        Le choix est désormais explicitement piloté par l'utilisateur via
+        la case à cocher "SoA" de loop_tab.py (stockée dans
+        template_config['_use_soa']) — plus de seuil automatique implicite.
+        Conditions supplémentaires vérifiées ici, indépendamment du choix
+        utilisateur, car le chemin SoA ne sait tout simplement pas produire
+        ces cas :
+          - avatar_type ∈ {rigidDisk, rigidSphere} (seuls types supportés
+            par LMGC90Bridge.create_avatars_from_population)
+          - le template ne contient PAS de clés incompatibles avec le SoA
+            (contactors, vertices, wall_params, is_hollow, generation_type,
+            axis, nb_vertices) — ces avatars restent individuellement
+            construits même si l'utilisateur a coché la case
+        """
         tc = for_loop.template_config
+        if not tc.get(_SOA_FLAG_KEY):
+            return False
 
-        def _ev(val, ctx):
-            if not isinstance(val, str):
-                return val
+        avatar_type = tc.get('avatar_type', {}).get('value') if isinstance(
+            tc.get('avatar_type'), dict
+        ) else tc.get('avatar_type')
+        if avatar_type not in _POPULATION_ELIGIBLE_TYPES:
+            return False
+
+        incompatible_keys = {
+            'contactors', 'vertices', 'wall_params', 'is_hollow',
+            'generation_type', 'axis', 'nb_vertices',
+        }
+        if incompatible_keys & set(tc.keys()):
+            return False
+
+        return True
+
+    def _generate_for_loop_avatar_population(
+        self, for_loop: ForLoop, evaluator: SafeEvaluator, start, end, step
+    ) -> List[int]:
+        """
+        Chemin rapide : construit une ParticlePopulation en une passe numpy
+        plutôt que N objets Avatar individuels. Suit le même schéma que
+        GranuloMixin.create_granulo_population_from_arrays().
+
+        Activé uniquement si l'utilisateur l'a explicitement demandé (case
+        à cocher SoA dans loop_tab.py) — voir _for_loop_eligible_for_population.
+
+        Limitation assumée : les avatars produits ne sont plus
+        individuellement modifiables via l'onglet Avatar (comme pour les
+        populations granulo) — cohérent avec le compromis déjà accepté
+        pour la granulométrie massive, et explicité à l'utilisateur dans
+        le tooltip de la case à cocher.
+        """
+        tc       = for_loop.template_config
+        loop_var = for_loop.loop_var
+
+        avatar_type_str = (
+            tc['avatar_type']['value'] if isinstance(tc['avatar_type'], dict)
+            else tc['avatar_type']
+        )
+        material_name = str(tc.get('material_name', 'TDURx'))
+        model_name    = str(tc.get('model_name', 'rigid'))
+        color         = str(tc.get('color', 'BLUEx'))
+        radius_expr   = tc.get('radius', 0.1)
+        center_expr   = tc.get('center', '[0, 0]')
+
+        centers: List[List[float]] = []
+        radii:   List[float]       = []
+        current = start
+        while (step > 0 and current < end) or (step < 0 and current > end):
+            ctx = {**_BASE_CONTEXT, loop_var: current}
             evaluator.allowed_names = ctx
-            try:
-                return evaluator.eval_expression(val)
-            except Exception:
-                return val
 
-        evaluator.allowed_names = _BASE_CONTEXT
-        start = evaluator.eval_expression(for_loop.start_expr)
-        end   = evaluator.eval_expression(for_loop.end_expr)
-        step  = evaluator.eval_expression(for_loop.step_expr)
-
-        try:
-            base_config = GranuloGeneration(
-                nb_particles     = int(tc.get('nb_particles', 50)),
-                radius_min       = float(tc.get('radius_min', 0.01)),
-                radius_max       = float(tc.get('radius_max', 0.05)),
-                container_type   = str(tc.get('container_type', 'Box2D')),
-                container_params = {k: float(v) for k, v in tc.get('container_params', {}).items()},
-                material_name    = str(tc.get('material_name', '')),
-                model_name       = str(tc.get('model_name', '')),
-                avatar_type      = str(tc.get('avatar_type', 'rigidDisk')),
-                color            = str(tc.get('color', 'BLUEx')),
-                seed             = tc.get('seed'),
-                group_name       = for_loop.group_name,
+            c = evaluator.eval_expression(center_expr) if isinstance(center_expr, str) else center_expr
+            if isinstance(c, str):
+                c = evaluator.eval_expression(c)
+            r = (
+                evaluator.eval_expression(radius_expr)
+                if isinstance(radius_expr, str) else radius_expr
             )
-        except Exception as exc:
-            raise ValueError(f"Erreur dans le template granulo : {exc}")
 
-        nb_p, coords_ref, radii_ref = GranuloGenerator.generate(base_config)
-        av_type_obj = AvatarType(base_config.avatar_type)
+            centers.append([float(x) for x in c])
+            radii.append(float(r))
+            current += step
 
-        generated_indices = []
-        prev_batch        = self._batch_mode
-        self._batch_mode  = True
-        loop_var          = for_loop.loop_var
-        try:
-            current = start
-            while (step > 0 and current < end) or (step < 0 and current > end):
-                ctx    = {**_BASE_CONTEXT, loop_var: current, 'i': current}
-                origin = list(_ev(tc.get('origin', '[0.0, 0.0]'), ctx))
-                for k in range(nb_p):
-                    coord  = coords_ref[k].tolist()
-                    center = [
-                        coord[j] + (origin[j] if j < len(origin) else 0.0)
-                        for j in range(len(coord))
-                    ]
-                    avatar = Avatar(
-                        avatar_type   = av_type_obj,
-                        center        = center,
-                        material_name = base_config.material_name,
-                        model_name    = base_config.model_name,
-                        color         = base_config.color,
-                        origin        = AvatarOrigin.GRANULO,
-                        radius        = float(radii_ref[k]),
-                    )
-                    idx = self.add_avatar(avatar)
-                    generated_indices.append(idx)
-                current += step
-        finally:
-            self._batch_mode = prev_batch
+        if not centers:
+            # Boucle vide : rien à générer, pas de population à créer
+            for_loop.generated_refs = []
+            if not self._is_loading:
+                self.state.for_loops.append(for_loop)
+            return []
 
-        for_loop.generated_refs = [
-            self.state.avatars[idx].avatar_id for idx in generated_indices
-        ]
+        centers_arr = np.array(centers, dtype=np.float64)
+        radii_arr   = np.array(radii, dtype=np.float64)
+
+        mat_obj = self._pylmgc_materials.get(material_name)
+        mod_obj = self._pylmgc_models.get(model_name)
+        if not mat_obj:
+            raise ValueError(f"Matériau '{material_name}' introuvable")
+        if not mod_obj:
+            raise ValueError(f"Modèle '{model_name}' introuvable")
+
+        population = ParticlePopulation.create(
+            avatar_type=AvatarType(avatar_type_str),
+            material_name=material_name,
+            model_name=model_name,
+            color=color,
+            origin=AvatarOrigin.LOOP,
+            centers=centers_arr,
+            radii=radii_arr,
+            group_name=for_loop.group_name,
+        )
+
+        from ..core.pylmgc_bridge import LMGC90Bridge
+        bodies = LMGC90Bridge.create_avatars_from_population(population, mod_obj, mat_obj)
+        for body in bodies:
+            self._bodies_container.addAvatar(body)
+            self._pylmgc_bodies.append(body)
+        self._pylmgc_population_bodies[population.population_id] = bodies
+
         if not self._is_loading:
+            self.state.particle_populations.append(population)
             self.state.for_loops.append(for_loop)
+
         if for_loop.group_name:
-            self.state.avatar_groups.setdefault(
+            self.state.populations_groups.setdefault(
                 for_loop.group_name, []
-            ).extend(for_loop.generated_refs)
+            ).append(population.population_id)
+
+        # generated_refs reste vide pour ce chemin (pas d'Avatar AoS
+        # individuel produit) — ces particules vivent dans
+        # state.particle_populations, pas state.avatars.
+        for_loop.generated_refs = []
+
         self.state_changed.emit()
-        return generated_indices
-
-    # ── Mise à jour ───────────────────────────────────────────────────────────
-
-    def update_for_loop(self, index: int, for_loop: ForLoop) -> None:
-        if not (0 <= index < len(self.state.for_loops)):
-            raise ValueError(f"Index {index} invalide")
-
-        old = self.state.for_loops[index]
-
-        # Supprimer les anciens éléments
-        if old.target_type == 'avatar':
-            for aid in old.generated_refs:
-                res = self._find_avatar_by_id(aid)
-                if res:
-                    self.remove_avatar(res[0])
-        elif old.target_type == 'material':
-            for elem_idx in sorted(old.generated_refs, reverse=True):
-                if elem_idx < len(self.state.materials):
-                    self.remove_material(self.state.materials[elem_idx].name)
-        elif old.target_type == 'model':
-            for elem_idx in sorted(old.generated_refs, reverse=True):
-                if elem_idx < len(self.state.models):
-                    self.remove_model(self.state.models[elem_idx].name)
-
-        self.state.for_loops[index] = for_loop
-
-        # Régénérer (sans append dans state.for_loops)
-        was_loading       = self._is_loading
-        self._is_loading  = True   # empêche le double-append
-        try:
-            generated_indices = self.generate_for_loop(for_loop)
-        finally:
-            self._is_loading = was_loading
-
-        # Mettre à jour les groupes
-        if old.group_name and old.group_name in self.state.avatar_groups:
-            if old.target_type == 'avatar':
-                old_ids = set(old.generated_refs)
-                self.state.avatar_groups[old.group_name] = [
-                    aid for aid in self.state.avatar_groups[old.group_name]
-                    if aid not in old_ids
-                ]
-
-        if for_loop.group_name and for_loop.target_type == 'avatar':
-            self.state.avatar_groups.setdefault(for_loop.group_name, []).extend(
-                for_loop.generated_refs
-            )
-
-    # ── Suppression ───────────────────────────────────────────────────────────
+        return []
 
     def remove_for_loop(self, index: int) -> bool:
         if not (0 <= index < len(self.state.for_loops)):
@@ -275,6 +307,8 @@ class ForLoopsMixin:
                 res = self._find_avatar_by_id(aid)
                 if res:
                     self.remove_avatar(res[0])
+            # Chemin SoA (generated_refs vide) : nettoyer la population associée
+            self._remove_for_loop_population(for_loop)
         elif for_loop.target_type == 'material':
             for elem_idx in sorted(for_loop.generated_refs, reverse=True):
                 if elem_idx < len(self.state.materials):
@@ -287,7 +321,10 @@ class ForLoopsMixin:
         self.state.for_loops.pop(index)
         return True
 
-    def get_for_loop(self, index: int) -> Optional[ForLoop]:
-        if 0 <= index < len(self.state.for_loops):
-            return self.state.for_loops[index]
-        return None
+    def _remove_for_loop_population(self, for_loop: ForLoop) -> None:
+        """Supprime la ParticlePopulation associée à une boucle For SoA, si présente."""
+        if not for_loop.group_name:
+            return
+        pop_ids = self.state.populations_groups.get(for_loop.group_name, [])
+        for pop_id in list(pop_ids):
+            self.remove_particle_population(pop_id)

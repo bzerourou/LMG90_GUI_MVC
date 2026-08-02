@@ -115,21 +115,7 @@ class MasonryWizard(QWizard):
         # ── Dimension ─────────────────────────────────────────────────────────
         dim_page  = self.page(self.PAGE_DIMENSION)
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
-        ok, reasons = self.controller.can_change_dimension(dimension)
-        if not ok:
-            reply = QMessageBox.question(
-                self, "⚠️ Changement de dimension",
-                "Ce projet contient déjà des éléments incompatibles avec "
-                "la dimension choisie :\n\n• " + "\n• ".join(reasons) +
-                "\n\nContinuer quand même ?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                raise ValueError("Génération annulée : dimension incompatible avec le projet existant.")
-            self.controller.set_dimension(dimension, force=True)
-        else:
-            self.controller.set_dimension(dimension)
+        self.controller.state.dimension = dimension
 
         # ── Matériau ──────────────────────────────────────────────────────────
         mat_page = self.page(self.PAGE_MATERIAL)
@@ -179,7 +165,6 @@ class MasonryWizard(QWizard):
         lx        = dim_brick.lx_spin.value()
         ly        = dim_brick.ly_spin.value()
         lz        = dim_brick.lz_spin.value() if dimension == 3 else None
-        # brick_name : identifiant du type de brique (libre, 8 chars max)
         brick_name = dim_brick.brick_name_input.text().strip() or "std"
 
         # ── Paramètres d'appareil ─────────────────────────────────────────────
@@ -194,7 +179,6 @@ class MasonryWizard(QWizard):
         color        = layout_page.color_input.text().strip() or "BLUEx"
         group_name   = (layout_page.group_name_input.text().strip()
                         if layout_page.store_check.isChecked() else None)
-        # Paramètres paneresse — lecture défensive (widgets optionnels)
         _psm = getattr(layout_page, "pan_size_mode_combo", None)
         pan_use_length = (_psm.currentIndex() == 1) if _psm else False
         _pls = getattr(layout_page, "pan_length_spin", None)
@@ -226,276 +210,282 @@ class MasonryWizard(QWizard):
         tf_copy_dy   = _gv(_tf_pg, "copy_dy_spin",    0.0)
         tf_copy_dz   = _gv(_tf_pg, "copy_dz_spin",    0.0)
 
-        # ── Création de la brique de référence pylmgc90 ───────────────────────
-        # brick2D(name, lx, ly)          — lx=longueur, ly=hauteur
-        # brick3D(name, lx, ly, lz)      — lx=longueur, ly=profondeur, lz=hauteur
-        if dimension == 2:
-            brick_ref = pre.brick2D(brick_name, lx, ly)
-        else:
-            brick_ref = pre.brick3D(brick_name, lx, ly, lz)
+        # ── Mode rapide (batch) — case à cocher LayoutPage ─────────────────────
+        # Regroupe toute la génération dans self.controller._batch_mode :
+        # un seul state_changed.emit() à la fin au lieu d'un potentiel signal
+        # par brique. Purement une optimisation de flux de signaux ; la
+        # géométrie et les objets pylmgc90 créés sont IDENTIQUES au mode
+        # normal (contrairement au SoA granulo/for-loop, qui produit une
+        # structure de données différente). Ce n'est donc pas un
+        # ParticlePopulation — les briques restent des Avatar individuels,
+        # pleinement éditables un par un après génération.
+        fast_mode = getattr(layout_page, "fast_mode_check", None)
+        use_fast_mode = fast_mode.isChecked() if fast_mode else False
 
-        # ── Génération selon le pattern ───────────────────────────────────────
-        generated_indices = []
+        was_batch = self.controller._batch_mode
+        if use_fast_mode:
+            self.controller._batch_mode = True
 
-        def _place_body(body, center, bx, by, bz=None):
-            """Enregistre le body pylmgc90 et l'Avatar correspondant."""
-            self.controller._bodies_container.addAvatar(body)
-            self.controller._pylmgc_bodies.append(body)
-            # wall_params pour reconstruction au rechargement
-            wp = {'l': bx, 'h': by, 'brick_name': brick_name}
-            if bz is not None:
-                wp['lz'] = bz
-            av = Avatar(
-                avatar_type=AvatarType.EMPTY_AVATAR,
-                center=list(center),
-                material_name=mat_name,
-                model_name=mod_name,
-                color=color,
-                origin=AvatarOrigin.MANUAL,
-                wall_params=wp,
-                contactors=[]
-            )
-            self.controller.state.avatars.append(av)
-            generated_indices.append(len(self.controller.state.avatars) - 1)
-
-        def _place(cx, cy, bx, by):
-            """Crée et place une brique via brick2D/3D.rigidBrick."""
-            center = [cx, cy] if dimension == 2 else [cx, cy, offset_z]
+        try:
+            # ── Création de la brique de référence pylmgc90 ───────────────────────
             if dimension == 2:
-                b = pre.brick2D(brick_name, bx, by)
+                brick_ref = pre.brick2D(brick_name, lx, ly)
             else:
-                b = pre.brick3D(brick_name, bx, by, lz)
-            body = b.rigidBrick(
-                center=center, model=mod_obj, material=mat_obj, color=color
-            )
-            _place_body(body, center, bx, by, lz)
+                brick_ref = pre.brick3D(brick_name, lx, ly, lz)
 
-        # ── Standard : décalage demi-brique sur rangs impairs ─────────────────
-        if pattern == "Standard":
-            for row in range(nb_rows):
-                row_offset = (lx / 2.0) if (row % 2 == 1) else 0.0
-                for col in range(nb_cols):
-                    cx = offset_x + col * (lx + joint) + row_offset + lx / 2.0
-                    cy = offset_y + row * (ly + joint) + ly / 2.0
-                    _place(cx, cy, lx, ly)
+            # ── Génération selon le pattern ───────────────────────────────────────
+            generated_indices = []
 
-        # ── Running Bond : décalage progressif d'un tiers par rang ────────────
-        elif pattern == "Running Bond":
-            for row in range(nb_rows):
-                row_offset = (row % 3) * (lx / 3.0)
-                for col in range(nb_cols):
-                    cx = offset_x + col * (lx + joint) + row_offset + lx / 2.0
-                    cy = offset_y + row * (ly + joint) + ly / 2.0
-                    _place(cx, cy, lx, ly)
-
-        # ── Stack Bond : joints parfaitement alignés ───────────────────────────
-        elif pattern == "Stack Bond":
-            for row in range(nb_rows):
-                for col in range(nb_cols):
-                    cx = offset_x + col * (lx + joint) + lx / 2.0
-                    cy = offset_y + row * (ly + joint) + ly / 2.0
-                    _place(cx, cy, lx, ly)
-
-        # ── Flemish Bond : alternance panneresse (lx) / boutisse (lx/2) ───────
-        elif pattern == "Flemish Bond":
-            for row in range(nb_rows):
-                x_cursor = offset_x
-                for col in range(nb_cols):
-                    # Panneresse sur col paire (rang pair) ou impaire (rang impair)
-                    if (row + col) % 2 == 0:
-                        brick_lx = lx        # panneresse
-                    else:
-                        brick_lx = lx / 2.0  # boutisse
-                    cx = x_cursor + brick_lx / 2.0
-                    cy = offset_y + row * (ly + joint) + ly / 2.0
-                    _place(cx, cy, brick_lx, ly)
-                    x_cursor += brick_lx + joint
-
-        # ── Paneresse simple / double (API pylmgc90 brick_wall) ───────────────
-        elif pattern in ("Paneresse simple (pylmgc90)", "Paneresse double (pylmgc90)"):
-            disposition = layout_page.disposition_combo.currentText()
-            first_type  = layout_page.first_brick_combo.currentText()
-
-            # brick3D requis même en 2D : ly=1.0 pour un mur plan
-            if dimension == 2:
-                brick_ref_wall = pre.brick3D(brick_name, lx, 1.0, ly)
-            else:
-                brick_ref_wall = pre.brick3D(brick_name, lx, ly, lz)
-
-            # Choisir simple ou double
-            if "double" in pattern:
-                wall = pre.paneresse_double(brick_ref=brick_ref_wall, disposition=disposition)
-            else:
-                wall = pre.paneresse_simple(brick_ref=brick_ref_wall, disposition=disposition)
-
-            wall.setNumberOfRows(nb_rows)
-            wall.setJointThicknessBetweenRows(joint)
-            wall.computeHeight()
-
-            # Dimensionnement : nombre de briques OU longueur totale
-            if pan_use_length:
-                wall.setFirstRowByLength(
-                    first_brick_type=first_type,
-                    length=pan_length,
-                    joint_thickness=joint
+            def _place_body(body, center, bx, by, bz=None):
+                """Enregistre le body pylmgc90 et l'Avatar correspondant."""
+                self.controller._bodies_container.addAvatar(body)
+                self.controller._pylmgc_bodies.append(body)
+                wp = {'l': bx, 'h': by, 'brick_name': brick_name}
+                if bz is not None:
+                    wp['lz'] = bz
+                av = Avatar(
+                    avatar_type=AvatarType.EMPTY_AVATAR,
+                    center=list(center),
+                    material_name=mat_name,
+                    model_name=mod_name,
+                    color=color,
+                    origin=AvatarOrigin.MANUAL,
+                    wall_params=wp,
+                    contactors=[]
                 )
-            else:
-                wall.setFirstRowByNumberOfBricks(
-                    first_brick_type=first_type,
-                    nb_bricks=nb_cols,
-                    joint_thickness=joint
+                self.controller.state.avatars.append(av)
+                generated_indices.append(len(self.controller.state.avatars) - 1)
+
+            def _place(cx, cy, bx, by):
+                """Crée et place une brique via brick2D/3D.rigidBrick."""
+                center = [cx, cy] if dimension == 2 else [cx, cy, offset_z]
+                if dimension == 2:
+                    b = pre.brick2D(brick_name, bx, by)
+                else:
+                    b = pre.brick3D(brick_name, bx, by, lz)
+                body = b.rigidBrick(
+                    center=center, model=mod_obj, material=mat_obj, color=color
                 )
+                _place_body(body, center, bx, by, lz)
 
-            origin = [offset_x, offset_y, offset_z] if dimension == 3 \
-                     else [offset_x, offset_y, 0.0]
+            # ── Standard : décalage demi-brique sur rangs impairs ─────────────────
+            if pattern == "Standard":
+                for row in range(nb_rows):
+                    row_offset = (lx / 2.0) if (row % 2 == 1) else 0.0
+                    for col in range(nb_cols):
+                        cx = offset_x + col * (lx + joint) + row_offset + lx / 2.0
+                        cy = offset_y + row * (ly + joint) + ly / 2.0
+                        _place(cx, cy, lx, ly)
 
-            # Générer avec ou sans demi-briques aux extrémités
-            if pan_no_half:
-                bodies_container = wall.buildRigidWallWithoutHalfBricks(
-                    origin=origin,
-                    model=mod_obj,
-                    material=mat_obj,
-                    colors=[color, color]
-                )
-            else:
-                bodies_container = wall.buildRigidWall(
-                    origin=origin,
-                    model=mod_obj,
-                    material=mat_obj,
-                    colors=[color, color]
-                )
+            # ── Running Bond : décalage progressif d'un tiers par rang ────────────
+            elif pattern == "Running Bond":
+                for row in range(nb_rows):
+                    row_offset = (row % 3) * (lx / 3.0)
+                    for col in range(nb_cols):
+                        cx = offset_x + col * (lx + joint) + row_offset + lx / 2.0
+                        cy = offset_y + row * (ly + joint) + ly / 2.0
+                        _place(cx, cy, lx, ly)
 
-            for body in bodies_container:
-                center = list(body.nodes[1].coor)
-                _place_body(body, center, lx, ly, lz)
+            # ── Stack Bond : joints parfaitement alignés ───────────────────────────
+            elif pattern == "Stack Bond":
+                for row in range(nb_rows):
+                    for col in range(nb_cols):
+                        cx = offset_x + col * (lx + joint) + lx / 2.0
+                        cy = offset_y + row * (ly + joint) + ly / 2.0
+                        _place(cx, cy, lx, ly)
 
-        else:
-            raise ValueError(f"Appareil inconnu : '{pattern}'")
-
-        # ── Transformations post-génération ──────────────────────────────────
-        if tf_translate or tf_rotate or tf_copy:
-            import math as _math, copy as _copy, numpy as _np
-            # Bodies de cette session = les derniers enregistrés
-            session_bodies = self.controller._pylmgc_bodies[-len(generated_indices):]
-
-            def _apply_tf(body_list):
-                if tf_translate:
-                    for b in body_list:
-                        if dimension == 3:
-                            b.translate(dx=tf_tx, dy=tf_ty, dz=tf_tz)
+            # ── Flemish Bond : alternance panneresse (lx) / boutisse (lx/2) ───────
+            elif pattern == "Flemish Bond":
+                for row in range(nb_rows):
+                    x_cursor = offset_x
+                    for col in range(nb_cols):
+                        if (row + col) % 2 == 0:
+                            brick_lx = lx
                         else:
-                            b.translate(dx=tf_tx, dy=tf_ty)
-                if tf_rotate:
-                    _alpha = _math.radians(tf_alpha_deg)
-                    _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
-                    if dimension == 3:
-                        _ctr = _np.array([tf_cx, tf_cy, tf_cz])
-                    else:
-                        _ctr = _np.array([tf_cx, tf_cy])
-                    for b in body_list:
-                        b.rotate(description='axis', center=_ctr,
-                                 axis=_ax, alpha=_alpha)
+                            brick_lx = lx / 2.0
+                        cx = x_cursor + brick_lx / 2.0
+                        cy = offset_y + row * (ly + joint) + ly / 2.0
+                        _place(cx, cy, brick_lx, ly)
+                        x_cursor += brick_lx + joint
 
-            _apply_tf(session_bodies)
+            # ── Paneresse simple / double (API pylmgc90 brick_wall) ───────────────
+            elif pattern in ("Paneresse simple (pylmgc90)", "Paneresse double (pylmgc90)"):
+                disposition = layout_page.disposition_combo.currentText()
+                first_type  = layout_page.first_brick_combo.currentText()
 
-            # Mettre à jour les centres dans l'état après transformation
-            for idx_av, body in zip(generated_indices, session_bodies):
-                try:
-                    self.controller.state.avatars[idx_av].center = list(body.nodes[1].coor)
-                except Exception:
-                    pass
+                if dimension == 2:
+                    brick_ref_wall = pre.brick3D(brick_name, lx, 1.0, ly)
+                else:
+                    brick_ref_wall = pre.brick3D(brick_name, lx, ly, lz)
 
-            # Copie décalée : deepcopy + translate + enregistrement
-            if tf_copy:
-                copy_bodies = _copy.deepcopy(session_bodies)
-                for b in copy_bodies:
-                    if dimension == 3:
-                        b.translate(dx=tf_copy_dx, dy=tf_copy_dy, dz=tf_copy_dz)
-                    else:
-                        b.translate(dx=tf_copy_dx, dy=tf_copy_dy)
-                for b in copy_bodies:
-                    self.controller._bodies_container.addAvatar(b)
-                    self.controller._pylmgc_bodies.append(b)
+                if "double" in pattern:
+                    wall = pre.paneresse_double(brick_ref=brick_ref_wall, disposition=disposition)
+                else:
+                    wall = pre.paneresse_simple(brick_ref=brick_ref_wall, disposition=disposition)
+
+                wall.setNumberOfRows(nb_rows)
+                wall.setJointThicknessBetweenRows(joint)
+                wall.computeHeight()
+
+                if pan_use_length:
+                    wall.setFirstRowByLength(
+                        first_brick_type=first_type,
+                        length=pan_length,
+                        joint_thickness=joint
+                    )
+                else:
+                    wall.setFirstRowByNumberOfBricks(
+                        first_brick_type=first_type,
+                        nb_bricks=nb_cols,
+                        joint_thickness=joint
+                    )
+
+                origin = [offset_x, offset_y, offset_z] if dimension == 3 \
+                         else [offset_x, offset_y, 0.0]
+
+                if pan_no_half:
+                    bodies_container = wall.buildRigidWallWithoutHalfBricks(
+                        origin=origin,
+                        model=mod_obj,
+                        material=mat_obj,
+                        colors=[color, color]
+                    )
+                else:
+                    bodies_container = wall.buildRigidWall(
+                        origin=origin,
+                        model=mod_obj,
+                        material=mat_obj,
+                        colors=[color, color]
+                    )
+
+                for body in bodies_container:
+                    center = list(body.nodes[1].coor)
+                    _place_body(body, center, lx, ly, lz)
+
+            else:
+                raise ValueError(f"Appareil inconnu : '{pattern}'")
+
+            # ── Transformations post-génération ──────────────────────────────────
+            if tf_translate or tf_rotate or tf_copy:
+                import math as _math, copy as _copy, numpy as _np
+                session_bodies = self.controller._pylmgc_bodies[-len(generated_indices):]
+
+                def _apply_tf(body_list):
+                    if tf_translate:
+                        for b in body_list:
+                            if dimension == 3:
+                                b.translate(dx=tf_tx, dy=tf_ty, dz=tf_tz)
+                            else:
+                                b.translate(dx=tf_tx, dy=tf_ty)
+                    if tf_rotate:
+                        _alpha = _math.radians(tf_alpha_deg)
+                        _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
+                        if dimension == 3:
+                            _ctr = _np.array([tf_cx, tf_cy, tf_cz])
+                        else:
+                            _ctr = _np.array([tf_cx, tf_cy])
+                        for b in body_list:
+                            b.rotate(description='axis', center=_ctr,
+                                     axis=_ax, alpha=_alpha)
+
+                _apply_tf(session_bodies)
+
+                for idx_av, body in zip(generated_indices, session_bodies):
                     try:
-                        center_copy = list(b.nodes[1].coor)
+                        self.controller.state.avatars[idx_av].center = list(body.nodes[1].coor)
                     except Exception:
-                        center_copy = [0., 0., 0.]
-                    self.controller.state.avatars.append(Avatar(
-                        avatar_type=AvatarType.EMPTY_AVATAR,
-                        center=center_copy,
-                        material_name=mat_name,
-                        model_name=mod_name,
-                        color=color,
-                        origin=AvatarOrigin.MANUAL,
-                        wall_params={'l': lx, 'h': ly,
-                                     'brick_name': brick_name, 'copy': True},
-                        contactors=[]
-                    ))
-                    generated_indices.append(len(self.controller.state.avatars) - 1)
+                        pass
 
-        # ── Groupe ────────────────────────────────────────────────────────────
-        if group_name and generated_indices:
-            if not hasattr(self.controller.state, 'avatar_groups'):
-                self.controller.state.avatar_groups = {}
-            if group_name not in self.controller.state.avatar_groups:
-                self.controller.state.avatar_groups[group_name] = []
+                if tf_copy:
+                    copy_bodies = _copy.deepcopy(session_bodies)
+                    for b in copy_bodies:
+                        if dimension == 3:
+                            b.translate(dx=tf_copy_dx, dy=tf_copy_dy, dz=tf_copy_dz)
+                        else:
+                            b.translate(dx=tf_copy_dx, dy=tf_copy_dy)
+                    for b in copy_bodies:
+                        self.controller._bodies_container.addAvatar(b)
+                        self.controller._pylmgc_bodies.append(b)
+                        try:
+                            center_copy = list(b.nodes[1].coor)
+                        except Exception:
+                            center_copy = [0., 0., 0.]
+                        self.controller.state.avatars.append(Avatar(
+                            avatar_type=AvatarType.EMPTY_AVATAR,
+                            center=center_copy,
+                            material_name=mat_name,
+                            model_name=mod_name,
+                            color=color,
+                            origin=AvatarOrigin.MANUAL,
+                            wall_params={'l': lx, 'h': ly,
+                                         'brick_name': brick_name, 'copy': True},
+                            contactors=[]
+                        ))
+                        generated_indices.append(len(self.controller.state.avatars) - 1)
 
-            # Convertir les positions entières (locales) en avatar_ids stables
-            # pour que le groupe reste cohérent si d'autres avatars sont
-            # supprimés ultérieurement.
-            generated_avatar_ids = [
-                self.controller.state.avatars[idx].avatar_id
-                for idx in generated_indices
-                if idx < len(self.controller.state.avatars)
-            ]
-            self.controller.state.avatar_groups[group_name].extend(generated_avatar_ids)
+            # ── Groupe ────────────────────────────────────────────────────────────
+            if group_name and generated_indices:
+                if not hasattr(self.controller.state, 'avatar_groups'):
+                    self.controller.state.avatar_groups = {}
+                if group_name not in self.controller.state.avatar_groups:
+                    self.controller.state.avatar_groups[group_name] = []
 
-            # ── Paramètres du pattern — pour reconstituer la boucle dans le script
-            if not hasattr(self.controller.state, 'masonry_patterns'):
-                self.controller.state.masonry_patterns = {}
-            mp = {
-                'pattern':   pattern,
-                'lx':        lx,
-                'ly':        ly,
-                'lz':        lz,
-                'nb_rows':   nb_rows,
-                'nb_cols':   nb_cols,
-                'offset_x':  offset_x,
-                'offset_y':  offset_y,
-                'offset_z':  offset_z,
-                'joint':     joint,
-                'brick_name': brick_name,
-                'mat':       mat_name,
-                'mod':       mod_name,
-                'color':     color,
-                'dim':       dimension,
-            }
-            if pattern in ('Paneresse simple (pylmgc90)', 'Paneresse double (pylmgc90)'):
-                mp['disposition']    = layout_page.disposition_combo.currentText()
-                mp['first_type']     = layout_page.first_brick_combo.currentText()
-                mp['pan_use_length'] = pan_use_length
-                mp['pan_length']     = pan_length
-                mp['pan_no_half']    = pan_no_half
-            # Transformations post-génération
-            mp['tf_translate']  = tf_translate
-            mp['tf_tx']         = tf_tx
-            mp['tf_ty']         = tf_ty
-            mp['tf_tz']         = tf_tz
-            mp['tf_rotate']     = tf_rotate
-            mp['tf_cx']         = tf_cx
-            mp['tf_cy']         = tf_cy
-            mp['tf_cz']         = tf_cz
-            mp['tf_axis']       = tf_axis
-            mp['tf_alpha_deg']  = tf_alpha_deg
-            mp['tf_copy']       = tf_copy
-            mp['tf_copy_dx']    = tf_copy_dx
-            mp['tf_copy_dy']    = tf_copy_dy
-            mp['tf_copy_dz']    = tf_copy_dz
-            self.controller.state.masonry_patterns[group_name] = mp
+                generated_avatar_ids = [
+                    self.controller.state.avatars[idx].avatar_id
+                    for idx in generated_indices
+                    if idx < len(self.controller.state.avatars)
+                ]
+                self.controller.state.avatar_groups[group_name].extend(generated_avatar_ids)
 
+                if not hasattr(self.controller.state, 'masonry_patterns'):
+                    self.controller.state.masonry_patterns = {}
+                mp = {
+                    'pattern':   pattern,
+                    'lx':        lx,
+                    'ly':        ly,
+                    'lz':        lz,
+                    'nb_rows':   nb_rows,
+                    'nb_cols':   nb_cols,
+                    'offset_x':  offset_x,
+                    'offset_y':  offset_y,
+                    'offset_z':  offset_z,
+                    'joint':     joint,
+                    'brick_name': brick_name,
+                    'mat':       mat_name,
+                    'mod':       mod_name,
+                    'color':     color,
+                    'dim':       dimension,
+                }
+                if pattern in ('Paneresse simple (pylmgc90)', 'Paneresse double (pylmgc90)'):
+                    mp['disposition']    = layout_page.disposition_combo.currentText()
+                    mp['first_type']     = layout_page.first_brick_combo.currentText()
+                    mp['pan_use_length'] = pan_use_length
+                    mp['pan_length']     = pan_length
+                    mp['pan_no_half']    = pan_no_half
+                mp['tf_translate']  = tf_translate
+                mp['tf_tx']         = tf_tx
+                mp['tf_ty']         = tf_ty
+                mp['tf_tz']         = tf_tz
+                mp['tf_rotate']     = tf_rotate
+                mp['tf_cx']         = tf_cx
+                mp['tf_cy']         = tf_cy
+                mp['tf_cz']         = tf_cz
+                mp['tf_axis']       = tf_axis
+                mp['tf_alpha_deg']  = tf_alpha_deg
+                mp['tf_copy']       = tf_copy
+                mp['tf_copy_dx']    = tf_copy_dx
+                mp['tf_copy_dy']    = tf_copy_dy
+                mp['tf_copy_dz']    = tf_copy_dz
+                self.controller.state.masonry_patterns[group_name] = mp
+
+        finally:
+            # Restaurer l'état précédent de _batch_mode (défensif si ce
+            # wizard était lui-même appelé depuis un contexte déjà batché)
+            self.controller._batch_mode = was_batch
+
+        # Un seul signal, que le mode rapide ait été utilisé ou non
         self.controller.state_changed.emit()
         return len(generated_indices)
-
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
@@ -922,7 +912,7 @@ class LayoutPage(QWizardPage):
         pos_group.setLayout(pos_form)
         layout.addWidget(pos_group)
 
-        # Options
+# ── Options ───────────────────────────────────────────────────────────
         opt_group = QGroupBox("Options")
         opt_form  = QFormLayout()
 
@@ -934,6 +924,17 @@ class LayoutPage(QWizardPage):
         self.store_check.setChecked(True)
         self.group_name_input = QLineEdit("mur_briques")
         opt_form.addRow(self.store_check, self.group_name_input)
+
+        self.fast_mode_check = QCheckBox("Mode rapide (regroupe les signaux — recommandé au-delà de ~500 briques)")
+        self.fast_mode_check.setToolTip(
+            "Regroupe toute la génération dans un seul rafraîchissement UI\n"
+            "au lieu d'un potentiel signal par brique. La géométrie produite\n"
+            "est identique au mode normal — chaque brique reste un Avatar\n"
+            "individuel, éditable après génération. Recommandé pour les murs\n"
+            "de grande taille (nombreux rangs × colonnes)."
+        )
+        self.fast_mode_check.setChecked(False)
+        opt_form.addRow("", self.fast_mode_check)
 
         opt_group.setLayout(opt_form)
         layout.addWidget(opt_group)

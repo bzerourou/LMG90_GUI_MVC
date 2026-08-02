@@ -148,6 +148,25 @@ class LoopTab(BaseTab):
         self.target_type_combo.currentTextChanged.connect(self._on_target_type_changed)
         for_form.addRow("Type d'élément :", self.target_type_combo)
 
+        # ── Case à cocher SoA — visible seulement pour target_type == "avatar" ─
+        self.use_soa_check = QCheckBox(
+            "Créer comme ParticlePopulation (SoA, plus rapide pour les gros volumes)"
+        )
+        self.use_soa_check.setToolTip(
+            "Active un chemin de génération vectorisé (numpy) au lieu de créer\n"
+            "un Avatar individuel par itération. Beaucoup plus rapide pour de\n"
+            "grands nombres d'itérations, mais :\n"
+            "  • uniquement pour avatar_type = rigidDisk ou rigidSphere\n"
+            "  • le template ne doit pas contenir de contactors, vertices,\n"
+            "    wall_params, axis, nb_vertices, generation_type ou is_hollow\n"
+            "  • les particules produites ne seront pas individuellement\n"
+            "    éditables (comme pour la granulométrie en mode SoA)\n"
+            "Si ces conditions ne sont pas remplies, la case est ignorée et\n"
+            "le mode classique (un Avatar par itération) est utilisé."
+        )
+        self.use_soa_check.setChecked(False)
+        for_form.addRow("", self.use_soa_check)
+
         # Sélecteur de distribution — visible seulement quand target_type == "granulo"
         self.for_dist_label = QLabel("Distribution source :")
         self.for_dist_combo = QComboBox()
@@ -344,6 +363,11 @@ class LoopTab(BaseTab):
         """Appelé quand le type cible change (boucle For)."""
         is_granulo = (target_type == "granulo")
 
+        # SoA disponible uniquement pour target_type == "avatar"
+        self.use_soa_check.setVisible(target_type == "avatar")
+        if target_type != "avatar":
+            self.use_soa_check.setChecked(False)
+
         # Le sélecteur de distribution n'est plus nécessaire pour granulo
         self.for_dist_label.setVisible(False)
         self.for_dist_combo.setVisible(False)
@@ -487,6 +511,11 @@ class LoopTab(BaseTab):
 
                 template_config = json.loads(template_text)
 
+                # Injecter le choix SoA de l'utilisateur (ignoré par le
+                # contrôleur si les conditions d'éligibilité ne sont pas
+                # remplies — voir ForLoopsMixin._for_loop_eligible_for_population)
+                if target_type == "avatar" and self.use_soa_check.isChecked():
+                    template_config['_use_soa'] = True
                 for_loop = ForLoop(
                     loop_var=self.loop_var_input.text().strip(),
                     start_expr=self.start_input.text().strip(),
@@ -499,10 +528,18 @@ class LoopTab(BaseTab):
 
                 indices = self.controller.generate_for_loop(for_loop)
                 self.loop_generated.emit()
-                QMessageBox.information(
-                    self, "Succès",
-                    f"{len(indices)} éléments générés.\nGroupe : {for_loop.group_name or 'Aucun'}"
-                )
+                
+                # Message adapté selon le chemin effectivement utilisé
+                if template_config.get('_use_soa') and not indices and for_loop.target_type == 'avatar':
+                    QMessageBox.information(
+                        self, "Succès",
+                        f"Population générée (mode SoA).\nGroupe : {for_loop.group_name or 'Aucun'}"
+                    )
+                else:
+                    QMessageBox.information(
+                        self, "Succès",
+                        f"{len(indices)} éléments générés.\nGroupe : {for_loop.group_name or 'Aucun'}"
+                    )
             
             else:
                 # avatar_combo stocke désormais un avatar_id (str)
@@ -756,6 +793,10 @@ class LoopTab(BaseTab):
                     raise ValidationError("Le template JSON est requis")
                 
                 template_config = json.loads(template_text)
+
+                target_type = self.target_type_combo.currentText()
+                if target_type == "avatar" and self.use_soa_check.isChecked():
+                    template_config['_use_soa'] = True
                 
                 for_loop = ForLoop(
                     loop_var=self.loop_var_input.text().strip(),
@@ -816,6 +857,9 @@ class LoopTab(BaseTab):
             self.end_input.setText(for_loop.end_expr)
             self.step_for_input.setText(for_loop.step_expr)
             self.target_type_combo.setCurrentText(for_loop.target_type)
+
+            # Restaurer le choix SoA depuis le template sauvegardé
+            self.use_soa_check.setChecked(bool(for_loop.template_config.get('_use_soa', False)))
             
             self.template_input.setPlainText(json.dumps(for_loop.template_config, indent=2))
             
@@ -999,6 +1043,7 @@ class LoopTab(BaseTab):
         self.start_input.setText("0")
         self.end_input.setText("10")
         self.step_for_input.setText("1")
+        self.use_soa_check.setChecked(False)
         self.template_input.clear()
 
         # Réinitialiser le widget Distribution

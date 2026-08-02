@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from pathlib import Path
 
-from ...core.convert import Converter   # adapte le chemin
+from ...core.converter import Converter   # adapte le chemin
 
 class ConvertDialog(QDialog):
     def __init__(self, parent=None):
