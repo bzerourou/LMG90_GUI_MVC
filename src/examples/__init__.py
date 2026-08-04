@@ -15,6 +15,11 @@ from .ex_dumbbell_avatar import build as _build_dumbbell_avatar
 from .ex_for_loop_ramp import build as _build_for_loop_ramp
 from .ex_dof_conditions import build as _build_dof_conditions
 from .ex_couette_shear import build as _build_couette_shear
+from .ex_hopper_discharge import build as _build_hopper_discharge
+from .ex_cable_pendulum import build as _build_cable_pendulum
+from .ex_deformable_impact import build as _build_deformable_impact
+from .ex_l_shaped_wall import build as _build_l_shaped_wall
+from .ex_silo_factory import build as _build_silo_factory
 
 
 EXAMPLES: list[ExampleSpec] = [
@@ -133,6 +138,76 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Avancé",
         builder=_build_couette_shear,
         tags=["granulo", "couette"],
+    ),
+    ExampleSpec(
+        id="hopper_discharge",
+        title="⏳ Décharge en trémie",
+        category="Avancé",
+        description=(
+            "Trémie en V (géométrie réelle via AvatarFactory) recevant un "
+            "dépôt granulométrique de 180 disques. Illustre : "
+            "AvatarFactory.create_hopper_2d, DOF par groupe, post-pro."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_hopper_discharge,
+        tags=["factory", "granulo", "dof"],
+    ),
+    ExampleSpec(
+        id="cable_pendulum",
+        title="🪢 Pendule à câble",
+        category="Avancé",
+        description=(
+            "Deux points matériels (PT2Dx) reliés par une loi ELASTIC_WIRE, "
+            "l'un fixé, l'autre libre sous gravité. Illustre le contact "
+            "point/point et l'immobilisation complète d'un avatar via DOF."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_cable_pendulum,
+        tags=["contact", "dof", "point_point"],
+    ),
+    ExampleSpec(
+        id="deformable_impact",
+        title="💥 Impact déformable (contacteur complet)",
+        category="Avancé",
+        description=(
+            "Corps déformable avec contacteur CLxxx correctement câblé "
+            "(live + script + viewer) chutant sur un sol immobilisé. "
+            "Corrige une simplification des exemples déformables précédents."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_deformable_impact,
+        tags=["deformable", "contact"],
+    ),
+    ExampleSpec(
+        id="l_shaped_wall",
+        title="📐 Structure en L + dépôt granulométrique",
+        category="Avancé",
+        description=(
+            "Deux murs de briques formant un angle, immobilisés en un "
+            "seul DOFOperation de groupe, recevant un dépôt de 120 grains "
+            "dans le coin. Illustre DOFOperation(target_type='group')."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_l_shaped_wall,
+        tags=["maconnerie", "granulo", "dof", "groupe"],
+    ),
+    ExampleSpec(
+        id="silo_factory",
+        title="🏭 Factory en silo",
+        category="Avancé",
+        description=(
+            "Particle Factory avec conteneur silo complet (parois "
+            "générées automatiquement) + lois de contact et post-pro "
+            "préconfigurées, prêtes à l'emploi après génération du script."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_silo_factory,
+        tags=["factory", "contact", "postpro"],
     ),
 ]
 

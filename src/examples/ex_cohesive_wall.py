@@ -58,7 +58,7 @@ def build(controller) -> None:
     # correctif précédent sur ex_deformable_drop.py pour le même piège).
     controller.add_contact_law(ContactLaw(
         name="czm01",
-        law_type=ContactLawType.MAC_CZM,
+        law_type=ContactLawType.IQS_MAC_CZM,
         properties={
             "stfr": 1e10,   # rigidité de contact statique
             "dyfr": 1e10,   # rigidité de contact dynamique
