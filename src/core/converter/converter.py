@@ -7,6 +7,7 @@ import traceback
 import types as _types
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import math
 
 import numpy as np
 
@@ -16,6 +17,8 @@ from .mock_pre import _MockPre
 from .proxies_avatar import _AvatarObj, _EmptyAvatarObj, _MeshAvatarObj
 from .proxies_data import _MaterialObj, _ModelObj, _TactBehavObj, _SeeTableObj, _PostproCommandObj
 from .proxies_runtime import _NpProxy, _RangeProxy
+from .containers import _SilentModule
+
 from .utils import _center, _name, _to_serial, _rotate_vertices_2d, _default_preferences
 
 

@@ -159,6 +159,14 @@ class MainWindow(QMainWindow):
         # Menu Outils
         tools_menu = menubar.addMenu("Outils")
 
+        # Menu Exemples
+        examples_menu = menubar.addMenu("📚 Exemples")
+
+        browse_examples_action = QAction("📂 Parcourir les exemples...", self)
+        browse_examples_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        browse_examples_action.triggered.connect(self._on_browse_examples)
+        examples_menu.addAction(browse_examples_action)
+
         datbox_action = QAction("Générer DATBOX", self)
         datbox_action.triggered.connect(self._on_generate_datbox)
         tools_menu.addAction(datbox_action)
@@ -686,6 +694,34 @@ class MainWindow(QMainWindow):
             self._add_tab(tab_id)
    
     # =======Menu Outils =============
+    def _on_browse_examples(self):
+            """Ouvre la bibliothèque d'exemples et charge celui choisi."""
+            from ..gui.dialogs.examples_dialog import ExamplesDialog
+            from ..examples import get_example
+
+            dlg = ExamplesDialog(self)
+            if dlg.exec() != ExamplesDialog.DialogCode.Accepted:
+                return
+
+            example = get_example(dlg.selected_example_id)
+            if example is None:
+                return
+
+            try:
+                self.controller.new_project(example.title)
+                example.builder(self.controller)
+                self.setWindowTitle(f"LMGC90_GUI v0.4.6 - {self.controller.state.name}")
+                self._refresh_all()
+                self.statusBar().showMessage(
+                    f"✅ Exemple « {example.title} » chargé", 5000
+                )
+            except Exception as e:
+                import traceback
+                QMessageBox.critical(
+                    self, "Erreur",
+                    f"Échec du chargement de l'exemple :\n{e}\n\n{traceback.format_exc()}"
+                )
+
     def _on_dynamic_vars(self):
         """Ouvre le dialogue des variables dynamiques"""
         from .dialogs import DynamicVarsDialog

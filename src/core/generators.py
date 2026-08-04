@@ -422,7 +422,6 @@ class GranuloGenerator:
         
         if ctype == "Box2D":
             nb_remaining, coor, dradii = _call_deposit(pre.depositInBox2D, radii, params['lx'], params['ly'])
-            print(nb_remaining, coor)
         elif ctype == "Disk2D":
             nb_remaining, coor, dradii = _call_deposit(pre.depositInDisk2D, radii, params['r'])
         elif ctype == "Couette2D":
