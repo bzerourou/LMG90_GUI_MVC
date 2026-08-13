@@ -29,7 +29,7 @@ def _place_bricks(controller, mat_name, mod_name, mat_obj, mod_obj,
                 material_name=mat_name, model_name=mod_name, color=color,
                 origin=AvatarOrigin.MANUAL,
                 wall_params={'l': lx, 'h': ly, 'brick_name': 'std'},
-                contactors=[],
+                contactors=[ {'shape': 'POLYG', 'color': color} ],  # il faut un contacteur pour chaque brique, mais on ne le définit pas ici
             )
             controller.state.avatars.append(av)
             indices.append(len(controller.state.avatars) - 1)
@@ -94,27 +94,30 @@ def build(controller) -> None:
 
     # ── Lois de contact ────────────────────────────────────────────────────
     controller.add_contact_law(ContactLaw(
-        name="mur_law", law_type=ContactLawType.IQS_DS_CLB,
-        friction=0.6, properties={"stfr": 1e8, "dyfr": 1e8},
+        name="law01", law_type=ContactLawType.IQS_DS_CLB,
+        friction = 0.4,
+        properties={"stfr": 1e8, "dyfr": 1e8},
     ))
     controller.add_contact_law(ContactLaw(
-        name="grain_law", law_type=ContactLawType.IQS_CLB, friction=0.4
+        name="law02", law_type=ContactLawType.IQS_CLB, friction=0.4
     ))
 
+    # Bricks are rigid bodies in this example: use RBDY2 + CLxxx contactor
     controller.add_visibility_rule(VisibilityRule(
-        candidate_body="RBDY2", candidate_contactor="ALpxx", candidate_color="ORANx",
-        antagonist_body="RBDY2", antagonist_contactor="ALpxx", antagonist_color="ORANx",
-        behavior_name="mur_law", alert=0.02,
+        candidate_body="RBDY2", candidate_contactor="POLYG", candidate_color="ORANx",
+        antagonist_body="RBDY2", antagonist_contactor="POLYG", antagonist_color="ORANx",
+        behavior_name="law01", alert=0.02,
     ))
     controller.add_visibility_rule(VisibilityRule(
         candidate_body="RBDY2", candidate_contactor="DISKx", candidate_color="BLUEx",
         antagonist_body="RBDY2", antagonist_contactor="DISKx", antagonist_color="BLUEx",
-        behavior_name="grain_law", alert=0.05,
+        behavior_name="law02", alert=0.05,
     ))
+    # Interaction bricks <-> disks: bricks are RBDY2 with CLxxx contactor
     controller.add_visibility_rule(VisibilityRule(
-        candidate_body="RBDY2", candidate_contactor="DISKx", candidate_color="BLUEx",
-        antagonist_body="RBDY2", antagonist_contactor="ALpxx", antagonist_color="ORANx",
-        behavior_name="grain_law", alert=0.05,
+        candidate_body="RBDY2", candidate_contactor="POLYG", candidate_color="ORANx",
+        antagonist_body="RBDY2", antagonist_contactor="DISKx", antagonist_color="BLUEx",
+        behavior_name="law02", alert=0.05,
     ))
 
     controller.state.name = "Exemple - Structure en L + dépôt granulométrique"
