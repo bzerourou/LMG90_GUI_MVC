@@ -20,6 +20,11 @@ from .ex_cable_pendulum import build as _build_cable_pendulum
 from .ex_deformable_impact import build as _build_deformable_impact
 from .ex_l_shaped_wall import build as _build_l_shaped_wall
 from .ex_silo_factory import build as _build_silo_factory
+from .ex_rotating_drum import build as _build_rotating_drum
+from .ex_biaxial_compression import build as _build_biaxial_compression
+from .ex_hexagon_packing import build as _build_hexagon_packing
+from .ex_cluster_pile import build as _build_cluster_pile
+from .ex_avalanche_slope import build as _build_avalanche_slope
 
 
 EXAMPLES: list[ExampleSpec] = [
@@ -208,6 +213,71 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Avancé",
         builder=_build_silo_factory,
         tags=["factory", "contact", "postpro"],
+    ),
+    ExampleSpec(
+        id="rotating_drum",
+        title="🌀 Tambour rotatif",
+        category="Avancé",
+        description=(
+            "Disque creux (is_hollow, contacteur xKSID) entraîné en "
+            "rotation constante, contenant un dépôt granulométrique "
+            "Drum2D. Illustre le conteneur xKSID et la rotation entraînée."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_rotating_drum,
+        tags=["dof", "granulo", "rotation"],
+    ),
+    ExampleSpec(
+        id="biaxial_compression",
+        title="🗜️ Compression biaxiale",
+        category="Avancé",
+        description=(
+            "Deux parois verticales mobiles compriment un lit de grains "
+            "à vitesse constante. Illustre imposeDrivenDof en translation "
+            "continue, combiné à une rotation ponctuelle de mise en place."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_biaxial_compression,
+        tags=["dof", "granulo", "essai_mecanique"],
+    ),
+    ExampleSpec(
+        id="hexagon_packing",
+        title="⬡ Pavage hexagonal",
+        category="Structures",
+        description=(
+            "Grille de 16 hexagones (rigidPolygon, sommets explicites) "
+            "en pavage décalé de type nid d'abeille. Illustre les "
+            "polygones personnalisés (generation_type='full')."
+        ),
+        dimension=2, difficulty="Intermédiaire",
+        builder=_build_hexagon_packing,
+        tags=["avatar", "polygone"],
+    ),
+    ExampleSpec(
+        id="cluster_pile",
+        title="🔺 Empilement de clusters",
+        category="Structures",
+        description=(
+            "Grille de 12 clusters triangulaires (rigidCluster, 3 disques "
+            "chacun) tombant sur un socle fixe. Illustre rigidCluster, "
+            "non compatible avec la génération granulométrique standard."
+        ),
+        dimension=2, difficulty="Intermédiaire",
+        builder=_build_cluster_pile,
+        tags=["avatar", "cluster"],
+    ),
+    ExampleSpec(
+        id="avalanche_slope",
+        title="⛰️ Avalanche sur pente inclinée",
+        category="Avancé",
+        description=(
+            "Pente inclinée à 25° (rotation DOF) recevant un dépôt "
+            "granulométrique qui s'écoule sous gravité et friction. "
+            "Illustre la combinaison rotation statique + granulo + DOF."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_avalanche_slope,
+        tags=["dof", "granulo", "pente"],
     ),
 ]
 
