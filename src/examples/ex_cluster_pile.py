@@ -57,6 +57,7 @@ def build(controller) -> None:
                 origin=AvatarOrigin.MANUAL,
                 radius=0.08,
                 nb_vertices=3,   # nb_disk : 3 disques élémentaires par cluster
+
             )
             idx = controller.add_avatar(cluster)
             generated_indices.append(idx)
@@ -66,17 +67,17 @@ def build(controller) -> None:
 
     # ── Lois de contact ────────────────────────────────────────────────────
     controller.add_contact_law(ContactLaw(
-        name="cluster_law", law_type=ContactLawType.IQS_CLB, friction=0.5
+        name="isqc0", law_type=ContactLawType.IQS_CLB, friction=0.5
     ))
     controller.add_visibility_rule(VisibilityRule(
         candidate_body="RBDY2", candidate_contactor="DISKx", candidate_color="MAGEx",
         antagonist_body="RBDY2", antagonist_contactor="DISKx", antagonist_color="MAGEx",
-        behavior_name="cluster_law", alert=0.05,
+        behavior_name="isqc0", alert=0.05,
     ))
     controller.add_visibility_rule(VisibilityRule(
         candidate_body="RBDY2", candidate_contactor="DISKx", candidate_color="MAGEx",
-        antagonist_body="RBDY2", antagonist_contactor="ALpxx", antagonist_color="GRAYx",
-        behavior_name="cluster_law", alert=0.05,
+        antagonist_body="RBDY2", antagonist_contactor="JONCx", antagonist_color="GRAYx",
+        behavior_name="isqc0", alert=0.05,
     ))
 
     controller.state.name = "Exemple - Empilement de clusters"

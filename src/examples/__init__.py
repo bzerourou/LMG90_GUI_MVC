@@ -25,6 +25,7 @@ from .ex_biaxial_compression import build as _build_biaxial_compression
 from .ex_hexagon_packing import build as _build_hexagon_packing
 from .ex_cluster_pile import build as _build_cluster_pile
 from .ex_avalanche_slope import build as _build_avalanche_slope
+from .ex_composite_scene import build as _build_composite_scene
 
 
 EXAMPLES: list[ExampleSpec] = [
@@ -72,6 +73,48 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Intermédiaire",
         builder=_build_masonry_wall,
         tags=["maconnerie", "groupe"],
+    ),
+    ExampleSpec(
+        id="granulo_deposit",
+        title="🎲 Dépôt granulométrique",
+        category="Génération de masse",
+        description=(
+            "500 disques de rayons aléatoires [0.03, 0.08] déposés par "
+            "gravité dans une boîte via granulo_Random + depositInBox2D. "
+            "Illustre : GranuloGeneration, génération vectorisée numpy."
+        ),
+        dimension=2,
+        difficulty="Intermédiaire",
+        builder=_build_granulo_deposit,
+        tags=["granulo", "masse"],
+    ),
+    ExampleSpec(
+        id="circle_loop",
+        title="⭕ Boucle géométrique — Cercle",
+        category="Génération de masse",
+        description=(
+            "12 disques disposés en cercle autour d'un centre, générés "
+            "depuis un avatar modèle via une boucle Cercle. Illustre le "
+            "système de boucles géométriques (Loop) et les groupes."
+        ),
+        dimension=2,
+        difficulty="Débutant",
+        builder=_build_circle_loop,
+        tags=["boucle", "groupe"],
+    ),
+    ExampleSpec(
+        id="deformable_drop",
+        title="🔷 Corps déformable sur sol rigide",
+        category="Avancé",
+        description=(
+            "Un rectangle déformable (maillage T3, matériau ELAS) tombe "
+            "sur un mur rigide. Illustre : buildMesh2D, matériau élastique, "
+            "loi GAP_SGR_CLB (rigide/déformable)."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_deformable_drop,
+        tags=["deformable", "fem"],
     ),
     ExampleSpec(
         id="cohesive_wall",
@@ -278,7 +321,24 @@ EXAMPLES: list[ExampleSpec] = [
         dimension=2, difficulty="Avancé",
         builder=_build_avalanche_slope,
         tags=["dof", "granulo", "pente"],
+    ),    
+    ExampleSpec(
+        id="composite_scene",
+        title="🎨 Scène composite — synthèse complète",
+        category="Avancé",
+        description=(
+            "L'exemple le plus complet : mur de briques cohésif, rampe "
+            "inclinée, disques/jonc/polygone/cluster mobiles, 3 lois de "
+            "contact distinctes, tables de visibilité croisées par paire "
+            "de couleurs, et variables dynamiques (dynamic_vars) pilotant "
+            "toute la géométrie — visibles dans Outils > Variables "
+            "dynamiques après chargement."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_composite_scene,
+        tags=["synthese", "variables", "contact", "avatar"],
     ),
+
 ]
 
 

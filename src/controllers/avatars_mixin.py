@@ -21,10 +21,18 @@ class AvatarsMixin:
                 raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
             if not mod_obj:
                 raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
+            from ..core.app_logger import get_logger
+            logger = get_logger('controller')
+            logger.debug(
+                "add_avatar avant native: type=%s center=%s radius=%s",
+                avatar.avatar_type.value, avatar.center, avatar.radius,
+            )
             body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
+            logger.debug("add_avatar après create_avatar")
             # None pour MESH_DEFORMABLE sans mesh_params — placeholder alignement
             if body_obj is not None:
                 self._bodies_container.addAvatar(body_obj)
+            logger.debug("add_avatar après containers.addAvatar")
             self._pylmgc_bodies.append(body_obj)
         else:
             self._pylmgc_bodies.append(None)

@@ -42,6 +42,18 @@ def build(controller) -> None:
     model_idx = controller.add_avatar(model_disk)
     model_id = controller.state.avatars[model_idx].avatar_id
 
+        # ── Boucle Ligne : 10 disques alignés à 1m de hauteur ────────────────
+    loop = Loop(
+        loop_type="Ligne",
+        model_avatar_id=model_id,
+        count=10,
+        step=0.3,
+        offset_x=-1.15,
+        offset_y=1.0,
+        group_name="disques_chute",
+    )
+    controller.generate_loop(loop)
+
     # ── Loi de contact + visibilité ────────────────────────────────────────
     law = ContactLaw(
         name="iqsc0", law_type=ContactLawType.IQS_CLB, friction=0.3

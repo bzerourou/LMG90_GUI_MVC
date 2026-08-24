@@ -81,14 +81,19 @@ class LMGC90Bridge:
             Objet avatar pylmgc90
         """
         atype = avatar.avatar_type
-        center = avatar.center
+        center = np.ascontiguousarray(avatar.center, dtype=np.float64)
         color = avatar.color
         
         # Création selon le type
         # 2D avatars
         if atype == AvatarType.RIGID_DISK:
+            radius = float(avatar.radius)
+            if center.shape != (2,) or not np.isfinite(center).all() or not np.isfinite(radius) or radius <= 0:
+                raise ValueError(
+                    f"Paramètres rigidDisk invalides: center={center!r}, radius={radius!r}"
+                )
             kwargs = {
-                'r': avatar.radius,
+                'r': radius,
                 'center': center,
                 'model': model_obj,
                 'material': material_obj,
@@ -96,7 +101,12 @@ class LMGC90Bridge:
             }
             if avatar.is_hollow:
                 kwargs['is_Hollow'] = True
-            return pre.rigidDisk(**kwargs)
+            from .app_logger import get_logger
+            logger = get_logger('pylmgc_bridge')
+            logger.debug("rigidDisk avant: center=%s radius=%s", center.tolist(), radius)
+            body = pre.rigidDisk(**kwargs)
+            logger.debug("rigidDisk après")
+            return body
         
         elif atype == AvatarType.RIGID_JONC:
             return pre.rigidJonc(

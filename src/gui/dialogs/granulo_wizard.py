@@ -94,17 +94,20 @@ class GranuloWizard(QWizard):
     }
 
     def _generate_granulo(self):
-        """Génère la distribution directement via pre.granuloRandom + depositInXxx.
-        Contourne add_avatar() qui émet un signal par particule → trop lent à 1000+.
-        Les avatars sont insérés directement dans les conteneurs pylmgc90.
         """
-        from pylmgc90 import pre 
+        Génère la distribution via GranuloGenerator
+        (qui appelle pre.granulo_Random + pre.depositInXxx sur le thread principal).
+        """
+        from ...core.generators import GranuloGenerator
+        from ...core.models import (
+            Material, Model, MaterialType,
+            GranuloGeneration, AvatarType, AvatarOrigin, Avatar,
+        )
         from ...core.pylmgc_bridge import LMGC90Bridge
-        from ...core.models import AvatarType, AvatarOrigin, Avatar
 
         ctrl = self.controller
 
-        # ── Dimension ────────────────────────────────────────────────────────
+        # ── 1. Dimension ─────────────────────────────────────────────────────
         dim_page = self.page(self.PAGE_DIMENSION)
         dimension = 2 if dim_page.dim_2d_radio.isChecked() else 3
         ok, reasons = self.controller.can_change_dimension(dimension)
@@ -115,21 +118,23 @@ class GranuloWizard(QWizard):
                 "la dimension choisie :\n\n• " + "\n• ".join(reasons) +
                 "\n\nContinuer quand même ?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.No,
             )
             if reply != QMessageBox.StandardButton.Yes:
-                raise ValueError("Génération annulée : dimension incompatible avec le projet existant.")
+                raise ValueError(
+                    "Génération annulée : dimension incompatible avec le projet existant."
+                )
             self.controller.set_dimension(dimension, force=True)
         else:
             self.controller.set_dimension(dimension)
 
-        # ── Matériau ─────────────────────────────────────────────────────────
+        # ── 2. Matériau ──────────────────────────────────────────────────────
         mat_page = self.page(self.PAGE_MATERIAL)
         if mat_page.create_material_check.isChecked():
             material = Material(
                 name=mat_page.mat_name_input.text().strip(),
                 material_type=MaterialType.RIGID,
-                density=mat_page.density_spin.value()
+                density=mat_page.density_spin.value(),
             )
             ctrl.add_material(material)
             mat_name = material.name
@@ -138,7 +143,7 @@ class GranuloWizard(QWizard):
             if mat_name in ("", "(Aucun matériau)"):
                 raise ValueError("Aucun matériau sélectionné")
 
-        # ── Modèle ───────────────────────────────────────────────────────────
+        # ── 3. Modèle ────────────────────────────────────────────────────────
         mod_page = self.page(self.PAGE_MODEL)
         if mod_page.create_model_check.isChecked():
             element = "Rxx2D" if dimension == 2 else "Rxx3D"
@@ -146,7 +151,7 @@ class GranuloWizard(QWizard):
                 name=mod_page.mod_name_input.text().strip(),
                 physics="MECAx",
                 element=element,
-                dimension=dimension
+                dimension=dimension,
             )
             ctrl.add_model(model)
             mod_name = model.name
@@ -155,94 +160,70 @@ class GranuloWizard(QWizard):
             if mod_name in ("", "(Aucun modèle)"):
                 raise ValueError("Aucun modèle sélectionné")
 
-        # ── Distribution ─────────────────────────────────────────────────────
+        # ── 4. Distribution ──────────────────────────────────────────────────
         dist_page = self.page(self.PAGE_DISTRIBUTION)
         nb_particles = dist_page.nb_particles_spin.value()
-        radius_min   = dist_page.radius_min_spin.value()
-        radius_max   = dist_page.radius_max_spin.value()
-        seed         = dist_page.seed_spin.value() if dist_page.use_seed_check.isChecked() else None
+        radius_min = dist_page.radius_min_spin.value()
+        radius_max = dist_page.radius_max_spin.value()
+        seed = (
+            dist_page.seed_spin.value()
+            if dist_page.use_seed_check.isChecked()
+            else None
+        )
+        use_particle_population = dist_page.use_particle_population_check.isChecked()
 
-        # ── Conteneur ────────────────────────────────────────────────────────
-        cont_page      = self.page(self.PAGE_CONTAINER)
+        # ── 5. Conteneur ─────────────────────────────────────────────────────
+        cont_page = self.page(self.PAGE_CONTAINER)
         container_type = cont_page.container_combo.currentText()
         container_params = cont_page.get_container_params()
 
-        # ── granuloRandom ────────────────────────────────────────────────────
-        granu_kwargs = dict(nb=nb_particles, r_min=radius_min, r_max=radius_max)
-        if seed is not None:
-            granu_kwargs["seed"] = seed
-        radii = pre.granulo_Random(**granu_kwargs)
+        avatar_type_str = "rigidDisk" if dimension == 2 else "rigidSphere"
+        group_name = f"granulo_{container_type.lower()}"
+        color = "BLUEx"
 
-        use_particle_population = dist_page.use_particle_population_check.isChecked()
+        # ── 6. Config + appel pylmgc90 (thread principal) ────────────────────
+        config = GranuloGeneration(
+            nb_particles=nb_particles,
+            radius_min=radius_min,
+            radius_max=radius_max,
+            container_type=container_type,
+            container_params=container_params,
+            model_name=mod_name,
+            material_name=mat_name,
+            avatar_type=avatar_type_str,
+            seed=seed,
+            group_name=group_name,
+            color=color,
+            use_particle_population=use_particle_population,
+        )
 
-        # ── Dépôt dans le conteneur ──────────────────────────────────────────
-        deposit_fn   = self._DEPOSIT_FUNC.get(container_type, "depositInBox2D")
-        deposit_keys = self._DEPOSIT_PARAMS.get(container_type, ["lx", "ly"])
-        deposit_kwargs = {k: container_params[k] for k in deposit_keys if k in container_params}
+        # C’est ICI que pre.granulo_Random + pre.depositInXxx sont appelés
+        # (via GranuloGenerator, version corrigée)
+        nb_laid, coords, radii = GranuloGenerator.generate(config)
 
-        _deposit_result = getattr(pre, deposit_fn)(radii=radii, **deposit_kwargs)
-        if not isinstance(_deposit_result, (tuple, list)):
-            raise RuntimeError(
-                f"{deposit_fn} : retour inattendu ({_deposit_result!r}). "
-                f"Vérifiez la version de pylmgc90 installée."
-            )
-        if len(_deposit_result) < 2:
-            raise RuntimeError(
-                f"{deposit_fn} : retour inattendu ({_deposit_result!r}). "
-                f"Vérifiez la version de pylmgc90 installée."
-            )
-
-        nb_particles, coords = _deposit_result[0], _deposit_result[1]
-        deposit_radii = _deposit_result[2] if len(_deposit_result) > 2 else radii
-
-        # Reshape coordinates
-        #nb_remaining = np.shape(coor)[0] // 2
-        coords.shape = [coords.size//2,2]
-        
-        # Tronquer les rayons au nombre effectif
-        radii = deposit_radii[:nb_particles]
-
-        # ── Objets pylmgc90 matériau / modèle ────────────────────────────────
+        # ── 7. Objets pylmgc90 matériau / modèle ─────────────────────────────
         mat_obj = ctrl._pylmgc_materials.get(mat_name)
         mod_obj = ctrl._pylmgc_models.get(mod_name)
         if mat_obj is None:
-            raise ValueError(f"Matériau pylmgc90 '{mat_name}' introuvable dans les conteneurs")
+            raise ValueError(f"Matériau pylmgc90 '{mat_name}' introuvable")
         if mod_obj is None:
-            raise ValueError(f"Modèle pylmgc90 '{mod_name}' introuvable dans les conteneurs")
+            raise ValueError(f"Modèle pylmgc90 '{mod_name}' introuvable")
 
-        # ── Boucle de création directe ────────────────────────────────────────
-        avatar_type_str = "rigidDisk" if dimension == 2 else "rigidSphere"
-        avatar_type_enum = AvatarType(avatar_type_str)
-        group_name       = f"granulo_{container_type.lower()}"
-        color            = "BLUEx"
-
+        # ── 8. Création des particules ───────────────────────────────────────
         if use_particle_population:
-            config = GranuloGeneration(
-                nb_particles=len(radii),
-                radius_min=radius_min,
-                radius_max=radius_max,
-                container_type=container_type,
-                container_params=container_params,
-                model_name=mod_name,
-                material_name=mat_name,
-                avatar_type=avatar_type_str,
-                seed=seed,
-                group_name=group_name,
-                color=color,
-                use_particle_population=True,
-            )
             ctrl.create_granulo_population_from_arrays(
                 config,
                 coords.astype(float),
                 radii.astype(float),
             )
         else:
+            avatar_type_enum = AvatarType(avatar_type_str)
             generated_indices = []
-            for j in range(nb_particles):
-                center = coords[j].tolist()  # Convertir en liste pour compatibilité avec Avatar
-                radius = radii[j]
 
-                # Modèle Avatar (state) — sans signal
+            for j in range(nb_laid):
+                center = coords[j].tolist()
+                radius = float(radii[j])
+
                 av_model = Avatar(
                     avatar_type=avatar_type_enum,
                     center=center,
@@ -250,12 +231,11 @@ class GranuloWizard(QWizard):
                     model_name=mod_name,
                     color=color,
                     origin=AvatarOrigin.GRANULO,
-                    radius=radius
+                    radius=radius,
                 )
                 ctrl.state.avatars.append(av_model)
                 idx = len(ctrl.state.avatars) - 1
 
-                # Objet pylmgc90 direct
                 body_obj = LMGC90Bridge.create_avatar(av_model, mod_obj, mat_obj)
                 ctrl._bodies_container.addAvatar(body_obj)
                 ctrl._pylmgc_bodies.append(body_obj)
@@ -265,21 +245,6 @@ class GranuloWizard(QWizard):
             generated_avatar_ids = [
                 ctrl.state.avatars[i].avatar_id for i in generated_indices
             ]
-
-            # ── Enregistrer la config granulo dans le state ───────────────────────
-            config = GranuloGeneration(
-                nb_particles=len(radii),
-                radius_min=radius_min,
-                radius_max=radius_max,
-                container_type=container_type,
-                container_params=container_params,
-                model_name=mod_name,
-                material_name=mat_name,
-                avatar_type=avatar_type_str,
-                seed=seed,
-                group_name=group_name,
-                color=color,
-            )
             config.generated_ids = generated_avatar_ids
             ctrl.state.granulo_generations.append(config)
 
@@ -288,9 +253,8 @@ class GranuloWizard(QWizard):
                     ctrl.state.avatar_groups[group_name] = []
                 ctrl.state.avatar_groups[group_name].extend(generated_avatar_ids)
 
-        # Un seul signal à la fin pour rafraîchir l'UI
+        # ── 9. Rafraîchir l’UI une seule fois ────────────────────────────────
         ctrl.state_changed.emit()
-
 
 class GranuloIntroPage(QWizardPage):
     """Introduction"""
@@ -681,6 +645,11 @@ class ContainerPage(QWizardPage):
         self.ly_input.setRange(0.1, 100)
         self.ly_input.setValue(4.0)
         self.ly_input.setSuffix(" m")
+
+        self.lz_input = QDoubleSpinBox()
+        self.lz_input.setRange(0.1, 100)
+        self.lz_input.setValue(4.0)
+        self.lz_input.setSuffix(" m")
         
         self.r_input = QDoubleSpinBox()
         self.r_input.setRange(0.1, 100)
@@ -738,6 +707,16 @@ class ContainerPage(QWizardPage):
             self.params_layout.addRow("Rayon ext (rext) :", self.rext_input)
             self.rint_input.setVisible(True)
             self.rext_input.setVisible(True)
+        elif container_type == "Box3D":
+            self.params_layout.addRow("Largeur (lx) :", self.lx_input)
+            self.params_layout.addRow("Hauteur (ly) :", self.ly_input)
+            self.params_layout.addRow("Profondeur (lz) :", self.lz_input)
+            self.lx_input.setVisible(True)
+            self.ly_input.setVisible(True)
+            self.lz_input.setVisible(True)
+        elif container_type in ["Sphere3D", "Cylinder3D"]:
+            self.params_layout.addRow("Rayon (r) :", self.r_input)
+            self.r_input.setVisible(True)
     
     def get_container_params(self):
         """Retourne les paramètres du conteneur"""
@@ -749,6 +728,14 @@ class ContainerPage(QWizardPage):
             return {'r': self.r_input.value()}
         elif container_type == "Couette2D":
             return {'rint': self.rint_input.value(), 'rext': self.rext_input.value()}
+        elif container_type == "Box3D":
+            return {
+                'lx': self.lx_input.value(),
+                'ly': self.ly_input.value(),
+                'lz': self.lz_input.value(),
+            }
+        elif container_type in ["Sphere3D", "Cylinder3D"]:
+            return {'r': self.r_input.value()}
         else:
             return {}
 
