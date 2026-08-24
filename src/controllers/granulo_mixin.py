@@ -12,11 +12,21 @@ class GranuloMixin:
 
     def generate_granulo(self, config: GranuloGeneration) -> List[int]:
         if config.use_particle_population:
-            nb_particles, coordinates, radii = GranuloGenerator.generate(config)
-            self.create_granulo_population_from_arrays(config, coordinates, radii)
-            return []
-
-        nb_particles, coordinates, radii = GranuloGenerator.generate(config)
+            try:
+                nb_particles, coordinates, radii = GranuloGenerator.generate(config)
+                self.create_granulo_population_from_arrays(config, coordinates, radii)
+                return []
+            except Exception as e:
+                raise RuntimeError(
+                    f"Erreur lors de la génération de la population granulo: {e}"
+                ) from e
+        else:     
+            try:      
+                nb_particles, coordinates, radii = GranuloGenerator.generate(config)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Erreur lors de la génération granulo: {e}"
+                ) from e
 
         generated_indices = []
         prev_batch        = self._batch_mode

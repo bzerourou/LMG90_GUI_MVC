@@ -23,6 +23,7 @@ from ...controllers.project_controller import ProjectController
 from ...views.tabs.base_tab import BaseTab
 
 from ...core.workers.granulo_worker import GranuloWorker
+from ...core.generators import GranuloGenerator
 
 import gc
 
@@ -345,45 +346,46 @@ class GranuloTab(BaseTab):
                 group_name=self.group_name_input.text().strip() if self.store_check.isChecked() else None,
                 use_particle_population=self.use_population_check.isChecked(),
             )
-            
-            # Stocker la config
+
             self.current_config = config
-            
-            # Réinitialiser le flag d'annulation
             self._user_canceled = False
-            
-            # Créer un label de progression au lieu du dialogue
-            if not hasattr(self, 'progress_label'):
+
+            if not hasattr(self, "progress_label"):
                 self.progress_label = QLabel(self)
                 self.progress_label.setStyleSheet(
                     "QLabel { background-color: #E3F2FD; border: 2px solid #2196F3; "
                     "border-radius: 5px; padding: 10px; font-weight: bold; }"
                 )
                 self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            
-            self.progress_label.setText("⏳ Phase 1/2: Calcul du dépôt granulométrique...)")
+
+            self.progress_label.setText("⏳ Phase 1/2: Calcul du dépôt granulométrique…")
             self.progress_label.setGeometry(
-                self.width() // 2 - 200,
-                self.height() // 2 - 50,
-                400,
-                100
+                self.width() // 2 - 200, self.height() // 2 - 50, 400, 100
             )
             self.progress_label.show()
             self.progress_label.raise_()
-            
-            # Désactiver le bouton
             self.gen_btn.setEnabled(False)
-            
-            # Lancer le worker pour CALCULS SEULEMENT
-            self.worker = GranuloWorker(config)
+
+            # ── Dépôt pylmgc90 SUR LE THREAD PRINCIPAL (obligatoire) ──────────
+            from ...core.generators import GranuloGenerator
+            try:
+                nb_laid, coordinates, radii = GranuloGenerator.generate(config)
+            except Exception as e:
+                self._on_error(f"Erreur dépôt pylmgc90: {e}")
+                return
+
+            # Conversion légère en thread secondaire (pas de natif)
+            self.worker = GranuloWorker(coordinates, radii)
             self.worker.progress_updated.connect(self._on_calc_progress)
             self.worker.data_ready.connect(self._on_data_ready)
             self.worker.error_occurred.connect(self._on_error)
             self.worker.start()
             
         except ValidationError as e:
+            self._on_error(str(e))
             QMessageBox.warning(self, "Validation", str(e))
         except Exception as e:
+            self._on_error(str(e))
             QMessageBox.critical(self, "Erreur", f"Impossible de démarrer:\n{e}")
     
     def _generate_distribution_only(self, nb: int, rmin: float, rmax: float, seed):

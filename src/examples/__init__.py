@@ -20,6 +20,12 @@ from .ex_cable_pendulum import build as _build_cable_pendulum
 from .ex_deformable_impact import build as _build_deformable_impact
 from .ex_l_shaped_wall import build as _build_l_shaped_wall
 from .ex_silo_factory import build as _build_silo_factory
+from .ex_rotating_drum import build as _build_rotating_drum
+from .ex_biaxial_compression import build as _build_biaxial_compression
+from .ex_hexagon_packing import build as _build_hexagon_packing
+from .ex_cluster_pile import build as _build_cluster_pile
+from .ex_avalanche_slope import build as _build_avalanche_slope
+from .ex_composite_scene import build as _build_composite_scene
 
 
 EXAMPLES: list[ExampleSpec] = [
@@ -67,6 +73,48 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Intermédiaire",
         builder=_build_masonry_wall,
         tags=["maconnerie", "groupe"],
+    ),
+    ExampleSpec(
+        id="granulo_deposit",
+        title="🎲 Dépôt granulométrique",
+        category="Génération de masse",
+        description=(
+            "500 disques de rayons aléatoires [0.03, 0.08] déposés par "
+            "gravité dans une boîte via granulo_Random + depositInBox2D. "
+            "Illustre : GranuloGeneration, génération vectorisée numpy."
+        ),
+        dimension=2,
+        difficulty="Intermédiaire",
+        builder=_build_granulo_deposit,
+        tags=["granulo", "masse"],
+    ),
+    ExampleSpec(
+        id="circle_loop",
+        title="⭕ Boucle géométrique — Cercle",
+        category="Génération de masse",
+        description=(
+            "12 disques disposés en cercle autour d'un centre, générés "
+            "depuis un avatar modèle via une boucle Cercle. Illustre le "
+            "système de boucles géométriques (Loop) et les groupes."
+        ),
+        dimension=2,
+        difficulty="Débutant",
+        builder=_build_circle_loop,
+        tags=["boucle", "groupe"],
+    ),
+    ExampleSpec(
+        id="deformable_drop",
+        title="🔷 Corps déformable sur sol rigide",
+        category="Avancé",
+        description=(
+            "Un rectangle déformable (maillage T3, matériau ELAS) tombe "
+            "sur un mur rigide. Illustre : buildMesh2D, matériau élastique, "
+            "loi GAP_SGR_CLB (rigide/déformable)."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_deformable_drop,
+        tags=["deformable", "fem"],
     ),
     ExampleSpec(
         id="cohesive_wall",
@@ -209,6 +257,88 @@ EXAMPLES: list[ExampleSpec] = [
         builder=_build_silo_factory,
         tags=["factory", "contact", "postpro"],
     ),
+    ExampleSpec(
+        id="rotating_drum",
+        title="🌀 Tambour rotatif",
+        category="Avancé",
+        description=(
+            "Disque creux (is_hollow, contacteur xKSID) entraîné en "
+            "rotation constante, contenant un dépôt granulométrique "
+            "Drum2D. Illustre le conteneur xKSID et la rotation entraînée."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_rotating_drum,
+        tags=["dof", "granulo", "rotation"],
+    ),
+    ExampleSpec(
+        id="biaxial_compression",
+        title="🗜️ Compression biaxiale",
+        category="Avancé",
+        description=(
+            "Deux parois verticales mobiles compriment un lit de grains "
+            "à vitesse constante. Illustre imposeDrivenDof en translation "
+            "continue, combiné à une rotation ponctuelle de mise en place."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_biaxial_compression,
+        tags=["dof", "granulo", "essai_mecanique"],
+    ),
+    ExampleSpec(
+        id="hexagon_packing",
+        title="⬡ Pavage hexagonal",
+        category="Structures",
+        description=(
+            "Grille de 16 hexagones (rigidPolygon, sommets explicites) "
+            "en pavage décalé de type nid d'abeille. Illustre les "
+            "polygones personnalisés (generation_type='full')."
+        ),
+        dimension=2, difficulty="Intermédiaire",
+        builder=_build_hexagon_packing,
+        tags=["avatar", "polygone"],
+    ),
+    ExampleSpec(
+        id="cluster_pile",
+        title="🔺 Empilement de clusters",
+        category="Structures",
+        description=(
+            "Grille de 12 clusters triangulaires (rigidCluster, 3 disques "
+            "chacun) tombant sur un socle fixe. Illustre rigidCluster, "
+            "non compatible avec la génération granulométrique standard."
+        ),
+        dimension=2, difficulty="Intermédiaire",
+        builder=_build_cluster_pile,
+        tags=["avatar", "cluster"],
+    ),
+    ExampleSpec(
+        id="avalanche_slope",
+        title="⛰️ Avalanche sur pente inclinée",
+        category="Avancé",
+        description=(
+            "Pente inclinée à 25° (rotation DOF) recevant un dépôt "
+            "granulométrique qui s'écoule sous gravité et friction. "
+            "Illustre la combinaison rotation statique + granulo + DOF."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_avalanche_slope,
+        tags=["dof", "granulo", "pente"],
+    ),    
+    ExampleSpec(
+        id="composite_scene",
+        title="🎨 Scène composite — synthèse complète",
+        category="Avancé",
+        description=(
+            "L'exemple le plus complet : mur de briques cohésif, rampe "
+            "inclinée, disques/jonc/polygone/cluster mobiles, 3 lois de "
+            "contact distinctes, tables de visibilité croisées par paire "
+            "de couleurs, et variables dynamiques (dynamic_vars) pilotant "
+            "toute la géométrie — visibles dans Outils > Variables "
+            "dynamiques après chargement."
+        ),
+        dimension=2, difficulty="Avancé",
+        builder=_build_composite_scene,
+        tags=["synthese", "variables", "contact", "avatar"],
+    ),
+
 ]
 
 

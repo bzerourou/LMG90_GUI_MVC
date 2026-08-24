@@ -48,17 +48,17 @@ def build(controller) -> None:
     # ── Lois de contact — appliquées aux particules une fois le script
     # pre.py exécuté et les avatars factory chargés (Charger Factory) ──────
     controller.add_contact_law(ContactLaw(
-        name="silo_law", law_type=ContactLawType.IQS_CLB, friction=0.35
+        name="law01", law_type=ContactLawType.IQS_CLB, friction=0.35
     ))
     controller.add_visibility_rule(VisibilityRule(
         candidate_body="RBDY2", candidate_contactor="DISKx", candidate_color="BLUEx",
         antagonist_body="RBDY2", antagonist_contactor="DISKx", antagonist_color="BLUEx",
-        behavior_name="silo_law", alert=0.05,
+        behavior_name="law01", alert=0.05,
     ))
     controller.add_visibility_rule(VisibilityRule(
         candidate_body="RBDY2", candidate_contactor="DISKx", candidate_color="BLUEx",
         antagonist_body="RBDY2", antagonist_contactor="JONCx", antagonist_color="GRAYx",
-        behavior_name="silo_law", alert=0.05,
+        behavior_name="law01", alert=0.05,
     ))
 
     controller.add_postpro_command(PostProCommand(name="KINETIC ENERGY", step=10))

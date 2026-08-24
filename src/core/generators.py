@@ -11,55 +11,107 @@ from typing import List, Tuple, Dict, Any
 from .models import Avatar, Loop, GranuloGeneration, AvatarType, AvatarOrigin
 
 
-# adapter à la version pylmgc90
-def _call_deposit(func, *args, **kwargs):
-    """
-    Appelle une fonction de dépôt pylmgc90 (depositInBox2D, depositInDisk2D, ...)
-    en s'adaptant au nombre de valeurs retournées selon la version installée :
-      - pylmgc90 (ancien, ~2023)  : (nb_remaining, coor)
-      - pylmgc90 (récent, ~2025) : (nb_remaining, coor, <valeur additionnelle>)
+def _safe_copy_array(arr, dtype=np.float64) -> np.ndarray:
+    """Copie sûre d'un tableau retourné par le Fortran/C de pylmgc90."""
+    if arr is None:
+        return np.array([], dtype=dtype)
+    return np.array(arr, dtype=dtype, copy=True, order="C")
 
-    Retourne toujours (nb_remaining, coor, radii). Si la version installée ne
-    renvoie pas de valeur supplémentaire, on réutilise les rayons fournis en entrée.
+
+def _normalize_coords(coor, nb: int, dim: int = 2) -> np.ndarray:
     """
-    result = func(*args, **kwargs)
+    Normalise les coordonnées renvoyées par depositInXxx.
+    - flat (nb*dim,)  → (nb, dim)
+    - déjà (nb, dim)  → inchangé
+    Toujours une copie C-contiguous.
+    """
+    coor = _safe_copy_array(coor)
+    if coor.size == 0:
+        return np.zeros((0, dim), dtype=np.float64)
+
+    if coor.ndim == 1:
+        if coor.size % dim != 0:
+            raise RuntimeError(
+                f"Coordonnées invalides: taille={coor.size}, dim={dim} "
+                f"(attendu multiple de {dim})"
+            )
+        coor = coor.reshape(-1, dim)
+    elif coor.ndim == 2:
+        if coor.shape[1] != dim and coor.shape[0] == dim:
+            coor = coor.T
+    else:
+        raise RuntimeError(f"Forme de coordonnées inattendue: {coor.shape}")
+
+    # Tronquer au nombre réellement posé
+    if nb is not None and nb >= 0:
+        coor = coor[:nb]
+
+    return np.ascontiguousarray(coor, dtype=np.float64)
+
+
+def _call_deposit(func, radii, *geom_args):
+    """
+    Appelle pre.depositInXxx de façon robuste.
+
+    API officielle (pylmgc90 2025) :
+        nb_laid, coors, radii = pre.depositInBox2D(radii, lx, ly)
+
+    - Arguments positionnels uniquement (pas de kwargs radii=...)
+    - Copie immédiate des tableaux (évite corruption mémoire / stack buffer overrun)
+    - Compatible 2 ou 3 valeurs de retour
+    """
+    # radii doit être un ndarray float contigu côté Python
+    radii_in = _safe_copy_array(radii)
+
+    result = func(radii_in, *geom_args)
 
     if not isinstance(result, (tuple, list)):
         raise RuntimeError(
-            f"{func.__name__} : retour inattendu ({type(result).__name__!r}), "
-            f"une séquence était attendue. Vérifiez la version de pylmgc90 installée."
+            f"{func.__name__}: retour inattendu ({type(result).__name__}), "
+            f"tuple attendu. Vérifiez la version de pylmgc90."
         )
-
     if len(result) < 2:
         raise RuntimeError(
-            f"{func.__name__} : seulement {len(result)} valeur(s) retournée(s), "
-            f"au moins 2 attendues (nb_remaining, coor)."
+            f"{func.__name__}: seulement {len(result)} valeur(s) retournée(s), "
+            f"au moins 2 attendues (nb, coor)."
         )
 
-    nb_remaining = result[0]
-    coor = result[1]
-    dradii = result[2] if len(result) > 2 else (args[0] if args else None)
+    nb_raw = result[0]
+    coor_raw = result[1]
+    radii_raw = result[2] if len(result) > 2 else radii_in
 
-    if len(result) > 2:
-        try:
-            from .app_logger import get_logger
-            get_logger('generators').debug(
-                f"{func.__name__} a retourné {len(result)} valeurs "
-                f"(version pylmgc90 récente détectée) — "
-                f"{len(result) - 2} valeur(s) additionnelle(s) ignorée(s)."
-            )
-        except Exception:
-            pass  # le logging ne doit jamais faire échouer le dépôt
+    # nb peut être int ou array-like selon version
+    try:
+        nb = int(nb_raw)
+    except (TypeError, ValueError):
+        nb = int(np.asarray(nb_raw).ravel()[0])
 
-    return nb_remaining, coor, dradii
+    if nb < 0:
+        raise RuntimeError(f"{func.__name__}: nb_laid négatif ({nb})")
+
+    dim = 2  # toutes les deposit*2D
+    coor = _normalize_coords(coor_raw, nb, dim=dim)
+    out_radii = _safe_copy_array(radii_raw)[:nb]
+
+    if len(out_radii) < nb:
+        # fallback si la version ne renvoie pas les rayons tronqués
+        out_radii = radii_in[:nb]
+
+    if coor.shape[0] != nb:
+        # sécurité finale
+        n = min(coor.shape[0], nb, len(out_radii))
+        coor = coor[:n]
+        out_radii = out_radii[:n]
+        nb = n
+
+    return nb, coor, out_radii
 
 class LoopGenerator:
     """Génère des positions selon différents motifs"""
-    
+
     @staticmethod
-    def generate_circle(count: int, radius: float, offset_x: float = 0.0, 
-                       offset_y: float = 0.0) -> List[List[float]]:
-        """Génère des positions en cercle"""
+    def generate_circle(count: int, radius: float, offset_x: float = 0.0,
+                        offset_y: float = 0.0) -> List[List[float]]:
         centers = []
         for i in range(count):
             angle = 2 * math.pi * i / count
@@ -67,11 +119,10 @@ class LoopGenerator:
             y = offset_y + radius * math.sin(angle)
             centers.append([x, y])
         return centers
-    
+
     @staticmethod
-    def generate_grid(count: int, step: float, offset_x: float = 0.0, 
-                     offset_y: float = 0.0) -> List[List[float]]:
-        """Génère des positions en grille"""
+    def generate_grid(count: int, step: float, offset_x: float = 0.0,
+                      offset_y: float = 0.0) -> List[List[float]]:
         side = int(math.ceil(math.sqrt(count)))
         centers = []
         for i in range(count):
@@ -79,26 +130,22 @@ class LoopGenerator:
             y = offset_y + (i // side) * step
             centers.append([x, y])
         return centers
-    
+
     @staticmethod
-    def generate_line(count: int, step: float, offset_x: float = 0.0, 
-                     offset_y: float = 0.0, invert_axis: bool = False) -> List[List[float]]:
-        """Génère des positions en ligne"""
+    def generate_line(count: int, step: float, offset_x: float = 0.0,
+                      offset_y: float = 0.0, invert_axis: bool = False) -> List[List[float]]:
         centers = []
         for i in range(count):
             if invert_axis:
-                x = offset_x
-                y = offset_y + i * step
+                x, y = offset_x, offset_y + i * step
             else:
-                x = offset_x + i * step
-                y = offset_y
+                x, y = offset_x + i * step, offset_y
             centers.append([x, y])
         return centers
-    
+
     @staticmethod
     def generate_spiral(count: int, radius: float, spiral_factor: float,
-                       offset_x: float = 0.0, offset_y: float = 0.0) -> List[List[float]]:
-        """Génère des positions en spirale"""
+                        offset_x: float = 0.0, offset_y: float = 0.0) -> List[List[float]]:
         centers = []
         for i in range(count):
             angle = 2 * math.pi * i / max(1, count // 5)
@@ -107,18 +154,9 @@ class LoopGenerator:
             y = offset_y + r * math.sin(angle)
             centers.append([x, y])
         return centers
-    
+
     @staticmethod
     def generate_positions(loop: Loop) -> List[List[float]]:
-        """
-        Génère les positions selon la configuration de la boucle.
-        
-        Args:
-            loop: Configuration de la boucle
-            
-        Returns:
-            Liste des centres [x, y]
-        """
         if loop.loop_type == "Cercle":
             return LoopGenerator.generate_circle(
                 loop.count, loop.radius, loop.offset_x, loop.offset_y
@@ -137,7 +175,7 @@ class LoopGenerator:
             )
         else:
             raise ValueError(f"Type de boucle inconnu: {loop.loop_type}")
-
+        
 class ForLoopGenerator:
     """Génère des éléments via boucle for avec expressions"""
     @staticmethod
@@ -367,75 +405,94 @@ class ForLoopGenerator:
         )
 
 class GranuloGenerator:
-    """Génère des distributions granulométriques"""
-    
+    """Génère des distributions granulométriques via pylmgc90.pre"""
+
     @staticmethod
     def generate_radii(config: GranuloGeneration) -> np.ndarray:
-        """
-        Génère uniquement la distribution de rayons sans dépôt (granulo_Random).
-
-        Args:
-            config: Configuration de la génération — seuls nb_particles,
-                    radius_min, radius_max et seed sont utilisés.
-
-        Returns:
-            Array numpy de rayons de forme (nb_particles,).
-        """
+        """Distribution de rayons seule (sans dépôt)."""
         from pylmgc90 import pre
-        return pre.granulo_Random(
-            config.nb_particles,
-            config.radius_min,
-            config.radius_max,
-            config.seed
+
+        kwargs = {}
+        if config.seed is not None:
+            # certaines versions acceptent seed en 4e argument positionnel
+            try:
+                return _safe_copy_array(
+                    pre.granulo_Random(
+                        config.nb_particles,
+                        config.radius_min,
+                        config.radius_max,
+                        config.seed,
+                    )
+                )
+            except TypeError:
+                pass
+
+        return _safe_copy_array(
+            pre.granulo_Random(
+                config.nb_particles,
+                config.radius_min,
+                config.radius_max,
+            )
         )
 
     @staticmethod
     def generate(config: GranuloGeneration) -> Tuple[int, np.ndarray, np.ndarray]:
         """
-        Génère une distribution granulométrique avec dépôt.
-        
-        Args:
-            config: Configuration de la génération
-            
-        Returns:
-            (nb_particles, coordinates, radii)
-            - nb_particles: nombre de particules effectivement placées
-            - coordinates: array de shape (nb_particles, 2) avec positions
-            - radii: array de shape (nb_particles,) avec rayons
-        
-        Raises:
-            ValueError: Si le conteneur est inconnu ou paramètres invalides
+        Génère une distribution granulométrique avec dépôt pylmgc90.
+
+        Returns
+        -------
+        (nb_particles, coordinates, radii)
+            coordinates : shape (nb, 2), C-contiguous float64
+            radii       : shape (nb,),   C-contiguous float64
+
+        IMPORTANT
+        ---------
+        Doit être appelé depuis le **thread principal** uniquement
+        (pylmgc90 / Fortran n'est pas thread-safe).
         """
         from pylmgc90 import pre
-        
-        # Génération des rayons
-        radii = pre.granulo_Random(
-            config.nb_particles, 
-            config.radius_min, 
-            config.radius_max,
-            config.seed
-        )
-        
-        # Dépôt selon le type de conteneur
+
+        if config.radius_min <= 0 or config.radius_max <= 0:
+            raise ValueError("radius_min et radius_max doivent être > 0")
+        if config.radius_min > config.radius_max:
+            raise ValueError("radius_min doit être ≤ radius_max")
+        if config.nb_particles <= 0:
+            raise ValueError("nb_particles doit être > 0")
+
+        # 1) Rayons
+        radii = GranuloGenerator.generate_radii(config)
+
+        # 2) Dépôt
         ctype = config.container_type
-        params = config.container_params
-        
+        params = config.container_params or {}
+
         if ctype == "Box2D":
-            nb_remaining, coor, dradii = _call_deposit(pre.depositInBox2D, radii, params['lx'], params['ly'])
+            nb, coor, out_radii = _call_deposit(
+                pre.depositInBox2D, radii, float(params["lx"]), float(params["ly"])
+            )
         elif ctype == "Disk2D":
-            nb_remaining, coor, dradii = _call_deposit(pre.depositInDisk2D, radii, params['r'])
+            nb, coor, out_radii = _call_deposit(
+                pre.depositInDisk2D, radii, float(params["r"])
+            )
         elif ctype == "Couette2D":
-            nb_remaining, coor, dradii = _call_deposit(pre.depositInCouette2D, radii, params['rint'], params['rext'])
+            nb, coor, out_radii = _call_deposit(
+                pre.depositInCouette2D,
+                radii,
+                float(params["rint"]),
+                float(params["rext"]),
+            )
         elif ctype == "Drum2D":
-            nb_remaining, coor, dradii = _call_deposit(pre.depositInDrum2D, radii, params['r'])
+            nb, coor, out_radii = _call_deposit(
+                pre.depositInDrum2D, radii, float(params["r"])
+            )
         else:
             raise ValueError(f"Type de conteneur inconnu: {ctype}")
-        
-        # Reshape coordinates
-        #nb_remaining = np.shape(coor)[0] // 2
-        coor.shape = [coor.size//2,2]
-        
-        # Tronquer les rayons au nombre effectif
-        radii = dradii[:nb_remaining]
-        
-        return nb_remaining, coor, radii
+
+        if nb == 0:
+            raise ValueError(
+                "Aucune particule n'a pu être déposée. "
+                "Augmentez la taille du conteneur ou réduisez les rayons / le nombre."
+            )
+
+        return nb, coor, out_radii

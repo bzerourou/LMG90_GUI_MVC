@@ -101,7 +101,7 @@ def build(controller) -> None:
     ))
     controller.add_visibility_rule(VisibilityRule(
         candidate_body="MAILx", candidate_contactor="CLxxx", candidate_color="CYANx",
-        antagonist_body="RBDY2", antagonist_contactor="ALpxx", antagonist_color="GRAYx",
+        antagonist_body="MAILx", antagonist_contactor="ALpxx", antagonist_color="GRAYx",
         behavior_name="gapc0", alert=0.05,
     ))
     controller.add_postpro_command(PostProCommand(name="Fint EVOLUTION", step=10))
