@@ -4,10 +4,8 @@ Interface entre l'utilisateur et le contrôleur.
 """
 import sys
 from PyQt6.QtWidgets import (
-    QMainWindow, QToolBar, QPushButton, QDockWidget,
-    QTabWidget, QMessageBox, QFileDialog, QApplication,
-    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-    QDialog, QTextEdit,
+    QMainWindow, QToolBar, QPushButton, QTabWidget, QMessageBox,
+    QFileDialog, QApplication, QDialog, QTextEdit, QVBoxLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QProcess, QProcessEnvironment
 from PyQt6.QtGui import QAction, QKeySequence, QIcon
@@ -20,17 +18,25 @@ from .tabs import (
     GranuloTab, DOFTab, ContactTab, VisibilityTab, PostProTab, ComputeTab, ViewerTab
 )
 
-from .tree_view import ModelTreeView
 from ..core.models import UnitSystem
 from ..core.app_logger import get_logger, get_log_path, get_log_dir, get_recent_logs
 _log = get_logger('main_window')
 from ..gui.dialogs.fast_granulo_dialg import GranuloFastDialog
 from ..gui.dialogs.convert_dialog import ConvertDialog
 
+from ..views.main_window_parts import (
+    CommandPaletteController,
+    MainWindowTabsMixin,
+    MainWindowTreeMixin,
+    MainWindowLayoutMixin,
+)
+
 import threading
 
 
-class MainWindow(QMainWindow):
+class MainWindow(
+    QMainWindow, MainWindowTabsMixin, MainWindowTreeMixin, MainWindowLayoutMixin
+):
     """Fenêtre principale de l'application"""
     
     # Signaux
@@ -77,6 +83,9 @@ class MainWindow(QMainWindow):
         
         # Zone centrale avec splitter
         self._create_central_area()
+
+        self._command_palette = CommandPaletteController(self)
+        self._command_palette.setup_shortcut()
     
     def _create_menu(self):
         """Crée la barre de menu"""
@@ -299,97 +308,6 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(slot)
             toolbar.addWidget(btn)
     
-    def _create_tree_dock(self):
-        """Crée le dock avec l'arbre du modèle"""
-        dock = QDockWidget("Arbre du modèle", self)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
-        
-        self.tree_view = ModelTreeView(self.controller)
-        dock.setWidget(self.tree_view.tree)
-        dock.setMinimumWidth(400)
-        #connect le signal
-        self.tree_view.item_selected.connect(self._on_tree_item_selected)
-
-    def  _on_tree_item_selected(self, item_type: str, item_data):
-        """Quand un élément est sélectionné dans l'arbre"""
-        if item_type == "material":
-            # Charger le matériau et switcher vers l'onglet
-            material = self.controller.get_material(item_data)
-            if material:
-                self.tabs.setCurrentWidget(self.material_tab)
-                if hasattr(self.material_tab, 'load_for_edit') : 
-                    self.material_tab.load_for_edit(material)
-        elif item_type == "model":
-            model = self.controller.get_model(item_data)
-            if model:
-                self.tabs.setCurrentWidget(self.model_tab)
-                self.model_tab.load_for_edit(model)
-        
-        elif item_type == "avatar":
-            avatar = self.controller.get_avatar(item_data)
-            if avatar:
-                from ..core.models import AvatarType
-                if avatar.avatar_type == AvatarType.EMPTY_AVATAR:
-                    self.tabs.setCurrentWidget(self.empty_avatar_tab)
-                    self.empty_avatar_tab.load_for_edit(item_data, avatar)
-                else:
-                    self.tabs.setCurrentWidget(self.avatar_tab)
-                    self.avatar_tab.load_for_edit(item_data, avatar)
-        
-        elif item_type == "contact_law":
-            law = self.controller.get_contact_law(item_data)
-            if law:
-                self.tabs.setCurrentWidget(self.contact_tab)
-                self.contact_tab.load_for_edit(law)
-        
-        elif item_type == "visibility":
-            rule = self.controller.get_visibility_rule(item_data)
-            if rule:
-                self.tabs.setCurrentWidget(self.visibility_tab)
-                self.visibility_tab.load_for_edit(item_data, rule)
-
-        elif item_type == "dof_operation":
-            operation = self.controller.get_dof_operation(item_data)
-            if operation:
-                self.tabs.setCurrentWidget(self.dof_tab)
-                self.dof_tab.load_for_edit(item_data, operation)
-
-        elif item_type == "loop":   
-            loop = self.controller.get_loop(item_data)
-            print(item_data)
-            if loop:
-                self.tabs.setCurrentWidget(self.loop_tab)
-                self.loop_tab.load_for_edit(item_data)
-
-        elif item_type == "granulo":
-            granulo = self.controller.get_granulo(item_data)
-            if granulo:
-                self.tabs.setCurrentWidget(self.granulo_tab)
-                self.granulo_tab.load_for_edit(item_data, granulo)
-
-        elif item_type == "postpro":
-            postpro = self.controller.get_postpro_command(item_data)
-            if postpro:
-                self.tabs.setCurrentWidget(self.postpro_tab)
-                self.postpro_tab.load_for_edit(postpro)
-    
-    def _create_central_area(self):
-        """Crée la zone centrale avec splitter vertical"""
-        # Splitter vertical (haut/bas)
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        self.setCentralWidget(splitter)
-        
-        # Partie haute : Onglets de travail
-        self._create_tabs()
-        splitter.addWidget(self.tabs)
-        
-        # Partie basse : Widget de rendu
-        self._create_render_widget()
-        splitter.addWidget(self.render_widget)
-        
-        # Proportions : 70% tabs, 30% rendu
-        splitter.setSizes([700, 300])
-    
     def _create_tabs(self):
         """Crée les onglets de travail"""
         self.tabs = QTabWidget()
@@ -436,35 +354,6 @@ class MainWindow(QMainWindow):
         
         for tab_id in default_tabs:
             self._add_tab(tab_id)
-    
-    def _create_render_widget(self):
-        """Crée le widget de rendu (toujours visible en bas)"""
-        self.render_widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Groupe de visualisation
-        viz_group = QGroupBox("🎨 Visualisation et Rendu")
-        viz_layout = QHBoxLayout()
-        
-        # Bouton LMGC90
-        lmgc_btn = QPushButton("📊 LMGC90 Visualisation")
-        lmgc_btn.setToolTip("Visualise les avatars créés")
-        lmgc_btn.setMinimumHeight(40)
-        lmgc_btn.clicked.connect(self._on_lmgc_visualization)
-        viz_layout.addWidget(lmgc_btn)
-        
-        # Bouton ParaView
-        paraview_btn = QPushButton("🔬 Ouvrir ParaView")
-        paraview_btn.setToolTip("Ouvre les résultats de simulation")
-        paraview_btn.setMinimumHeight(40)
-        paraview_btn.clicked.connect(self._on_paraview)
-        viz_layout.addWidget(paraview_btn)
-           
-        viz_group.setLayout(viz_layout)
-        layout.addWidget(viz_group)
-        self.render_widget.setLayout(layout)
-        self.render_widget.setMinimumHeight(150)
     
     def _connect_signals(self):
         """Connecte les signaux"""
@@ -622,77 +511,42 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Succès", f"DATBOX généré !\n{output_path}")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Génération échouée :\n{e}")
+
+    def _update_recent_menu(self):
+        """Met à jour le menu des projets récents."""
+        if not hasattr(self, "recent_menu"):
+            return
+
+        self.recent_menu.clear()
+        preferences = getattr(self.controller.state, "preferences", None)
+        recent_projects = getattr(preferences, "recent_projects", [])
+
+        if not recent_projects:
+            empty_action = self.recent_menu.addAction("(Aucun projet récent)")
+            empty_action.setEnabled(False)
+            return
+
+        for project_path in recent_projects[:10]:
+            project_path = Path(project_path)
+            if project_path.exists():
+                action = self.recent_menu.addAction(f"📄 {project_path.name}")
+                action.triggered.connect(
+                    lambda checked=False, path=project_path: self._open_recent_project(path)
+                )
+            else:
+                action = self.recent_menu.addAction(
+                    f"❌ {project_path.name} (introuvable)"
+                )
+                action.setEnabled(False)
+
+        self.recent_menu.addSeparator()
+        clear_action = self.recent_menu.addAction("🗑️ Effacer l'historique")
+        clear_action.triggered.connect(self._clear_recent_projects)
     
  
 
     # ======Tabs======================
 
-    def _add_tab(self, tab_id: str):
-        """Ajoute un onglet s'il n'est pas déjà ouvert"""
-        if tab_id not in self.all_tabs:
-            return
-        
-        title, widget, icon = self.all_tabs[tab_id]
-        
-        # Vérifier si déjà ouvert
-        for i in range(self.tabs.count()):
-            if self.tabs.widget(i) == widget:
-                self.tabs.setCurrentIndex(i)
-                return
-        
-        # Ajouter l'onglet
-        index = self.tabs.addTab(widget, f"{icon} {title}")
-        self.tabs.setCurrentIndex(index)
-
-    def _on_tab_close_requested(self, index : int): 
-        """Gère la fermeture d'un onglet"""
-        widget = self.tabs.widget(index)
-        tab_name = self.tabs.tabText(index)
-        
-        # Empêcher la fermeture de certains onglets essentiels
-        essential_tabs = [self.material_tab, self.model_tab]
-        
-        if widget in essential_tabs:
-            QMessageBox.warning(
-                self, "Onglet essentiel",
-                f"L'onglet '{tab_name}' ne peut pas être fermé car il est essentiel."
-            )
-            return
-    
-        # Fermer l'onglet (ne pas le supprimer, juste le retirer)
-        self.tabs.removeTab(index)
-    
-    def _close_other_tabs(self):
-        """Ferme tous les onglets sauf celui actif"""
-        current_index = self.tabs.currentIndex()
-        current_widget = self.tabs.widget(current_index)
-        
-        # Fermer en ordre inverse pour garder les indices valides
-        for i in range(self.tabs.count() - 1, -1, -1):
-            if i != current_index:
-                widget = self.tabs.widget(i)
-                essential_tabs = [self.material_tab, self.model_tab, self.compute_tab]
-                
-                if widget not in essential_tabs:
-                    self.tabs.removeTab(i)
-
-    def _close_all_tabs(self):
-        """Ferme tous les onglets non essentiels"""
-        essential_tabs = [self.material_tab, self.model_tab, self.compute_tab]
-        
-        # Fermer en ordre inverse
-        for i in range(self.tabs.count() - 1, -1, -1):
-            widget = self.tabs.widget(i)
-            if widget not in essential_tabs:
-                self.tabs.removeTab(i)
-
-    def _reopen_default_tabs(self):
-        """Rouvre les onglets par défaut"""
-        default_tabs = ['material', 'model', 'avatar', 'dof', 'contact','visibility', 'postpro', 'viewer']
-        
-        for tab_id in default_tabs:
-            self._add_tab(tab_id)
-   
     # =======Menu Outils =============
     def _on_browse_examples(self):
             """Ouvre la bibliothèque d'exemples et charge celui choisi."""
@@ -791,40 +645,8 @@ class MainWindow(QMainWindow):
         unit_system_name = "SI" if prefs.unit_system == UnitSystem.SI else "CGS"
         self.statusBar().showMessage(f"Système d'unités : {unit_system_name}", 5000)
 
-    def _update_recent_menu(self):
-        """Met à jour le menu des projets récents"""
-        if not hasattr(self, 'recent_menu'):
-            return
-        self.recent_menu.clear()
-        
-        # Vérifier que preferences existe
-        if not hasattr(self.controller.state, 'preferences'):
-            no_recent = self.recent_menu.addAction("(Aucun projet récent)")
-            no_recent.setEnabled(False)
-            return
-        recent_projects = self.controller.state.preferences.recent_projects
-        
-        if not recent_projects:
-            no_recent = self.recent_menu.addAction("(Aucun projet récent)")
-            no_recent.setEnabled(False)
-            return
-        
-        for project_path in recent_projects[:10]:  # Limiter à 10
-            if project_path.exists():
-                action = self.recent_menu.addAction(f"📄 {project_path.name}")
-                action.triggered.connect(lambda checked, p=project_path: self._open_recent_project(p))
-            else:
-                # Projet introuvable
-                action = self.recent_menu.addAction(f"❌ {project_path.name} (introuvable)")
-                action.setEnabled(False)
-        
-        self.recent_menu.addSeparator()
-        
-        clear_action = self.recent_menu.addAction("🗑️ Effacer l'historique")
-        clear_action.triggered.connect(self._clear_recent_projects)
-
     def _open_recent_project(self, filepath: Path):
-        """Ouvre un projet récent"""
+        """Ouvre un projet récent."""
         try:
             self.controller.load_project(filepath)
             self.setWindowTitle(f"LMGC90_GUI v0.4.7 - {self.controller.state.name}")
@@ -866,6 +688,217 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.controller.state.preferences.recent_projects.clear()
             self._update_recent_menu()
+
+    # ======== Plattes des commandes =================================== 
+
+    def _on_command_entered(self, text: str):
+        """Interprète une commande tapée dans la CommandBar."""
+        parts = text.split()
+        if not parts:
+            return
+        cmd, args = parts[0].lower(), parts[1:]
+
+        try:
+            handler = self._COMMANDS.get(cmd)
+            if handler is None:
+                self.command_bar.set_status(f"Commande inconnue : '{cmd}' (essayez 'help')", ok=False)
+                return
+            handler(self, args)
+            self.command_bar.set_status(f"✓ {text}", ok=True)
+        except Exception as e:
+            self.command_bar.set_status(f"Erreur : {e}", ok=False)
+
+        self.statusBar().showMessage(f"> {text}", 3000)
+
+    # ── Table de dispatch des commandes ──────────────────────────────────────
+    def _cmd_help(self, args):
+        QMessageBox.information(self, "Commandes disponibles",
+            "tab <id>              — ouvre un onglet (avatar, material, model, loop, "
+            "granulo, dof, contact, visibility, postpro, compute, viewer, empty_avatar, library)\n"
+            "close <id>            — ferme un onglet\n"
+            "dim <2|3>             — change la dimension du projet\n"
+            "viewer color <mode>   — mode couleur du viewer (lmgc90|type|material|origin)\n"
+            "viewer refresh        — rafraîchit la scène 3D\n"
+            "viewer edges <on|off> — affiche/masque les arêtes\n"
+            "units <si|cgs>        — change le système d'unités\n"
+            "save                  — sauvegarde le projet\n"
+            "new <nom>             — nouveau projet\n"
+            "wizard project       — assistant de projet\n"
+            "wizard granulo       — assistant de granulométrie\n"
+            "wizard fast-granulo  — générateur granulométrique rapide\n"
+            "datbox               — génère DATBOX\n"
+            "script               — génère le script Python\n"
+            "compute setup        — ouvre les paramètres de calcul\n"
+            "logs app|lmgc90      — affiche les journaux\n"
+            "tabs default         — rouvre les onglets par défaut\n"
+            "menu <nom>           — ouvre un menu principal\n"
+        )
+
+    def _cmd_tab(self, args):
+        if not args:
+            raise ValueError("usage: tab <id>")
+        self._add_tab(args[0])
+
+    def _cmd_close(self, args):
+        if not args or args[0] not in self.all_tabs:
+            raise ValueError("usage: close <id>")
+        widget = self.all_tabs[args[0]][1]
+        for i in range(self.tabs.count()):
+            if self.tabs.widget(i) is widget:
+                self._on_tab_close_requested(i)
+                return
+
+    def _cmd_dim(self, args):
+        if not args or args[0] not in ("2", "3"):
+            raise ValueError("usage: dim <2|3>")
+        dim = int(args[0])
+        ok, reasons = self.controller.can_change_dimension(dim)
+        self.controller.set_dimension(dim, force=not ok)
+        self._refresh_all()
+
+    def _cmd_viewer(self, args):
+        if not args:
+            raise ValueError("usage: viewer <color|refresh|edges> ...")
+        sub = args[0]
+        v = self.viewer_tab.viewer
+        if sub == "color" and len(args) > 1:
+            modes = {"lmgc90": 0, "type": 1, "material": 2, "origin": 3}
+            idx = modes.get(args[1].lower())
+            if idx is None:
+                raise ValueError("mode: lmgc90|type|material|origin")
+            v._color_combo.setCurrentIndex(idx)
+        elif sub == "refresh":
+            self.viewer_tab._do_refresh()
+        elif sub == "edges" and len(args) > 1:
+            v._edges_check.setChecked(args[1].lower() in ("on", "1", "true"))
+        else:
+            raise ValueError("sous-commande viewer inconnue")
+
+    def _cmd_units(self, args):
+        from ..core.models import UnitSystem
+        if not args or args[0].lower() not in ("si", "cgs"):
+            raise ValueError("usage: units <si|cgs>")
+        self.controller.state.preferences.unit_system = (
+            UnitSystem.SI if args[0].lower() == "si" else UnitSystem.CGS
+        )
+        self._refresh_all()
+
+    def _cmd_save(self, args):
+        self._on_save_project()
+
+    def _cmd_new(self, args):
+        name = " ".join(args) or "Nouveau_Projet"
+        self.controller.new_project(name)
+        self._refresh_all()
+
+    def _cmd_wizard(self, args):
+        if len(args) != 1:
+            raise ValueError("usage: wizard <project|granulo|fast-granulo>")
+        actions = {
+            "project": self._on_project_wizard,
+            "granulo": self._on_granulo_wizard,
+            "fast-granulo": self._open_fast_granulo,
+        }
+        action = actions.get(args[0].lower())
+        if action is None:
+            raise ValueError("assistant inconnu: project|granulo|fast-granulo")
+        action()
+
+    def _cmd_datbox(self, args):
+        if args:
+            raise ValueError("usage: datbox")
+        self._on_generate_datbox()
+
+    def _cmd_script(self, args):
+        if args:
+            raise ValueError("usage: script")
+        self._on_generate_script()
+
+    def _cmd_compute(self, args):
+        if args != ["setup"]:
+            raise ValueError("usage: compute setup")
+        self._on_compute_setup()
+
+    def _cmd_logs(self, args):
+        if len(args) != 1 or args[0].lower() not in ("app", "lmgc90"):
+            raise ValueError("usage: logs <app|lmgc90>")
+        if args[0].lower() == "app":
+            self._on_show_app_log()
+        else:
+            self._on_show_logs()
+
+    def _cmd_tabs(self, args):
+        if args != ["default"]:
+            raise ValueError("usage: tabs default")
+        self._reopen_default_tabs()
+
+    def _cmd_menu(self, args):
+        """Ouvre un menu principal depuis la barre de commande."""
+        menu_names = {
+            "fichier": "Fichier",
+            "assistants": "Assistants",
+            "outils": "Outils",
+            "calcul": "Calcul",
+            "onglets": "Onglets",
+            "aide": "Aide",
+        }
+        if len(args) != 1 or args[0].lower() not in menu_names:
+            raise ValueError(
+                "usage: menu <fichier|assistants|outils|calcul|onglets|aide>"
+            )
+
+        requested = menu_names[args[0].lower()]
+        for action in self.menuBar().actions():
+            menu = action.menu()
+            if menu is not None and requested.lower() in menu.title().lower():
+                menu_pos = self.menuBar().actionGeometry(action).bottomLeft()
+                menu.popup(self.menuBar().mapToGlobal(menu_pos))
+                return
+        raise RuntimeError(f"menu introuvable: {requested}")
+
+    def _refresh_command_suggestions(self):
+        """Construit la liste d'autocomplétion à partir des commandes + contexte projet."""
+        suggestions = []
+        for name in self._COMMANDS:
+            suggestions.append(name)
+
+        # tab <id> — un item complet par onglet, plus pratique à taper
+        for tab_id in self.all_tabs:
+            suggestions.append(f"tab {tab_id}")
+            suggestions.append(f"close {tab_id}")
+
+        suggestions += [
+            "dim 2", "dim 3",
+            "viewer color lmgc90", "viewer color type",
+            "viewer color material", "viewer color origin",
+            "viewer refresh", "viewer edges on", "viewer edges off",
+            "units si", "units cgs",
+            "new","save", "help",
+            "wizard project", "wizard granulo", "wizard fast-granulo",
+            "datbox", "script", "compute setup", "logs app", "logs lmgc90",
+            "tabs default",
+            "menu fichier", "menu assistants", "menu outils", "menu calcul",
+            "menu onglets", "menu aide",
+        ]
+        self.command_bar.set_suggestions(suggestions)
+
+    _COMMANDS = {
+        "help": _cmd_help,
+        "tab": _cmd_tab,
+        "close": _cmd_close,
+        "dim": _cmd_dim,
+        "viewer": _cmd_viewer,
+        "units": _cmd_units,
+        "save": _cmd_save,
+        "new": _cmd_new,
+        "wizard": _cmd_wizard,
+        "datbox": _cmd_datbox,
+        "script": _cmd_script,
+        "compute": _cmd_compute,
+        "logs": _cmd_logs,
+        "tabs": _cmd_tabs,
+        "menu": _cmd_menu
+}
     
     # ========Wizard ===================================
 
