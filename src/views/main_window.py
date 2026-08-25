@@ -787,9 +787,18 @@ class MainWindow(
         self._on_save_project()
 
     def _cmd_new(self, args):
-        name = " ".join(args) or "Nouveau_Projet"
+        name = " ".join(args).strip() or "Nouveau_Projet"
+        name = "".join(
+            char if char.isalnum() or char in "_-" else "_"
+            for char in name
+        )
         self.controller.new_project(name)
+        from ..core.models import ProjectPreferences
+        self.controller.state.preferences = ProjectPreferences()
+        self.setWindowTitle(f"LMGC90_GUI v0.4.7 - {name}")
         self._refresh_all()
+        self._update_recent_menu()
+        self.statusBar().showMessage("Nouveau projet créé", 3000)
 
     def _cmd_wizard(self, args):
         if len(args) != 1:
@@ -838,6 +847,7 @@ class MainWindow(
             "fichier": "Fichier",
             "assistants": "Assistants",
             "outils": "Outils",
+            "exemples": "Exemples",
             "calcul": "Calcul",
             "onglets": "Onglets",
             "aide": "Aide",
@@ -873,7 +883,9 @@ class MainWindow(
             "viewer color material", "viewer color origin",
             "viewer refresh", "viewer edges on", "viewer edges off",
             "units si", "units cgs",
-            "new","save", "help",
+            "new",
+            "save", 
+            "help",
             "wizard project", "wizard granulo", "wizard fast-granulo",
             "datbox", "script", "compute setup", "logs app", "logs lmgc90",
             "tabs default",

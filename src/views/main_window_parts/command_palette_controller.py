@@ -47,6 +47,7 @@ class CommandPaletteController:
             ("viewer edges off", "Masquer les aretes dans le viewer"),
             ("units si", "Systeme d'unites : International (SI)"),
             ("units cgs", "Systeme d'unites : CGS"),
+            ("new", "Creer un nouveau projet"),
             ("save", "Sauvegarder le projet"),
             ("wizard project", "Ouvrir l'assistant de projet"),
             ("wizard granulo", "Ouvrir l'assistant de granulometrie"),
