@@ -20,10 +20,43 @@ class AvatarTemplate:
     
     def create(self, center: List[float], material: str, model: str,
                color: str = "BLUEx", **custom_params) -> Avatar:
-        """Crée un avatar depuis le template"""
-        params = self.default_params.copy()
-        params.update(custom_params)
-        
+        """Crée un avatar depuis le template.
+
+        Les paramètres UI à plat (l, r, h, axe1, ...) sont réinjectés
+        dans wall_params / axis avant l'appel à Avatar().
+        """
+        params = dict(self.default_params)
+
+        # Copies profondes des dicts imbriqués
+        if isinstance(params.get("wall_params"), dict):
+            params["wall_params"] = dict(params["wall_params"])
+        if isinstance(params.get("axis"), dict):
+            params["axis"] = dict(params["axis"])
+
+        WALL_KEYS = {"l", "r", "h", "nb_polyg", "nb_vertex"}
+        AXIS_KEYS = {"axe1", "axe2", "axe3"}
+
+        for key, value in custom_params.items():
+            if key in WALL_KEYS:
+                params.setdefault("wall_params", {})
+                if not isinstance(params["wall_params"], dict):
+                    params["wall_params"] = {}
+                params["wall_params"][key] = value
+            elif key in AXIS_KEYS:
+                params.setdefault("axis", {})
+                if not isinstance(params["axis"], dict):
+                    params["axis"] = {}
+                params["axis"][key] = value
+            elif key in ("wall_params", "axis") and isinstance(value, dict):
+                params.setdefault(key, {})
+                if isinstance(params[key], dict):
+                    params[key].update(value)
+                else:
+                    params[key] = value
+            else:
+                # radius, nb_vertices, vertices, generation_type, etc.
+                params[key] = value
+
         return Avatar(
             avatar_type=self.avatar_type,
             center=center,
@@ -31,9 +64,8 @@ class AvatarTemplate:
             model_name=model,
             color=color,
             origin=AvatarOrigin.MANUAL,
-            **params
+            **params,
         )
-
 
 class AvatarFactory:
     """Factory pour créer des avatars complexes"""
@@ -71,7 +103,7 @@ class AvatarFactory:
             name="Cylindre Horizontal",
             description="Jonc allongé horizontalement (2:1)",
             avatar_type=AvatarType.RIGID_JONC,
-            default_params={'axis': {'axe1': 2, 'axe2': 0.1}},
+            default_params={'axis': {'axe1': 2.0, 'axe2': 0.1}},
             param_schema={
                 'axe1': {'type': float, 'min': 0.001, 'max': 10.0},
                 'axe2': {'type': float, 'min': 0.001, 'max': 10.0}
@@ -82,11 +114,13 @@ class AvatarFactory:
             name="Cylindre Vertical",
             description="Jonc allongé verticalement (1:2)",
             avatar_type=AvatarType.RIGID_JONC,
-            default_params={'axis': {'axe1': 2, 'axe2': 0.1}},
+            default_params={'axis': {'axe1': 2.0, 'axe2': 0.1}},
             param_schema={
                 'axe1': {'type': float, 'min': 0.001, 'max': 10.0},
                 'axe2': {'type': float, 'min': 0.001, 'max': 10.0}
             }
+            #faire une rotation de 90° sur l'axe Z pour le rendre vertical
+            
 
         ),
         

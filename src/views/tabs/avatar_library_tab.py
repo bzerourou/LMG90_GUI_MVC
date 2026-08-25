@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...core.avatar_factory import AvatarFactory, AvatarTemplate
 from ...core.models import Avatar, AvatarOrigin, MaterialType
-from ...core.validators import ValidationError
+from ...core.validators import ValidationError, AvatarValidator
 from ...controllers.project_controller import ProjectController
 
 
@@ -274,15 +274,16 @@ class AvatarLibraryTab(QWidget):
             if isinstance(default, dict):
                 # Pour axis par exemple
                 if param_name == 'axis':
-                    axe1_input = QLineEdit(str(default.get('axe1', 2)))
-                    axe1_input.setObjectName('axe1')
-                    axe1_input.setText("2")
-                    self.params_form.addRow("Axe 1:", axe1_input)
-                    
-                    axe2_input = QLineEdit(str(default.get('axe2', 0.1)))
-                    axe2_input.setObjectName('axe2')
-                    axe2_input.setText("0.1")
-                    self.params_form.addRow("Axe 2:", axe2_input)
+                    axis_defaults = default
+                    axis_names = ['axe1', 'axe2']
+                    if 'axe3' in template.param_schema or 'axe3' in axis_defaults:
+                        axis_names.append('axe3')
+
+                    for axis_name in axis_names:
+                        value = axis_defaults.get(axis_name, 2.0 if axis_name == 'axe1' else 2.0 if axis_name == 'axe2' else 0.05)
+                        axis_input = QLineEdit(str(value))
+                        axis_input.setObjectName(axis_name)
+                        self.params_form.addRow(f"Axe {axis_name[-1]}:", axis_input)
                 else:
                     # Pour d'autres dict, afficher en JSON
                     import json
@@ -433,8 +434,8 @@ class AvatarLibraryTab(QWidget):
                     param_name = widget.objectName()
                     text_value = widget.text().strip()
                     
-                    # Gérer les axes spéciaux (axe1, axe2)
-                    if param_name in ['axe1', 'axe2']:
+                    # Gérer les axes spéciaux (axe1, axe2, axe3)
+                    if param_name in ['axe1', 'axe2', 'axe3']:
                         if 'axis' not in custom_params:
                             custom_params['axis'] = {}
                         try:

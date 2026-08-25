@@ -285,6 +285,10 @@ class AvatarValidator:
                 return False, "rigidJonc est uniquement 2D"
             if not avatar.axis or 'axe1' not in avatar.axis or 'axe2' not in avatar.axis:
                 return False, "Axes axe1 et axe2 requis pour rigidJonc"
+            if avatar.axis['axe1'] <= 0 or avatar.axis['axe2'] <= 0:
+                return False, "Les axes axe1 et axe2 doivent être strictement positifs"
+            if avatar.axis['axe1'] <= avatar.axis['axe2']:
+                return False, "Pour rigidJonc, axe1 doit être strictement supérieur à axe2"
         
         elif atype == AvatarType.RIGID_POLYGON:
             if dimension != 2:
@@ -385,6 +389,10 @@ class AvatarValidator:
             missing = [k for k in required_axes if k not in avatar.axis]
             if missing:
                 return False, f"Axes manquants pour rigidPlan: {', '.join(missing)}"
+            if any(avatar.axis[k] <= 0 for k in required_axes):
+                return False, "Les axes axe1, axe2 et axe3 doivent être strictement positifs"
+            if avatar.axis['axe1'] <= avatar.axis['axe3'] or avatar.axis['axe2'] <= avatar.axis['axe3']:
+                return False, "Pour rigidPlan, axe1 et axe2 doivent être strictement supérieurs à axe3"
         
         elif atype == AvatarType.RIGID_CYLINDER:
             if dimension != 3:
