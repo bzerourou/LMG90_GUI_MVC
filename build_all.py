@@ -21,30 +21,34 @@ class BuildManager:
         self.machine = platform.machine()
         
     def clean_build_dirs(self):
-        """Nettoie les répertoires de build précédents"""
-        print("🧹 Nettoyage des répertoires de build précédents...")
+        """Nettoie les repertoires de build precedents"""
+        print("?? Nettoyage des repertoires de build precedents...")
         for dir_name in ["build", "dist"]:
             dir_path = self.project_root / dir_name
             if dir_path.exists():
                 shutil.rmtree(dir_path)
-                print(f"   ✓ Suppression de {dir_name}/")
+                print(f"   ? Suppression de {dir_name}/")
     
     def run_pyinstaller(self, icon_path="ico.png"):
-        """Exécute PyInstaller avec la configuration commune"""
+        """Execute PyInstaller avec la configuration commune"""
         cmd = [
             sys.executable, "-m", "PyInstaller",
             "--noconfirm",
             "--onedir",
             "--windowed",
             "--clean",
+            "--noupx",
             "--name=LMGC90_GUI",
             f"--icon={icon_path}",
             "--collect-all=pylmgc90",
+            "--collect-all=numpy",
             "--collect-all=pyvistaqt",
             "--collect-all=PyQt6",
             "--collect-all=gmsh",
             "--collect-all=vtkmodules",
             "--collect-all=vtk",
+            "--hidden_import=pylmgc90",
+            "--hidden_import=pylmgc90.pre",
             "--hidden-import=vtkmodules.all",
             "--hidden-import=vtkmodules.util.execution_model",
             "--hidden-import=vtkmodules.util.numpy_support",
@@ -65,42 +69,42 @@ class BuildManager:
         if self.system == "Darwin":  # macOS
             cmd.append("--osx-bundle-identifier=com.lmgc90.gui")
         
-        print(f"🔨 Compilation de LMGC90_GUI pour {self.system}...")
+        print(f"?? Compilation de LMGC90_GUI pour {self.system}...")
         result = subprocess.run(cmd, cwd=self.project_root, check=False)
         
         if result.returncode != 0:
-            print(f"❌ Erreur lors de la compilation PyInstaller")
+            print(f"? Erreur lors de la compilation PyInstaller")
             return False
         
-        # Rendre l'exécutable exécutable sur Unix
+        # Rendre l'ex�cutable ex�cutable sur Unix
         if self.system in ["Linux", "Darwin"]:
             exe_path = self.project_root / "dist" / "LMGC90_GUI" / "LMGC90_GUI"
             if exe_path.exists():
                 os.chmod(exe_path, 0o755)
-                print(f"✓ Permissions définies pour l'exécutable")
+                print(f"? Permissions definies pour l'executable")
         
         return True
     
     def create_app_bundle_macos(self):
-        """Crée un bundle d'application macOS propre"""
+        """Cree un bundle d'application macOS propre"""
         if self.system != "Darwin":
             return
         
-        print("📦 Création du bundle d'application macOS...")
+        print("?? Creation du bundle d'application macOS...")
         dist_path = self.project_root / "dist" / "LMGC90_GUI"
         app_path = self.project_root / "dist" / "LMGC90_GUI.app"
         
         if app_path.exists():
             shutil.rmtree(app_path)
         
-        # Créer la structure du bundle
+        # Cr�er la structure du bundle
         (app_path / "Contents" / "MacOS").mkdir(parents=True, exist_ok=True)
         (app_path / "Contents" / "Resources").mkdir(parents=True, exist_ok=True)
         
         # Copier le contenu
         shutil.copytree(dist_path, app_path / "Contents" / "Resources" / "app")
         
-        # Créer l'executable wrapper
+        # Cr�er l'executable wrapper
         exe_wrapper = app_path / "Contents" / "MacOS" / "LMGC90_GUI"
         with open(exe_wrapper, "w") as f:
             f.write("#!/bin/bash\n")
@@ -108,12 +112,12 @@ class BuildManager:
             f.write("\"$DIR/../Resources/app/LMGC90_GUI\" \"$@\"\n")
         os.chmod(exe_wrapper, 0o755)
         
-        print("✓ Bundle d'application créé")
+        print("? Bundle d'application cree")
     
     def print_summary(self):
-        """Affiche le résumé de la compilation"""
+        """Affiche le resume de la compilation"""
         print("\n" + "="*70)
-        print("✅ BUILD TERMINÉ AVEC SUCCÈS")
+        print("? BUILD TERMINE AVEC SUCCES")
         print("="*70)
         
         dist_path = self.project_root / "dist" / "LMGC90_GUI"
@@ -121,11 +125,11 @@ class BuildManager:
         exe_path = dist_path / exe_name
         
         if exe_path.exists():
-            print(f"\n📍 Localisation : dist/LMGC90_GUI/{exe_name}")
+            print(f"\n?? Localisation : dist/LMGC90_GUI/{exe_name}")
             file_size = exe_path.stat().st_size / (1024*1024)  # MB
-            print(f"📊 Taille : {file_size:.1f} MB")
+            print(f"?? Taille : {file_size:.1f} MB")
         
-        print("\n🚀 Pour lancer l'application :")
+        print("\n?? Pour lancer l'application :")
         if self.system == "Windows":
             print(f"   dist\\LMGC90_GUI\\LMGC90_GUI.exe")
         elif self.system == "Darwin":
@@ -139,17 +143,17 @@ class BuildManager:
     def build(self):
         """Lance le processus de build complet"""
         print(f"\n{'='*70}")
-        print(f"🎯 Démarrage du build pour {self.system} ({self.machine})")
+        print(f"?? Demarrage du build pour {self.system} ({self.machine})")
         print(f"{'='*70}\n")
         
-        # Vérifier que les fichiers requis existent
+        # V�rifier que les fichiers requis existent
         required_files = ["main.py", "rthook_qt6.py"]
         for file in required_files:
             if not (self.project_root / file).exists():
-                print(f"❌ Erreur : {file} non trouvé dans {self.project_root}")
+                print(f"? Erreur : {file} non trouve dans {self.project_root}")
                 return False
         
-        # Exécuter les étapes de build
+        # Ex�cuter les �tapes de build
         self.clean_build_dirs()
         
         if not self.run_pyinstaller():
@@ -168,16 +172,16 @@ def main():
         if sys.argv[1] == "--clean":
             manager = BuildManager()
             manager.clean_build_dirs()
-            print("✓ Nettoyage effectué")
+            print("? Nettoyage effectue")
             return
         elif sys.argv[1] == "--help":
             print("""Usage: python build_all.py [OPTIONS]
     
 Options:
-    --clean     Nettoie uniquement les répertoires de build
+    --clean     Nettoie uniquement les repertoires de build
     --help      Affiche cette aide
     
-Sans options, lance la compilation complète pour le système d'exploitation courant.
+Sans options, lance la compilation complete pour le systeme d'exploitation courant.
 """)
             return
     

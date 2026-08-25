@@ -9,6 +9,7 @@ import sys
 import os
 from PyQt6.QtWidgets import QApplication
 from src.views.main_window import MainWindow
+#python -c "import vtk; print('VTK version:', vtk.__version__)"
 
 # ── Mode worker (calcul en subprocess frozen)
 _worker_script = os.environ.get("LMGC90_WORKER", "")
