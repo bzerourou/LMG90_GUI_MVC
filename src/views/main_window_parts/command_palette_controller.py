@@ -64,6 +64,7 @@ class CommandPaletteController:
             ("menu calcul", "Ouvrir le menu Calcul"),
             ("menu onglets", "Ouvrir le menu Onglets"),
             ("menu aide", "Ouvrir le menu Aide"),
+            ("menu exemples", "Ouvrir le menu Exemples"),
         ]
         for tab_id, (title, _widget, icon) in self.window.all_tabs.items():
             entries.append((f"tab {tab_id}", f"Ouvrir l'onglet {icon} {title}"))

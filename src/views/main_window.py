@@ -854,7 +854,7 @@ class MainWindow(
         }
         if len(args) != 1 or args[0].lower() not in menu_names:
             raise ValueError(
-                "usage: menu <fichier|assistants|outils|calcul|onglets|aide>"
+                "usage: menu <fichier|assistants|outils|exemples|calcul|onglets|aide>"
             )
 
         requested = menu_names[args[0].lower()]
@@ -889,7 +889,7 @@ class MainWindow(
             "wizard project", "wizard granulo", "wizard fast-granulo",
             "datbox", "script", "compute setup", "logs app", "logs lmgc90",
             "tabs default",
-            "menu fichier", "menu assistants", "menu outils", "menu calcul",
+            "menu fichier", "menu assistants", "menu outils", "menu exemples", "menu calcul",
             "menu onglets", "menu aide",
         ]
         self.command_bar.set_suggestions(suggestions)
