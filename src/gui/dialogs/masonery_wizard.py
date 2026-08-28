@@ -368,35 +368,48 @@ class MasonryWizard(QWizard):
             # ── Transformations post-génération ──────────────────────────────────
             if tf_translate or tf_rotate or tf_copy:
                 import math as _math, copy as _copy, numpy as _np
-                session_bodies = self.controller._pylmgc_bodies[-len(generated_indices):]
+                from ...core.models import DOFOperation
 
-                def _apply_tf(body_list):
-                    if tf_translate:
-                        for b in body_list:
-                            if dimension == 3:
-                                b.translate(dx=tf_tx, dy=tf_ty, dz=tf_tz)
-                            else:
-                                b.translate(dx=tf_tx, dy=tf_ty)
-                    if tf_rotate:
-                        _alpha = _math.radians(tf_alpha_deg)
-                        _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
+                generated_ids = [
+                    self.controller.state.avatars[idx].avatar_id for idx in generated_indices
+                ]
+
+                if tf_translate :
+                    for aid in generated_indices :
+                        params = {'dx': tf_tx, 'dy': tf_ty}
                         if dimension == 3:
-                            _ctr = _np.array([tf_cx, tf_cy, tf_cz])
-                        else:
-                            _ctr = _np.array([tf_cx, tf_cy])
-                        for b in body_list:
-                            b.rotate(description='axis', center=_ctr,
-                                     axis=_ax, alpha=_alpha)
-
-                _apply_tf(session_bodies)
-
-                for idx_av, body in zip(generated_indices, session_bodies):
-                    try:
-                        self.controller.state.avatars[idx_av].center = list(body.nodes[1].coor)
-                    except Exception:
-                        pass
+                            params['dz'] = tf_tz
+                        self.controller.add_dof_operation(
+                            DOFOperation(
+                                target_type='avatar',
+                                target_value=aid,
+                                operation='translate',
+                                params=params
+                            )
+                        )
+                if tf_rotate :
+                    _alpha = _math.radians(tf_alpha_deg)
+                    _ax = {'X': [1.,0.,0.], 'Y': [0.,1.,0.], 'Z': [0.,0.,1.]}[tf_axis]
+                    if dimension == 3:
+                        _ctr = [tf_cx, tf_cy, tf_cz]
+                    else:
+                        _ctr = [tf_cx, tf_cy]
+                    for aid in generated_indices:
+                        self.controller.add_dof_operation(
+                            DOFOperation(
+                                target_type='avatar',
+                                target_value=aid,
+                                operation='rotate',
+                                params={
+                                    'description': 'axis',
+                                    'center': _ctr, 
+                                    'axis': _ax, 
+                                    'alpha': _alpha}
+                            )
+                        )
 
                 if tf_copy:
+                    session_bodies = self.controller._pylmgc_bodies[-len(generated_indices):]
                     copy_bodies = _copy.deepcopy(session_bodies)
                     for b in copy_bodies:
                         if dimension == 3:
@@ -418,7 +431,7 @@ class MasonryWizard(QWizard):
                             color=color,
                             origin=AvatarOrigin.MANUAL,
                             wall_params={'l': lx, 'h': ly,
-                                         'brick_name': brick_name, 'copy': True},
+                                        'brick_name': brick_name, 'copy': True},
                             contactors=[]
                         ))
                         generated_indices.append(len(self.controller.state.avatars) - 1)
