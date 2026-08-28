@@ -73,12 +73,30 @@ class AvatarsMixin:
         if not (0 <= index < len(self.state.avatars)):
             return False, []
         aid = self.state.avatars[index].avatar_id
+
         for i, loop in enumerate(self.state.loops):
             if loop.model_avatar_id == aid:
                 refs.append(f"Boucle #{i + 1} ({loop.loop_type})")
+
         for grp_name, avatar_ids in self.state.avatar_groups.items():
             if aid in avatar_ids:
                 refs.append(f"Groupe '{grp_name}'")
+
+        for i, op in enumerate(self.state.dof_operations):
+            if op.target_type == 'avatar' and op.target_value == aid:
+                refs.append(f"Opération DOF #{i + 1} (avatar)")
+            elif op.target_type == 'group':
+                group_ids = self.state.avatar_groups.get(op.target_value, [])
+                if aid in group_ids:
+                    refs.append(f"Opération DOF #{i + 1} (groupe '{op.target_value}')")
+
+        for i, cmd in enumerate(self.state.post_commands):
+            if cmd.target_type == 'avatar' and cmd.target_value == aid:
+                refs.append(f"Commande post #{i + 1} (avatar)")
+            elif cmd.target_type == 'group':
+                group_ids = self.state.avatar_groups.get(cmd.target_value, [])
+                if aid in group_ids:
+                    refs.append(f"Commande post #{i + 1} (groupe '{cmd.target_value}')")
         return len(refs) > 0, refs
 
     def remove_avatar(self, index: int) -> bool:
