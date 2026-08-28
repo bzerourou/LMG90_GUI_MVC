@@ -2,7 +2,7 @@
 import copy as _copy
 from typing import Optional, List, Dict
 
-from ..core.models import Avatar, AvatarOrigin
+from ..core.models import Avatar, AvatarOrigin, new_avatar_id
 from ..core.validators import AvatarValidator
 from ..core.pylmgc_bridge import LMGC90Bridge
 
@@ -156,6 +156,7 @@ class AvatarsMixin:
         try:
             for k in range(1, n_copies + 1):
                 clone = _copy.deepcopy(source)
+                clone.avatar_id = new_avatar_id()
                 clone.center = [
                     source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
                     for i in range(dim)
@@ -201,6 +202,7 @@ class AvatarsMixin:
                     src_idx, source = res
                     dim   = len(source.center)
                     clone = _copy.deepcopy(source)
+                    clone.avatar_id = new_avatar_id()
                     clone.center = [
                         source.center[i] + k * (offset[i] if i < len(offset) else 0.0)
                         for i in range(dim)
