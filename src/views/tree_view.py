@@ -409,13 +409,16 @@ class ModelTreeView(QObject):
         commands = self.controller.state.postpro_commands
         if not commands:
             return
-        
+
+        id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+
         post_node = QTreeWidgetItem(parent, ["Post-Processing", "", f"{len(commands)}"])
         
         for idx, cmd in enumerate(commands):
             target_info = "Global"
             if cmd.target_type == 'avatar':
-                target_info = f"Avatar #{cmd.target_value}"
+                av_idx = id_to_idx.get(cmd.target_value, None)
+                target_info = f"Avatar #{av_idx}" if av_idx is not None else f"Avatar inconnu"
             elif cmd.target_type == 'group':
                 target_info = f"Groupe: {cmd.target_value}"
             
