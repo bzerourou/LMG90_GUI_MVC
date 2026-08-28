@@ -1154,8 +1154,9 @@ class ScriptGenerator:
                     )
 
             elif op.target_type == 'group':
+                safe = op.target_value.replace(' ', '_').replace('-', '_')
                 f.write(f"# DOF sur groupe '{op.target_value}'\n")
-                f.write(f"for av in group_{op.target_value}:\n")
+                f.write(f"for av in group_{safe}:\n")
                 f.write(f"    av.{op.operation_type}({params_str})\n\n")
 
     # ── Post-traitement ───────────────────────────────────────────────────────
@@ -1183,7 +1184,8 @@ class ScriptGenerator:
                             f"     # ⚠️  avatar '{cmd.target_value[:8]}…' introuvable\n"
                         )
                 elif cmd.target_type == 'group':
-                    f.write(f"     rigid_set=[bodies[i] for i in group_{cmd.target_value}]\n")
+                    safe = cmd.target_value.replace(' ', '_').replace('-', '_')
+                    f.write(f"     rigid_set=[bodies[i] for i in group_{safe}]\n")
 
                 f.write(f")\n")
                 f.write(f"posts.addCommand(post_cmd_{i})\n")
