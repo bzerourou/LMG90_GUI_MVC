@@ -732,3 +732,7 @@ class SafeEvaluator:
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
                 if n.func.id not in self.allowed_names:
                     raise ValueError(f"Fonction non autorisée : {n.func.id}")
+            if isinstance(n, ast.Attribute) : 
+                if n.attr.startswith('_'):
+                    raise ValueError(f"Accès à un attribut privé non autorisé : '{n.attr}'"
+                                     f"(les attributs commençant par '_' sont interdits pour la sécurité)")
