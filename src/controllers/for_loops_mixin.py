@@ -324,8 +324,13 @@ class ForLoopsMixin:
 
     def _remove_for_loop_population(self, for_loop: ForLoop) -> None:
         """Supprime la ParticlePopulation associée à une boucle For SoA, si présente."""
+        pop_id = for_loop.template_config.get('_population_id')
+        if pop_id :
+            self.remove_particle_population(pop_id)
+            return
+
         if not for_loop.group_name:
             return
         pop_ids = self.state.populations_groups.get(for_loop.group_name, [])
-        for pop_id in list(pop_ids):
-            self.remove_particle_population(pop_id)
+        for pid in list(pop_ids):
+            self.remove_particle_population(pid)
