@@ -272,6 +272,7 @@ class ForLoopsMixin:
             radii=radii_arr,
             group_name=for_loop.group_name,
         )
+        for_loop.template_config['_population_id'] = population.population_id
 
         from ..core.pylmgc_bridge import LMGC90Bridge
         bodies = LMGC90Bridge.create_avatars_from_population(population, mod_obj, mat_obj)
