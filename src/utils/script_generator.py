@@ -80,6 +80,7 @@ class ScriptGenerator:
             self._write_for_loops(f)
             self._write_loops(f)
             self._write_granulo(f)
+            self._write_avatar_groups(f)
             self._write_contact_laws(f)
             self._write_visibility(f)
             self._write_dof_operations(f)
@@ -1047,6 +1048,45 @@ class ScriptGenerator:
                 if gen.group_name:
                     f.write(f"    group_{gen.group_name}.append(av)\n")
                 f.write(f"\n")
+
+
+    # ── Groupes d'avatars (résolution unique, source unique de vérité) ───────
+
+    def _write_avatar_groups(self, f: TextIO):
+        """
+        Résout chaque groupe de state.avatar_groups en une variable Python
+        group_<nom_safe> = [bodies[i0], bodies[i1], ...] (liste d'OBJETS).
+
+        Point unique de création : DOF et PostPro consomment cette même
+        variable, éliminant l'incohérence précédente (DOF attendait des
+        objets, PostPro attendait des indices, et seuls les groupes granulo
+        "affichés individuellement" avaient une variable créée).
+        """
+        groups = getattr(self.state, 'avatar_groups', {}) or {}
+        if not groups:
+            return
+
+        id_to_idx = self._id_to_idx()
+
+        f.write('# ── Groupes d\'avatars ───────────────────────────────────\n')
+        for group_name, avatar_ids in groups.items():
+            safe = group_name.replace(' ', '_').replace('-', '_')
+            indices = []
+            missing = 0
+            for aid in avatar_ids:
+                idx = id_to_idx.get(aid)
+                if idx is not None:
+                    indices.append(idx)
+                else:
+                    missing += 1
+            if missing:
+                f.write(
+                    f"# ⚠️  Groupe '{group_name}' : {missing} avatar(s) "
+                    f"introuvable(s) — ignoré(s)\n"
+                )
+            f.write(f"group_{safe} = [bodies[i] for i in {indices}]\n")
+        f.write('\n')
+
 
     # ── Lois de contact ───────────────────────────────────────────────────────
 
