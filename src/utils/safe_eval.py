@@ -614,8 +614,8 @@ def build_eval_context(
         try:
             if isinstance(var_expr, str):
                 tmp = {**ctx, **evaluated}
-                evaluated[var_name] = eval(
-                    var_expr, {"__builtins__": {}}, tmp
+                ev = SafeEvaluator(allowed_names=tmp)
+                evaluated[var_name] = ev.eval_expression(var_expr
                 )
             else:
                 evaluated[var_name] = var_expr
