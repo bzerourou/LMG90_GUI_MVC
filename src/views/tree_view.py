@@ -347,14 +347,17 @@ class ModelTreeView(QObject):
         ops = self.controller.get_dof_operations()
         if not ops:
             return
-        
+
+        id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+
         ops_node = QTreeWidgetItem(parent, ["Opérations DOF", "", f"{len(ops)}"])
         
         for idx,op in enumerate(ops):
             if op.target_type == 'group':
                 target = f"Groupe: {op.target_value}"
             else:
-                target = f"Avatar #{op.target_value}"
+                av_idx = id_to_idx.get(op.target_value, None)
+                target = f"Avatar #{av_idx}" if av_idx is not None else f"Avatar ID {op.target_value}"
             
             item = QTreeWidgetItem([
                 op.operation_type,
