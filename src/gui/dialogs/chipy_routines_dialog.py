@@ -1677,6 +1677,7 @@ class ChipyRoutinesDialog(QDialog):
         _3D_TYPES = {
             "rigidSphere", "rigidPlan", "rigidCylinder",
             "rigidPolyhedron", "roughWall3D", "granuloRoughWall3D",
+            "emptyAvatar", "mesh",
         }
         _2D_TYPES = {
             "rigidDisk", "rigidJonc", "rigidPolygon", "rigidOvoid",
