@@ -40,7 +40,7 @@ _DEPOSIT_PARAMS = {
     "Cylinder3D": ["r"],
 }
 
-_MASONRY_WALL_KEYS = {'l', 'h', 'lz', 'brick_name'}
+_MASONRY_WALL_KEYS = {'lz', 'brick_name'}
 
 
 class ScriptGenerator:
@@ -49,6 +49,7 @@ class ScriptGenerator:
     def __init__(self, controller: ProjectController):
         self.controller = controller
         self.state = controller.state
+        self._written_group_vars: set[str] = set()
 
     @property
     def _use_loop(self) -> bool:
@@ -72,6 +73,7 @@ class ScriptGenerator:
         with open(output_path, 'w', encoding='utf-8') as f:
             self._write_header(f)
             self._write_imports(f)
+            self._write_numpy_compatibility_shim(f)
             self._write_dynamic_vars(f)
             self._write_containers(f)
             self._write_materials(f)
@@ -102,6 +104,24 @@ class ScriptGenerator:
         f.write('import numpy as np\n')
         f.write('import math\n\n')
         f.write('import copy\n\n')
+
+    def _write_numpy_compatibility_shim(self, f: TextIO):
+        """Compatibilité NumPy 2.x / pylmgc90 2D pour les axes rigides.
+
+        Pour les vecteurs plans (2D), l’API LMGC90 utilise le signe du
+        produit vectoriel 2D, c’est-à-dire un scalaire :
+            a.x * b.y - a.y * b.x
+        Le code de pylmgc90 compare ensuite ce résultat à 0.0.
+        """
+        f.write('# Compatibilité NumPy 2.x + pylmgc90 2D\n')
+        f.write('_np_cross = np.cross\n')
+        f.write('def _lmgc90_safe_cross(a, b, *args, **kwargs):\n')
+        f.write('    a = np.asarray(a, dtype=float)\n')
+        f.write('    b = np.asarray(b, dtype=float)\n')
+        f.write('    if a.shape[-1] == 2 and b.shape[-1] == 2:\n')
+        f.write('        return a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]\n')
+        f.write('    return _np_cross(a, b, *args, **kwargs)\n')
+        f.write('np.cross = _lmgc90_safe_cross\n\n')
 
     # ── Variables dynamiques ──────────────────────────────────────────────────
 
@@ -748,6 +768,8 @@ class ScriptGenerator:
             for k, v in avatar.wall_params.items():
                 if k in _MASONRY_WALL_KEYS:
                     continue
+                # l/h sont nécessaires pour les murs lisses/rough/fineWall, pas
+                # seulement pour les briques de maçonnerie.
                 args.append(f"{k}={v}")
                 if k == 'r':
                     has_r_in_wall_params = True
@@ -1011,15 +1033,15 @@ class ScriptGenerator:
 
             deposit_func = _DEPOSIT_FUNC.get(gen.container_type, "depositInBox2D")
             deposit_keys = _DEPOSIT_PARAMS.get(gen.container_type, ["lx", "ly"])
-            f.write(f"_nb_remaining, _coords_{i} = pre.{deposit_func}(\n")
+            f.write(f"_nb_remaining, _coords_{i}, _radii_{i} = pre.{deposit_func}(\n")
             f.write(f"    radii=radii_{i},\n")
             for key in deposit_keys:
                 val = gen.container_params.get(key, 1.0)
                 f.write(f"    {key}={val},\n")
             f.write(f")\n\n")
             f.write(f"# Reshape coordinates\n")
-            f.write(f"_coords_{i}.shape = [_coords_{i}.size//2,2]\n")
-            f.write(f"radii_{i} = radii_{i}[:_nb_remaining]\n\n")
+            f.write(f"_coords_{i} = np.asarray(_coords_{i}, dtype=float).reshape(-1, {self.state.dimension})\n")
+            f.write(f"radii_{i} = np.asarray(_radii_{i}, dtype=float).reshape(-1)\n")
 
             f.write(f"# Création des avatars — dépôt {i + 1}\n")
             if not show_individually:
@@ -1034,7 +1056,9 @@ class ScriptGenerator:
                 f.write(f"    bodies.addAvatar(av)\n\n")
             else:
                 if gen.group_name:
-                    f.write(f"group_{gen.group_name} = []\n")
+                    safe_group = gen.group_name.replace(' ', '_').replace('-', '_')
+                    self._written_group_vars.add(safe_group)
+                    f.write(f"group_{safe_group} = []\n")
                 f.write(f"for j in range(len(radii_{i})):\n")
                 f.write(f"    av = pre.{gen.avatar_type}(\n")
                 f.write(f"        center=_coords_{i}[j],\n")
@@ -1046,7 +1070,8 @@ class ScriptGenerator:
                 f.write(f"    bodies.addAvatar(av)\n")
                 f.write(f"    bodies_list.append(av)\n")
                 if gen.group_name:
-                    f.write(f"    group_{gen.group_name}.append(av)\n")
+                    safe_group = gen.group_name.replace(' ', '_').replace('-', '_')
+                    f.write(f"    group_{safe_group}.append(av)\n")
                 f.write(f"\n")
 
 
@@ -1054,13 +1079,12 @@ class ScriptGenerator:
 
     def _write_avatar_groups(self, f: TextIO):
         """
-        Résout chaque groupe de state.avatar_groups en une variable Python
-        group_<nom_safe> = [bodies[i0], bodies[i1], ...] (liste d'OBJETS).
+        Résout chaque groupe de state.avatar_groups en une liste d'objets
+        pylmgc90 dans ``group_<nom_safe>``.
 
-        Point unique de création : DOF et PostPro consomment cette même
-        variable, éliminant l'incohérence précédente (DOF attendait des
-        objets, PostPro attendait des indices, et seuls les groupes granulo
-        "affichés individuellement" avaient une variable créée).
+        Les références peuvent être soit des avatar_id (nouveau format), soit
+        des indices historiques (compatibilité legacy). On les normalise vers
+        des indices de ``state.avatars`` avant d’écrire le script final.
         """
         groups = getattr(self.state, 'avatar_groups', {}) or {}
         if not groups:
@@ -1069,16 +1093,26 @@ class ScriptGenerator:
         id_to_idx = self._id_to_idx()
 
         f.write('# ── Groupes d\'avatars ───────────────────────────────────\n')
-        for group_name, avatar_ids in groups.items():
+        for group_name, refs in groups.items():
             safe = group_name.replace(' ', '_').replace('-', '_')
+            if safe in self._written_group_vars:
+                continue
             indices = []
             missing = 0
-            for aid in avatar_ids:
-                idx = id_to_idx.get(aid)
-                if idx is not None:
+
+            for ref in refs:
+                if isinstance(ref, int):
+                    idx = ref
+                elif isinstance(ref, str):
+                    idx = id_to_idx.get(ref)
+                else:
+                    idx = None
+
+                if idx is not None and 0 <= idx < len(self.state.avatars):
                     indices.append(idx)
                 else:
                     missing += 1
+
             if missing:
                 f.write(
                     f"# ⚠️  Groupe '{group_name}' : {missing} avatar(s) "
