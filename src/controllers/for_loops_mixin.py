@@ -1,4 +1,4 @@
-"""ForLoopsMixin — boucles For génériques (avatar, material, model, granulo)."""
+"""ForLoopsMixin — boucles For génériques (avatar, material, model, contact_law, visibility, dof, granulo)."""
 import math
 from typing import Optional, List
 
@@ -7,6 +7,9 @@ import numpy as np
 from ..core.models import (
     Avatar, AvatarOrigin, AvatarType,
     ForLoop, GranuloGeneration,
+    ContactLaw, ContactLawType,
+    VisibilityRule,
+    DOFOperation,
 )
 from ..core.generators import GranuloGenerator
 from ..core.particle_population import ParticlePopulation
@@ -46,7 +49,18 @@ class ForLoopsMixin:
     def generate_for_loop(self, for_loop: ForLoop) -> List[int]:
         """
         Génère des éléments selon une boucle For.
-        Les avatars produits sont référencés par avatar_id dans generated_refs.
+        
+        Types de cibles supportés:
+          - avatar       : crée des Avatar individuels avec positions/paramètres variables
+          - material     : crée des Material avec densité/propriétés variables
+          - model        : crée des Model avec physique/éléments variables
+          - contact_law  : crée des ContactLaw avec loi/friction variables
+          - visibility   : crée des VisibilityRule avec paramètres de détection variables
+          - dof          : crée des DOFOperation avec conditions limites variables
+          - granulo      : crée une population de particules granulométriques
+        
+        Les avatars produits sont référencés par avatar_id dans generated_refs ;
+        les autres types sont référencés par leur index dans la liste respective.
         """
         evaluator = SafeEvaluator()
 
@@ -115,7 +129,10 @@ class ForLoopsMixin:
                 generated_indices.append(idx)
 
             elif for_loop.target_type == 'material':
-                from ...core.models import Material, MaterialType
+                try:
+                    from ..core.models import Material, MaterialType
+                except ImportError:  # exécution directe / package non standard
+                    from src.core.models import Material, MaterialType
                 mat = Material(
                     name          = evaluated['name'],
                     material_type = MaterialType(evaluated.get('material_type', 'RIGID')),
@@ -126,7 +143,10 @@ class ForLoopsMixin:
                 generated_indices.append(len(self.state.materials) - 1)
 
             elif for_loop.target_type == 'model':
-                from ...core.models import Model
+                try:
+                    from ..core.models import Model
+                except ImportError:  # exécution directe / package non standard
+                    from src.core.models import Model
                 mod = Model(
                     name      = evaluated['name'],
                     physics   = evaluated.get('physics', 'MECAx'),
@@ -136,6 +156,40 @@ class ForLoopsMixin:
                 )
                 self.add_model(mod)
                 generated_indices.append(len(self.state.models) - 1)
+
+            elif for_loop.target_type == 'contact_law':
+                law = ContactLaw(
+                    name      = evaluated.get('name', 'LAW'),
+                    law_type  = ContactLawType(evaluated.get('law_type', evaluated.get('law', 'IQS_CLB'))),
+                    friction  = evaluated.get('friction', evaluated.get('fric')),
+                    properties= evaluated.get('properties', {}),
+                )
+                self.add_contact_law(law)
+                generated_indices.append(len(self.state.contact_laws) - 1)
+
+            elif for_loop.target_type == 'visibility':
+                visibility = VisibilityRule(
+                    candidate_body       = evaluated.get('candidate_body', 'RBDY2'),
+                    candidate_contactor = evaluated.get('candidate_contactor', 'DISKx'),
+                    candidate_color     = evaluated.get('candidate_color', 'BLUEx'),
+                    antagonist_body     = evaluated.get('antagonist_body', 'RBDY2'),
+                    antagonist_contactor= evaluated.get('antagonist_contactor', 'DISKx'),
+                    antagonist_color    = evaluated.get('antagonist_color', 'REDxx'),
+                    behavior_name       = evaluated.get('behavior_name', 'LAW01'),
+                    alert               = evaluated.get('alert', 0.1),
+                )
+                self.add_visibility_rule(visibility)
+                generated_indices.append(len(self.state.visibility_rules) - 1)
+
+            elif for_loop.target_type == 'dof':
+                dof_op = DOFOperation(
+                    operation_type = evaluated.get('operation_type', evaluated.get('dof', 'translate')),
+                    target_type    = evaluated.get('target_type', evaluated.get('target', 'avatar')),
+                    target_value   = evaluated.get('target_value', ''),
+                    parameters     = evaluated.get('parameters', {}),
+                )
+                self.add_dof_operation(dof_op)
+                generated_indices.append(len(self.state.operations) - 1)
 
             current += step
 
