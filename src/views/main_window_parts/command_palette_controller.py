@@ -49,6 +49,7 @@ class CommandPaletteController:
             ("units cgs", "Systeme d'unites : CGS"),
             ("new", "Creer un nouveau projet"),
             ("save", "Sauvegarder le projet"),
+            ("vars", "Ouvrir les variables dynamiques"),
             ("wizard project", "Ouvrir l'assistant de projet"),
             ("wizard granulo", "Ouvrir l'assistant de granulometrie"),
             ("wizard fast-granulo", "Ouvrir le generateur granulometrique rapide"),
