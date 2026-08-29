@@ -267,31 +267,29 @@ class AvatarLibraryTab(QWidget):
                 item.widget().deleteLater()
         
         # Ajouter les paramètres du template
-        for param_name, schema in template.param_schema.items():
-            default = template.default_params.get(param_name, 0.1)
-            
-            # Gérer les paramètres complexes (dict)
-            if isinstance(default, dict):
-                # Pour axis par exemple
-                if param_name == 'axis':
-                    axis_defaults = default
-                    axis_names = ['axe1', 'axe2']
-                    if 'axe3' in template.param_schema or 'axe3' in axis_defaults:
-                        axis_names.append('axe3')
+        _AXIS_FALLBACK = {'axe1': 2.0, 'axe2': 2.0, 'axe3': 0.05}
 
-                    for axis_name in axis_names:
-                        value = axis_defaults.get(axis_name, 2.0 if axis_name == 'axe1' else 2.0 if axis_name == 'axe2' else 0.05)
-                        axis_input = QLineEdit(str(value))
-                        axis_input.setObjectName(axis_name)
-                        self.params_form.addRow(f"Axe {axis_name[-1]}:", axis_input)
-                else:
-                    # Pour d'autres dict, afficher en JSON
-                    import json
-                    input_field = QLineEdit(json.dumps(default))
-                    input_field.setObjectName(param_name)
-                    self.params_form.addRow(f"{param_name}:", input_field)
+        for param_name, schema in template.param_schema.items():
+            # Cas axe1/axe2/axe3 : la valeur par défaut réelle est nichée
+            # dans default_params['axis'], pas dans default_params[param_name]
+            # (param_schema utilise les clés à plat, default_params les groupe
+            # sous 'axis' — sans ce détour, on retombait toujours sur 0.1).
+            if param_name in ('axe1', 'axe2', 'axe3'):
+                axis_defaults = template.default_params.get('axis', {})
+                value = axis_defaults.get(param_name, _AXIS_FALLBACK.get(param_name, 0.1))
+                axis_input = QLineEdit(str(value))
+                axis_input.setObjectName(param_name)
+                self.params_form.addRow(f"Axe {param_name[-1]}:", axis_input)
+                continue
+
+            default = template.default_params.get(param_name, 0.1)
+
+            if isinstance(default, dict):
+                import json
+                input_field = QLineEdit(json.dumps(default))
+                input_field.setObjectName(param_name)
+                self.params_form.addRow(f"{param_name}:", input_field)
             else:
-                # Paramètre simple
                 input_field = QLineEdit(str(default))
                 input_field.setObjectName(param_name)
                 self.params_form.addRow(f"{param_name}:", input_field)
@@ -471,9 +469,13 @@ class AvatarLibraryTab(QWidget):
                 color=self.color_input.text().strip(),
                 **custom_params
             )
+
+            # appliquer la rotation pour le mur verttical 
+
             
             # Ajouter au projet via le controller (émet automatiquement les signaux)
-            self.controller.add_avatar(avatar)
+            idx =self.controller.add_avatar(avatar)
+
             
             # Émettre le signal local
             self.avatar_created.emit()
@@ -516,9 +518,11 @@ class AvatarLibraryTab(QWidget):
         
         # Sélection de l'avatar source
         avatar_combo = QComboBox()
-        for i, avatar in enumerate(avatars):
+        id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
+        for avatar in enumerate(avatars):
+            real_index = id_to_idx[avatar.avatar_id]
             avatar_combo.addItem(
-                f"#{i} - {avatar.avatar_type.value} ({avatar.color})",
+                f"#{real_index} - {avatar.avatar_type.value} ({avatar.color})",
                 avatar.avatar_id   # stocker l'id stable, non la position
             )
         form.addRow("Avatar source:", avatar_combo)
