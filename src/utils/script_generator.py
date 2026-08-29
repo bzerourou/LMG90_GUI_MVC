@@ -1009,6 +1009,12 @@ class ScriptGenerator:
         )
         f.write('# Génération granulométrique\n')
         for i, gen in enumerate(self.state.granulo_generations):
+            if gen.container_type == "Distribution" or gen.container_params.get("distribution_only"):
+                f.write(
+                    f"# Distribution {i + 1} (rayons seuls, sans dépôt) — "
+                    f"non reproduite dans le script\n\n"
+                )
+                continue
             f.write(f"# Dépôt granulo {i + 1}  : {gen.color}----\n")
             f.write(f"radii_{i} = pre.granulo_Random(\n")
             f.write(f"    nb={gen.nb_particles},\n")
@@ -1045,7 +1051,8 @@ class ScriptGenerator:
                 if gen.group_name:
                     safe_group = gen.group_name.replace(' ', '_').replace('-', '_')
                     self._written_group_vars.add(safe_group)
-                    f.write(f"group_{safe_group} = []\n")
+                    f.write(f"if 'group_{safe_group}' not in globals():\n")
+                    f.write(f"    group_{safe_group} = []\n")
                 f.write(f"for j in range(len(radii_{i})):\n")
                 f.write(f"    av = pre.{gen.avatar_type}(\n")
                 f.write(f"        center=_coords_{i}[j],\n")
@@ -1082,8 +1089,6 @@ class ScriptGenerator:
         f.write('# ── Groupes d\'avatars ───────────────────────────────────\n')
         for group_name, refs in groups.items():
             safe = group_name.replace(' ', '_').replace('-', '_')
-            if safe in self._written_group_vars:
-                continue
             indices = []
             missing = 0
 
@@ -1105,7 +1110,14 @@ class ScriptGenerator:
                     f"# ⚠️  Groupe '{group_name}' : {missing} avatar(s) "
                     f"introuvable(s) — ignoré(s)\n"
                 )
+
+            if safe in self._written_group_vars:
+                f.write(f"group_{safe}.extend([bodies[i] for i in {indices}])\n")
+                self._written_group_vars.add(safe)
+                continue
+
             f.write(f"group_{safe} = [bodies[i] for i in {indices}]\n")
+            self._written_group_vars.add(safe)
         f.write('\n')
 
 
