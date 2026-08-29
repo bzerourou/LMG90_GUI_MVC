@@ -906,6 +906,10 @@ class ScriptGenerator:
                 self._write_for_visibility(f, template, for_loop.loop_var)
             elif for_loop.target_type == "dof":
                 self._write_for_dof(f, template, for_loop.loop_var)
+            elif for_loop.target_type == "granulo":
+                self._write_for_granulo(f, template, for_loop.loop_var)
+            else:
+                f.write(f"    # ⚠️ Type cible non supporté : {for_loop.target_type}\n")
             f.write("\n")
 
     def _write_for_avatar(self, f, template: dict, loop_var: str):
@@ -970,33 +974,98 @@ class ScriptGenerator:
         f.write(f"    models.addModel(mods[mod_name])\n")
 
     def _write_for_contact_law(self, f, template: dict, loop_var: str):
-        f.write(f"    law_name = {template['name']}\n")
+        law_name = template.get('name', "'LAW'+str(%s)" % loop_var)
+        law_type = template.get('law_type', template.get('law', 'IQS_CLB'))
+        friction = template.get('friction', template.get('fric', '0.3'))
+        f.write(f"    law_name = {law_name}\n")
         f.write(f"    laws[law_name] = pre.tact_behav(\n")
         f.write(f"        name=law_name,\n")
-        f.write(f"        law='{template['law_type']}',\n")
-        f.write(f"        fric={template.get('friction', '0.3')}\n")
+        f.write(f"        law='{law_type}',\n")
+        f.write(f"        fric={friction}\n")
         f.write(f"    )\n")
         f.write(f"    tacts.addBehav(laws[law_name])\n")
 
     def _write_for_visibility(self, f, template: dict, loop_var: str):
+        candidate_body = template.get('candidate_body', template.get('CorpsCandidat', "'RBDY2'"))
+        candidate_contactor = template.get('candidate_contactor', template.get('candidat', "'DISKx'"))
+        candidate_color = template.get('candidate_color', template.get('colorCandidat', "'BLUEx'"))
+        antagonist_body = template.get('antagonist_body', template.get('CorpsAntagoniste', "'RBDY2'"))
+        antagonist_contactor = template.get('antagonist_contactor', template.get('antagoniste', "'DISKx'"))
+        antagonist_color = template.get('antagonist_color', template.get('colorAntagoniste', "'REDxx'"))
+        behavior_name = template.get('behavior_name', template.get('behav', "'LAW01'"))
+        alert = template.get('alert', 0.1)
         f.write(f"    see_table = pre.see_table(\n")
-        f.write(f"        CorpsCandidat='{template['candidate_body']}',\n")
-        f.write(f"        candidat='{template['candidate_contactor']}',\n")
-        f.write(f"        colorCandidat={template['candidate_color']},\n")
-        f.write(f"        CorpsAntagoniste='{template['antagonist_body']}',\n")
-        f.write(f"        antagoniste='{template['antagonist_contactor']}',\n")
-        f.write(f"        colorAntagoniste={template['antagonist_color']},\n")
-        f.write(f"        behav=laws['{template['behavior_name']}'],\n")
-        f.write(f"        alert={template.get('alert', 0.1)}\n")
+        f.write(f"        CorpsCandidat={candidate_body},\n")
+        f.write(f"        candidat={candidate_contactor},\n")
+        f.write(f"        colorCandidat={candidate_color},\n")
+        f.write(f"        CorpsAntagoniste={antagonist_body},\n")
+        f.write(f"        antagoniste={antagonist_contactor},\n")
+        f.write(f"        colorAntagoniste={antagonist_color},\n")
+        f.write(f"        behav=laws[{behavior_name}],\n")
+        f.write(f"        alert={alert}\n")
         f.write(f"    )\n")
-        f.write(f"    see_tables.addSeeTable(see_table)\n")
+        f.write(f"    sees.addSeeTable(see_table)\n")
 
     def _write_for_dof(self, f, template: dict, loop_var: str):
-        params     = template.get('parameters', {})
-        params_str = ", ".join(f"{k}={v}" for k, v in params.items())
-        if template['target_type'] == 'avatar':
-            target_expr = template['target_value']
-            f.write(f"    bodies_list[{target_expr}].{template['operation_type']}({params_str})\n")
+        operation_type = template.get('operation_type', template.get('dof', template.get('type', 'translate')))
+        target_type = template.get('target_type', template.get('target', 'group'))
+        target_value = template.get('target_value', template.get('target_id', 'all'))
+        params = template.get('parameters', template.get('params', {}))
+        if not params:
+            params = {
+                key: template[key]
+                for key in ('component', 'dofty', 'ct', 'amp', 'omega', 'phi', 'dx', 'dy', 'dz')
+                if key in template
+            }
+        params_str = ', '.join(f"{k}={v}" for k, v in params.items())
+        if target_type == 'avatar':
+            f.write(f"    bodies[{target_value}].{operation_type}({params_str})\n")
+        else:
+            f.write(f"    for av in group_{str(target_value).replace(' ', '_').replace('-', '_')}:\n")
+            f.write(f"        av.{operation_type}({params_str})\n")
+
+    def _write_for_granulo(self, f, template: dict, loop_var: str):
+        nb_particles = template.get('nb_particles', 1)
+        radius_min = template.get('radius_min', 0.04)
+        radius_max = template.get('radius_max', 0.05)
+        container_type = template.get('container_type', 'Box2D')
+        container_params = template.get('container_params', {})
+        material_name = template.get('material_name', 'TDURx')
+        model_name = template.get('model_name', 'rigid')
+        avatar_type = template.get('avatar_type', 'rigidDisk')
+        color = template.get('color', 'BLUEx')
+        seed = template.get('seed')
+
+        params_list = []
+        for key, value in container_params.items():
+            params_list.append(f"    {key}={value},")
+        params_block = "\n".join(params_list)
+
+        f.write(f"    radii = pre.granulo_Random(\n")
+        f.write(f"        nb={nb_particles},\n")
+        f.write(f"        r_min={radius_min},\n")
+        f.write(f"        r_max={radius_max}\n")
+        if seed is not None:
+            f.write(f"        , seed={seed}\n")
+        f.write(f"    )\n\n")
+        f.write(f"    _nb_remaining, _coords, _radii = pre.{_DEPOSIT_FUNC.get(container_type, 'depositInBox2D')}(\n")
+        f.write(f"        radii=radii,\n")
+        if params_block:
+            f.write(f"{params_block}\n")
+        f.write(f"    )\n")
+        f.write(f"    _coords = np.asarray(_coords, dtype=float).reshape(-1, {self.state.dimension})\n")
+        f.write(f"    radii = np.asarray(_radii, dtype=float).reshape(-1)\n")
+        f.write(f"    for j in range(len(radii)):\n")
+        f.write(f"        av = pre.{avatar_type}(\n")
+        f.write(f"            center=_coords[j],\n")
+        f.write(f"            model=mods['{model_name}'],\n")
+        f.write(f"            material=mats['{material_name}'],\n")
+        f.write(f"            color='{color}',\n")
+        f.write(f"            r=float(radii[j])\n")
+        f.write(f"        )\n")
+        f.write(f"        bodies.addAvatar(av)\n")
+        f.write(f"        bodies_list.append(av)\n")
+
 
     # ── Granulométrie ─────────────────────────────────────────────────────────
 
