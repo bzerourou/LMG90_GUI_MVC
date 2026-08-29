@@ -594,6 +594,59 @@ class ScriptGenerator:
         f.write("    bodies_list.append(body)\n")
         f.write('\n')
 
+    def _build_avatar_args(self, avatar, center_expr: str | None = None) -> list[str]:
+        """Construit la liste des arguments d’appel pylmgc90 pour un avatar."""
+        center_value = center_expr if center_expr is not None else self._format_value(avatar.center)
+        args = [
+            f"center={center_value}",
+            f"model=mods['{avatar.model_name}']",
+            f"material=mats['{avatar.material_name}']",
+            f"color='{avatar.color}'"
+        ]
+
+        has_r_in_wall_params = False
+        if avatar.wall_params:
+            for k, v in avatar.wall_params.items():
+                if k in _MASONRY_WALL_KEYS:
+                    continue
+                args.append(f"{k}={v}")
+                if k == 'r':
+                    has_r_in_wall_params = True
+
+        exclude_r = False
+        if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
+            if avatar.generation_type in ["full", "bevel"]:
+                exclude_r = True
+
+        if avatar.radius and not has_r_in_wall_params and not exclude_r:
+            if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
+                args.append(f"radius={avatar.radius}")
+            else:
+                args.append(f"r={avatar.radius}")
+
+        if avatar.axis:
+            args.append(f"axe1={avatar.axis['axe1']}")
+            args.append(f"axe2={avatar.axis['axe2']}")
+            if 'axe3' in avatar.axis:
+                args.append(f"axe3={avatar.axis['axe3']}")
+
+        if avatar.generation_type:
+            args.append(f"generation_type='{avatar.generation_type}'")
+
+        if avatar.nb_vertices:
+            if avatar.avatar_type == AvatarType.RIGID_CLUSTER:
+                args.append(f"nb_disk={avatar.nb_vertices}")
+            else:
+                args.append(f"nb_vertices={avatar.nb_vertices}")
+
+        if avatar.vertices:
+            args.append(f"vertices=np.array({avatar.vertices})")
+
+        if avatar.is_hollow:
+            args.append("is_Hollow=True")
+
+        return args
+
     def _write_single_avatar(self, f, avatar, container="bodies"):
         """Écrit un avatar individuel."""
         atype  = avatar.avatar_type.value
@@ -757,57 +810,7 @@ class ScriptGenerator:
             return
 
         # Avatars standards
-        args = [
-            f"center={center}",
-            f"model=mods['{mod}']",
-            f"material=mats['{mat}']",
-            f"color='{color}'"
-        ]
-        has_r_in_wall_params = False
-        if avatar.wall_params:
-            for k, v in avatar.wall_params.items():
-                if k in _MASONRY_WALL_KEYS:
-                    continue
-                # l/h sont nécessaires pour les murs lisses/rough/fineWall, pas
-                # seulement pour les briques de maçonnerie.
-                args.append(f"{k}={v}")
-                if k == 'r':
-                    has_r_in_wall_params = True
-
-        exclude_r = False
-        if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
-            if avatar.generation_type in ["full", "bevel"]:
-                exclude_r = True
-
-        if avatar.radius and not has_r_in_wall_params and not exclude_r:
-            # pylmgc90 API :
-            #   rigidPolygon / rigidPolyhedron → radius=
-            #   tous les autres (rigidDisk, rigidSphere, rigidCylinder…) → r=
-            if avatar.avatar_type in [AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON]:
-                args.append(f"radius={avatar.radius}")
-            else:
-                args.append(f"r={avatar.radius}")
-
-        if avatar.axis:
-            args.append(f"axe1={avatar.axis['axe1']}")
-            args.append(f"axe2={avatar.axis['axe2']}")
-            if 'axe3' in avatar.axis:
-                args.append(f"axe3={avatar.axis['axe3']}")
-
-        if avatar.generation_type:
-            args.append(f"generation_type='{avatar.generation_type}'")
-
-        if avatar.nb_vertices:
-            if avatar.avatar_type == AvatarType.RIGID_CLUSTER:
-                args.append(f"nb_disk = {avatar.nb_vertices}")
-            else:
-                args.append(f"nb_vertices={avatar.nb_vertices}")
-
-        if avatar.vertices:
-            args.append(f"vertices=np.array({avatar.vertices})")
-
-        if avatar.is_hollow:
-            args.append("is_Hollow=True")
+        args = self._build_avatar_args(avatar)
 
         f.write(f"body = pre.{atype}(\n")
         for i, arg in enumerate(args):
@@ -885,16 +888,15 @@ class ScriptGenerator:
             indent = "        " if loop.loop_type == "Grille" else "    "
 
             f.write(f"{indent}center = {center_calc}\n")
+            args = self._build_avatar_args(model_avatar, center_expr="center")
             f.write(f"{indent}av = pre.{model_avatar.avatar_type.value}(\n")
-            f.write(f"{indent}    center=center,\n")
-            f.write(f"{indent}    material=mat_{model_avatar.material_name},\n")
-            f.write(f"{indent}    model=mod_{model_avatar.model_name},\n")
-            f.write(f"{indent}    color='{model_avatar.color}'")
-
-            if model_avatar.radius is not None:
-                f.write(f",\n{indent}    r={model_avatar.radius}")
-
-            f.write(f"\n{indent})\n")
+            for i, arg in enumerate(args):
+                f.write(f"{indent}    {arg}")
+                if i < len(args) - 1:
+                    f.write(",\n")
+                else:
+                    f.write("\n")
+            f.write(f"{indent})\n")
             f.write(f"{indent}bodies.addAvatar(av)\n\n")
 
     # ── Boucles For génériques ────────────────────────────────────────────────
