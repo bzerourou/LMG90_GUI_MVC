@@ -554,12 +554,8 @@ class ScriptGenerator:
     def _write_standard_group_loop(
         self, f: TextIO, group_name: str, group_avs: list
     ):
-        _, ref  = group_avs[0]
-        atype   = ref.avatar_type.value
-        mat     = ref.material_name
-        mod     = ref.model_name
-        color   = ref.color
-        safe    = group_name.replace(' ', '_').replace('-', '_')
+        _, ref = group_avs[0]
+        safe = group_name.replace(' ', '_').replace('-', '_')
 
         lines = ['[']
         for _, av in group_avs:
@@ -570,26 +566,15 @@ class ScriptGenerator:
         f.write(f'# Groupe : {group_name} ({len(group_avs)} avatars)\n')
         f.write(f'_centers_{safe} = {centers_repr}\n\n')
         f.write(f'for _c in _centers_{safe}:\n')
-        f.write(f"    body = pre.{atype}(\n")
-        f.write(f"        center=_c,\n")
-        f.write(f"        model=mods['{mod}'],\n")
-        f.write(f"        material=mats['{mat}'],\n")
-        f.write(f"        color='{color}'")
-        if ref.radius is not None:
-            f.write(f",\n        r={ref.radius}")
-        if ref.generation_type:
-            f.write(f",\n        generation_type='{ref.generation_type}'")
-        if ref.nb_vertices:
-            key = 'nb_disk' if ref.avatar_type == AvatarType.RIGID_CLUSTER \
-                  else 'nb_vertices'
-            f.write(f",\n        {key}={ref.nb_vertices}")
-        if ref.is_hollow:
-            f.write(",\n        is_Hollow=True")
-        if ref.wall_params:
-            for k, v in ref.wall_params.items():
-                if k not in _MASONRY_WALL_KEYS:
-                    f.write(f",\n        {k}={v}")
-        f.write("\n    )\n")
+        args = self._build_avatar_args(ref, center_expr='_c')
+        f.write(f"    body = pre.{ref.avatar_type.value}(\n")
+        for i, arg in enumerate(args):
+            f.write(f"        {arg}")
+            if i < len(args) - 1:
+                f.write(",\n")
+            else:
+                f.write("\n")
+        f.write("    )\n")
         f.write("    bodies.addAvatar(body)\n")
         f.write("    bodies_list.append(body)\n")
         f.write('\n')
