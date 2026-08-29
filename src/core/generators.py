@@ -178,6 +178,14 @@ class LoopGenerator:
         
 class ForLoopGenerator:
     """Génère des éléments via boucle for avec expressions"""
+
+    @staticmethod
+    def _get_template_value(template: dict, *keys, default=None):
+        for key in keys:
+            if key in template:
+                return template[key]
+        return default
+
     @staticmethod
     def generate_items(for_loop, controller, evaluator) -> List[Any]:
         """Génère les items de la boucle for"""
@@ -357,51 +365,74 @@ class ForLoopGenerator:
     
     @staticmethod
     def _create_contact_law(template: dict, context: dict, evaluator) -> Any:
-        """Crée une loi de contact depuis le template"""
+        """Crée une loi de contact depuis le template."""
         from ..core.models import ContactLaw, ContactLawType
-        
-        friction = None
-        if 'friction' in template:
-            friction = float(ForLoopGenerator._eval_field(template['friction'], context, evaluator))
-        
+
+        name = ForLoopGenerator._get_template_value(template, 'name', default='LAW')
+        law_type = ForLoopGenerator._get_template_value(template, 'law_type', 'law', default='IQS_CLB')
+        friction = ForLoopGenerator._get_template_value(template, 'friction', 'fric', default=None)
+
+        friction_value = None
+        if friction is not None:
+            friction_value = float(ForLoopGenerator._eval_field(friction, context, evaluator))
+
         return ContactLaw(
-            name=str(ForLoopGenerator._eval_field(template['name'], context, evaluator)),
-            law_type=ContactLawType(template['law_type']),
-            friction=friction,
+            name=str(ForLoopGenerator._eval_field(name, context, evaluator)),
+            law_type=ContactLawType(ForLoopGenerator._eval_field(law_type, context, evaluator)),
+            friction=friction_value,
             properties=template.get('properties', {})
         )
-    
+
     @staticmethod
     def _create_visibility(template: dict, context: dict, evaluator) -> Any:
-        """Crée une règle de visibilité depuis le template"""
+        """Crée une règle de visibilité depuis le template."""
         from ..core.models import VisibilityRule
-        
+
+        candidate_body = ForLoopGenerator._get_template_value(template, 'candidate_body', 'CorpsCandidat', default='RBDY2')
+        candidate_contactor = ForLoopGenerator._get_template_value(template, 'candidate_contactor', 'candidat', default='DISKx')
+        candidate_color = ForLoopGenerator._get_template_value(template, 'candidate_color', 'colorCandidat', default='BLUEx')
+        antagonist_body = ForLoopGenerator._get_template_value(template, 'antagonist_body', 'CorpsAntagoniste', default='RBDY2')
+        antagonist_contactor = ForLoopGenerator._get_template_value(template, 'antagonist_contactor', 'antagoniste', default='DISKx')
+        antagonist_color = ForLoopGenerator._get_template_value(template, 'antagonist_color', 'colorAntagoniste', default='REDxx')
+        behavior_name = ForLoopGenerator._get_template_value(template, 'behavior_name', 'behav', default='LAW01')
+        alert = ForLoopGenerator._get_template_value(template, 'alert', default=0.1)
+
         return VisibilityRule(
-            candidate_body=template['candidate_body'],
-            candidate_contactor=template['candidate_contactor'],
-            candidate_color=str(ForLoopGenerator._eval_field(template['candidate_color'], context, evaluator)),
-            antagonist_body=template['antagonist_body'],
-            antagonist_contactor=template['antagonist_contactor'],
-            antagonist_color=str(ForLoopGenerator._eval_field(template['antagonist_color'], context, evaluator)),
-            behavior_name=template['behavior_name'],
-            alert=float(ForLoopGenerator._eval_field(template.get('alert', 0.1), context, evaluator))
+            candidate_body=str(ForLoopGenerator._eval_field(candidate_body, context, evaluator)),
+            candidate_contactor=str(ForLoopGenerator._eval_field(candidate_contactor, context, evaluator)),
+            candidate_color=str(ForLoopGenerator._eval_field(candidate_color, context, evaluator)),
+            antagonist_body=str(ForLoopGenerator._eval_field(antagonist_body, context, evaluator)),
+            antagonist_contactor=str(ForLoopGenerator._eval_field(antagonist_contactor, context, evaluator)),
+            antagonist_color=str(ForLoopGenerator._eval_field(antagonist_color, context, evaluator)),
+            behavior_name=str(ForLoopGenerator._eval_field(behavior_name, context, evaluator)),
+            alert=float(ForLoopGenerator._eval_field(alert, context, evaluator))
         )
-    
+
     @staticmethod
     def _create_dof(template: dict, context: dict, evaluator) -> Any:
-        """Crée une opération DOF depuis le template"""
+        """Crée une opération DOF depuis le template."""
         from ..core.models import DOFOperation
-        
-        params = {}
-        if 'parameters' in template:
-            for k, v in template['parameters'].items():
-                params[k] = ForLoopGenerator._eval_field(v, context, evaluator)
-        
+
+        params = template.get('parameters', template.get('params', {}))
+        if not params:
+            params = {
+                k: template[k]
+                for k in ('component', 'dofty', 'ct', 'amp', 'omega', 'phi', 'dx', 'dy', 'dz')
+                if k in template
+            }
+        param_dict = {}
+        for k, v in params.items():
+            param_dict[k] = ForLoopGenerator._eval_field(v, context, evaluator)
+
+        operation_type = ForLoopGenerator._get_template_value(template, 'operation_type', 'dof', 'type', default='translate')
+        target_type = ForLoopGenerator._get_template_value(template, 'target_type', 'target', default='avatar')
+        target_value = ForLoopGenerator._get_template_value(template, 'target_value', default=0)
+
         return DOFOperation(
-            operation_type=template['operation_type'],
-            target_type=template['target_type'],
-            target_value=ForLoopGenerator._eval_field(template['target_value'], context, evaluator),
-            parameters=params
+            operation_type=str(ForLoopGenerator._eval_field(operation_type, context, evaluator)),
+            target_type=str(ForLoopGenerator._eval_field(target_type, context, evaluator)),
+            target_value=ForLoopGenerator._eval_field(target_value, context, evaluator),
+            parameters=param_dict
         )
 
 class GranuloGenerator:
