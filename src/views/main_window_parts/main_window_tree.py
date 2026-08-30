@@ -77,4 +77,8 @@ class MainWindowTreeMixin:
         tab_id = "empty_avatar" if use_empty else "avatar"
         self._add_tab(tab_id)
         tab = self.empty_avatar_tab if use_empty else self.avatar_tab
+<<<<<<< HEAD
         tab.load_for_edit(index, avatar)
+=======
+        tab.load_for_edit(index, avatar)
+>>>>>>> 01edd2b3a7997f874b871c5ac54804f60ea9e840
