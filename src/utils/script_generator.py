@@ -1327,6 +1327,10 @@ class ScriptGenerator:
         pickle_code = engine.generate_pickle_code(dimension=self.state.dimension)
         if pickle_code:
             f.write(pickle_code)
+
+            meta_code = engine.generate_bodies_list_code()
+            if meta_code:
+                f.write(meta_code)
         f.write('\n')
 
     # ── DATBOX ────────────────────────────────────────────────────────────────
