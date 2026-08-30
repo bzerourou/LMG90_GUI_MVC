@@ -82,7 +82,7 @@ class AvatarsMixin:
             if aid in avatar_ids:
                 refs.append(f"Groupe '{grp_name}'")
 
-        for i, op in enumerate(self.state.dof_operations):
+        for i, op in enumerate(self.state.operations):          # ✅ corrigé
             if op.target_type == 'avatar' and op.target_value == aid:
                 refs.append(f"Opération DOF #{i + 1} (avatar)")
             elif op.target_type == 'group':
@@ -90,7 +90,7 @@ class AvatarsMixin:
                 if aid in group_ids:
                     refs.append(f"Opération DOF #{i + 1} (groupe '{op.target_value}')")
 
-        for i, cmd in enumerate(self.state.post_commands):
+        for i, cmd in enumerate(self.state.postpro_commands):   # ✅ corrigé
             if cmd.target_type == 'avatar' and cmd.target_value == aid:
                 refs.append(f"Commande post #{i + 1} (avatar)")
             elif cmd.target_type == 'group':
