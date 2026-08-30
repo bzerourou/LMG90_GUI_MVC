@@ -519,7 +519,7 @@ class AvatarLibraryTab(QWidget):
         # Sélection de l'avatar source
         avatar_combo = QComboBox()
         id_to_idx = {av.avatar_id: i for i, av in enumerate(self.controller.state.avatars)}
-        for avatar in enumerate(avatars):
+        for avatar in avatars:
             real_index = id_to_idx[avatar.avatar_id]
             avatar_combo.addItem(
                 f"#{real_index} - {avatar.avatar_type.value} ({avatar.color})",
