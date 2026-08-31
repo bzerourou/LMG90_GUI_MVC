@@ -556,17 +556,8 @@ class AvatarTab(BaseTab):
            
             avatar.generation_type = self.gen_type_combo.currentText()
             if avatar.generation_type == "regular":
-                avatar.nb_vertices = self.eval_int(
-                    self.nb_vertices_input.text(), 
-                    default=5, 
-                    field_name="Nb vertices"
-                )
-                avatar.radius = float(self._eval_expression(self.radius_input.text()))
-                avatar.radius = self.eval_float(
-                self.radius_input.text(), 
-                default=0.1, 
-                field_name="Rayon"
-            )
+                avatar.nb_vertices = self.eval_int(self.nb_vertices_input.text(), default=5, field_name="Nb vertices")
+                avatar.radius = self.eval_float(self.radius_input.text(), default=0.1, field_name="Rayon")
             else:
                 #Évaluer vertices
                 import ast
