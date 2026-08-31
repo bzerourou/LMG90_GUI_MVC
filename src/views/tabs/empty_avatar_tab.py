@@ -407,7 +407,7 @@ class EmptyAvatarTab(BaseTab):
                 continue
             row = widget.layout()
             shape = row.shape_combo.currentText()
-            color = row.color_input.text().strip() or "BLEUx"
+            color = row.color_input.text().strip() or "BLUEx"
             params_text = row.params_input.text().strip()
 
             params = {}
@@ -433,7 +433,7 @@ class EmptyAvatarTab(BaseTab):
             params_text = row.params_input.text().strip()
             params = self._parse_params(params_text) if params_text else {}
             entry = {'shape': row.shape_combo.currentText(),
-                     'color': row.color_input.text().strip() or "BLEUx",
+                     'color': row.color_input.text().strip() or "BLUEx",
                      'params': params}
             if group:
                 entry['group'] = group
