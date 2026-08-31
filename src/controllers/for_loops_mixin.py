@@ -211,6 +211,70 @@ class ForLoopsMixin:
 
         return generated_indices
 
+    def _generate_for_granulo(self, for_loop: ForLoop, evaluator: SafeEvaluator) -> List[int]:
+        """
+        Génère N dépôts granulométriques via une boucle For (target_type='granulo').
+        Chaque itération i évalue le template (nb_particles, container_params, ...)
+        avec la variable de boucle disponible, puis délègue à generate_granulo().
+        """
+        evaluator.allowed_names = _BASE_CONTEXT
+        start = evaluator.eval_expression(for_loop.start_expr)
+        end   = evaluator.eval_expression(for_loop.end_expr)
+        step  = evaluator.eval_expression(for_loop.step_expr)
+
+        tc       = for_loop.template_config
+        loop_var = for_loop.loop_var
+        all_generated_indices: List[int] = []
+        all_ids: List[str] = []
+
+        current = start
+        while (step > 0 and current < end) or (step < 0 and current > end):
+            ctx = {**_BASE_CONTEXT, loop_var: current}
+            evaluator.allowed_names = ctx
+
+            def _ev(value):
+                if isinstance(value, str):
+                    try:
+                        return evaluator.eval_expression(value)
+                    except Exception:
+                        return value
+                return value
+
+            container_params = {
+                k: _ev(v) for k, v in tc.get('container_params', {}).items()
+            }
+
+            config = GranuloGeneration(
+                nb_particles     = int(_ev(tc.get('nb_particles', 50))),
+                radius_min       = float(_ev(tc.get('radius_min', 0.04))),
+                radius_max       = float(_ev(tc.get('radius_max', 0.05))),
+                container_type   = str(_ev(tc.get('container_type', 'Box2D'))),
+                container_params = container_params,
+                model_name       = str(_ev(tc.get('model_name', 'rigid'))),
+                material_name    = str(_ev(tc.get('material_name', 'TDURx'))),
+                avatar_type      = str(_ev(tc.get('avatar_type', 'rigidDisk'))),
+                color            = str(_ev(tc.get('color', 'BLUEx'))),
+                seed             = tc.get('seed'),
+            )
+
+            indices = self.generate_granulo(config)   # délègue à GranuloMixin
+            all_generated_indices.extend(indices)
+            all_ids.extend(
+                self.state.avatars[i].avatar_id for i in indices
+            )
+
+            current += step
+
+        for_loop.generated_refs = all_ids
+        if not self._is_loading:
+            self.state.for_loops.append(for_loop)
+        if for_loop.group_name:
+            self.state.avatar_groups.setdefault(
+                for_loop.group_name, []
+            ).extend(for_loop.generated_refs)
+
+        return all_generated_indices
+
     # ── Chemin rapide SoA (ParticlePopulation) ────────────────────────────────
 
     def _for_loop_eligible_for_population(self, for_loop: ForLoop) -> bool:
