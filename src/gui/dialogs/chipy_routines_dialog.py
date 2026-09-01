@@ -145,12 +145,12 @@ class ChipyRoutinesDialog(QDialog):
         # Visibilite — liste d'entrees dynamiques
         # Chaque entree : {"action": "visible"|"invisible",
         #   "dim": "2D"|"3D", "ids": str, "group": str,
-        #   "step_mode": "all"|"every_n"|"at_k"|"after",
+        #   "step_mode": "before"|"all"|"every_n"|"at_k"|"after",
         #   "step_val": int}
         "vis_entries": [],
         # GetBodyVector RBDY2 — liste d'entrees configurables
         # Chaque entree : {"vec": str, "ids": str, "group": str,
-        #   "step_mode": "all"|"every_n"|"at_k",
+        #   "step_mode": "before"|"all"|"every_n"|"at_k"|"after",
         #   "step_val": int}  (N pour every_n, k pour at_k)
         "gbv2_entries": [],
         # GetBodyVector RBDY3
@@ -167,7 +167,7 @@ class ChipyRoutinesDialog(QDialog):
         "extract_internal":   False,
         # ── Inspection 2D ────────────────────────────────────────────────────
         # Chaque entree : {"func": str, "ids": str, "group": str,
-        #   "step_mode": "all"|"every_n"|"at_k",
+        #   "step_mode": "before"|"all"|"every_n"|"at_k"|"after",
         #   "step_val": int, "store": str}
         "insp2d_entries": [],
         # ── Inspection 3D ────────────────────────────────────────────────────
@@ -507,7 +507,7 @@ class ChipyRoutinesDialog(QDialog):
             ("Dim.",           50),
             ("IDs avatars",   120),
             ("Groupe",        110),
-            ("Mode / Timing", 185),
+            ("Mode / Timing", 200),
         ]:
             _lv = QLabel("<b>{}</b>".format(_lbl_v))
             _lv.setFixedWidth(_w_v)
@@ -547,7 +547,7 @@ class ChipyRoutinesDialog(QDialog):
 
         hdr2 = QHBoxLayout()
         for _lbl, _w in [("Vecteur", 110), ("IDs avatars", 120),
-                          ("Groupe", 110), ("Mode / Timing", 185)]:
+                          ("Groupe", 110), ("Mode / Timing", 200)]:
             _l = QLabel("<b>{}</b>".format(_lbl))
             _l.setFixedWidth(_w)
             hdr2.addWidget(_l)
@@ -583,7 +583,7 @@ class ChipyRoutinesDialog(QDialog):
 
         hdr3 = QHBoxLayout()
         for _lbl, _w in [("Vecteur", 110), ("IDs avatars", 120),
-                          ("Groupe", 110), ("Mode / Timing", 185)]:
+                          ("Groupe", 110), ("Mode / Timing", 200)]:
             _l = QLabel("<b>{}</b>".format(_lbl))
             _l.setFixedWidth(_w)
             hdr3.addWidget(_l)
@@ -1000,7 +1000,7 @@ class ChipyRoutinesDialog(QDialog):
             ("Fonction chipy", 230),
             ("IDs (paires/contacteurs)", 145),
             ("Groupe", 110),
-            ("Mode / Timing", 185),
+            ("Mode / Timing", 200),
             ("Var. Python", 110),
         ]:
             lbl = QLabel("<b>{}</b>".format(lbl_txt))
@@ -1148,7 +1148,7 @@ class ChipyRoutinesDialog(QDialog):
         row_layout.addWidget(combo_grp)
 
         # ── Mode d'execution (timing) ──────────────────────────────────────
-        _tc_i, _combo_mode_i, _spin_val_i = self._make_timing_widget(entry)
+        _tc_i, _combo_mode_i, _spin_val_i = self._make_timing_widget(entry, default_mode="all")
         row_layout.addWidget(_tc_i)
 
         # ── Variable de stockage ─────────────────────────────────────────────
@@ -1200,7 +1200,7 @@ class ChipyRoutinesDialog(QDialog):
             "step_val":  row["spin_val"].value(),
             "store":     row["edit_store"].text().strip(),
             # compat ascendante
-            "in_loop":   _mode != "after",
+            "in_loop":   _mode not in ("before", "after"),
             "freq":      row["spin_val"].value() if _mode == "every_n" else 1,
         }
 
@@ -1449,8 +1449,8 @@ class ChipyRoutinesDialog(QDialog):
         )
         row_layout.addWidget(combo_grp)
 
-        # ── Mode / Timing (memes options que GBV/Inspection) ──────────────
-        _tc, _combo_mode, _spin_val = self._make_timing_widget(entry)
+        # ── Mode / Timing (défaut : avant la boucle pour la visibilité) ──
+        _tc, _combo_mode, _spin_val = self._make_timing_widget(entry, default_mode="before")
         row_layout.addWidget(_tc)
 
         # ── Bouton supprimer ──────────────────────────────────────────────
@@ -1489,17 +1489,14 @@ class ChipyRoutinesDialog(QDialog):
             "group":     row["combo_grp"].currentText().strip(),
             "step_mode": _mode,
             "step_val":  row["spin_val"].value(),
-            "in_loop":   _mode != "after",
+            "in_loop":   _mode not in ("before", "after"),
         }
 
     @staticmethod
-    def _make_timing_widget(entry: dict):
+    def _make_timing_widget(entry: dict, default_mode: str = "all"):
         """
-        Construit un widget horizontal compact pour le mode d'execution :
-          [ComboBox mode] [SpinBox valeur]
-        Retourne (container_widget, combo_mode, spin_val).
-        step_mode : "all" | "every_n" | "at_k" | "after"
-        step_val  : N (every_n) ou k (at_k), ignore sinon
+        [ComboBox mode] [SpinBox valeur]
+        step_mode : "before" | "all" | "every_n" | "at_k" | "after"
         """
         container = QWidget()
         lay = QHBoxLayout(container)
@@ -1507,16 +1504,18 @@ class ChipyRoutinesDialog(QDialog):
         lay.setSpacing(3)
 
         combo = QComboBox()
-        combo.setFixedWidth(105)
-        combo.addItem("Tous les pas",   "all")
-        combo.addItem("Tous les N pas", "every_n")
-        combo.addItem("Au pas k =",     "at_k")
-        combo.addItem("Apres boucle",   "after")
+        combo.setFixedWidth(120)
+        combo.addItem("Avant la boucle", "before")
+        combo.addItem("Tous les pas",    "all")
+        combo.addItem("Tous les N pas",  "every_n")
+        combo.addItem("Au pas k =",      "at_k")
+        combo.addItem("Apres boucle",    "after")
         combo.setToolTip(
-            "Tous les pas   : appel a chaque iteration.\n"
-            "Tous les N pas : appel si k % N == 0.\n"
-            "Au pas k =     : appel seulement si k == valeur.\n"
-            "Apres boucle   : appel unique apres la boucle."
+            "Avant la boucle : appel unique avant for k.\n"
+            "Tous les pas    : appel a chaque iteration.\n"
+            "Tous les N pas  : appel si k % N == 0.\n"
+            "Au pas k =      : appel seulement si k == valeur.\n"
+            "Apres boucle    : appel unique apres la boucle."
         )
 
         spin = QSpinBox()
@@ -1524,21 +1523,26 @@ class ChipyRoutinesDialog(QDialog):
         spin.setFixedWidth(72)
         spin.setToolTip("N (frequence) ou k (pas unique)")
 
-        # Restaurer depuis entry
-        mode = entry.get("step_mode", "all")
-        # Compatibilite ascendante : in_loop=False => "after"
-        if not entry.get("in_loop", True) and "step_mode" not in entry:
-            mode = "after"
-        elif "step_mode" not in entry and entry.get("freq", 1) > 1:
-            mode = "every_n"
+        mode = entry.get("step_mode", default_mode)
+        # Compat ascendante
+        if "step_mode" not in entry:
+            if not entry.get("in_loop", True):
+                mode = "after"
+            elif entry.get("freq", 1) > 1:
+                mode = "every_n"
+            else:
+                mode = default_mode
+        # Anciennes entrées vis avec step_mode vide → "before"
+        if mode in ("", None):
+            mode = "before"
         val = entry.get("step_val", entry.get("freq", 1))
 
-        idx = {d: i for i, d in enumerate(["all","every_n","at_k","after"])}.get(mode, 0)
-        combo.setCurrentIndex(idx)
+        order = ["before", "all", "every_n", "at_k", "after"]
+        combo.setCurrentIndex(order.index(mode) if mode in order else order.index(default_mode))
         spin.setValue(int(val))
 
         def _on_mode(i, s=spin):
-            s.setEnabled(i in (1, 2))  # every_n ou at_k
+            s.setEnabled(i in (2, 3))  # every_n, at_k
         combo.currentIndexChanged.connect(_on_mode)
         _on_mode(combo.currentIndex())
 
@@ -1617,7 +1621,7 @@ class ChipyRoutinesDialog(QDialog):
         row_layout.addWidget(combo_grp)
 
         # ── Mode d'execution (timing) ──────────────────────────────────────
-        _tc, _combo_mode, _spin_val = self._make_timing_widget(entry)
+        _tc, _combo_mode, _spin_val = self._make_timing_widget(entry, default_mode="all")
         row_layout.addWidget(_tc)
 
         # ── Bouton supprimer ──────────────────────────────────────────────────
@@ -1656,7 +1660,7 @@ class ChipyRoutinesDialog(QDialog):
             "step_mode": _mode,
             "step_val":  row["spin_val"].value(),
             # compat ascendante
-            "in_loop":   _mode != "after",
+            "in_loop":   _mode not in ("before", "after"),
             "freq":      row["spin_val"].value() if _mode == "every_n" else 1,
         }
 
@@ -1981,15 +1985,8 @@ class ChipyRoutinesDialog(QDialog):
     # =========================================================================
 
     def _show_preview(self):
-        """Genere et affiche l'apercu du script command.py."""
-        try:
-            from ...utils.compute_script_generator import ComputeScriptGenerator
-        except ImportError:
-            try:
-                from ..utils.compute_script_generator import ComputeScriptGenerator
-            except ImportError:
-                from compute_script_generator import ComputeScriptGenerator
 
+        from ...utils.compute_script_generator import ComputeScriptGenerator
         preview_params = {
             "dt": 1e-3, "nb_steps": 100, "theta": 0.5,
             "tol": 1.666e-4, "relax": 1.0, "norm": "Quad ",

@@ -274,11 +274,37 @@ class ComputeScriptGenerator:
                     result.append(str(id_to_idx[aid] + 1))
             return result
 
+        def _normalize_mode(entry: dict) -> str:
+            """
+            Normalise step_mode vers une des 5 valeurs :
+              "before" | "all" | "every_n" | "at_k" | "after"
+
+            Compat ascendante :
+              - step_mode absent + in_loop=False  → "after"
+              - step_mode absent + freq > 1       → "every_n"
+              - step_mode absent / vide           → "before"  (ancien comportement vis)
+              - sinon                             → valeur brute
+            """
+            mode = entry.get('step_mode', None)
+            if mode is None or mode == '':
+                if 'step_mode' not in entry:
+                    if not entry.get('in_loop', True):
+                        return 'after'
+                    if entry.get('freq', 1) > 1:
+                        return 'every_n'
+                # Ancien cas vis (step_mode vide) ou défaut prudent
+                return 'before'
+            return mode
+
         def _timing_guard(entry: dict):
-            mode = entry.get('step_mode', '')
-            if not mode:
-                freq = int(entry.get('freq', 1))
-                mode = 'every_n' if freq > 1 else 'all'
+            """
+            Retourne (ligne_if, indentation_corps) pour les modes dans la boucle.
+            - every_n : if k % N == 0
+            - at_k    : if k == k_val
+            - all     : pas de garde (appel à chaque pas)
+            - before / after : ne devraient pas arriver ici
+            """
+            mode = _normalize_mode(entry)
             val = int(entry.get('step_val', entry.get('freq', 1)))
             if mode == 'every_n' and val > 1:
                 return ind + 'if k % {} == 0:\n'.format(val), ind + '    '
@@ -394,19 +420,24 @@ class ComputeScriptGenerator:
             w('\n')
 
         def _is_in_loop(e: dict) -> bool:
-            mode = e.get('step_mode', '')
-            return (mode != 'after') if mode else e.get('in_loop', True)
+            """True si l'entrée doit être émise à l'intérieur de la boucle for k."""
+            return _normalize_mode(e) in ('all', 'every_n', 'at_k')
+
+        def _is_before(e: dict) -> bool:
+            """True si l'entrée doit être émise une seule fois avant la boucle."""
+            return _normalize_mode(e) == 'before'
+
+        def _is_after(e: dict) -> bool:
+            """True si l'entrée doit être émise une seule fois après la boucle."""
+            return _normalize_mode(e) == 'after'
 
         # ── 6b. Visibilite des avatars avant la boucle ────────────────────────
-        _vis_before  = [e for e in p.get('vis_entries', []) if not e.get('step_mode')]
-        _vis_in_loop = [
-            e for e in p.get('vis_entries', [])
-            if e.get('step_mode') and e.get('step_mode') != 'after'
-        ]
-        _vis_after = [
-            e for e in p.get('vis_entries', [])
-            if e.get('step_mode') == 'after'
-        ]
+        # "before" (ou ancien step_mode vide) → une seule fois avant for k
+        # "all" / "every_n" / "at_k"          → dans la boucle
+        # "after"                            → après la boucle
+        _vis_before  = [e for e in p.get('vis_entries', []) if _is_before(e)]
+        _vis_in_loop = [e for e in p.get('vis_entries', []) if _is_in_loop(e)]
+        _vis_after   = [e for e in p.get('vis_entries', []) if _is_after(e)]
 
         for _ve in _vis_before:
             _write_vis_before(_ve)
@@ -468,6 +499,66 @@ class ComputeScriptGenerator:
             w('chipy.ReadIni()\n')
             w(f'chipy.SetStep({p["restart_step"]})\n')
             w('\n')
+
+        # ── 7b. GBV / Inspection avant la boucle (step_mode="before") ─────────
+        # Émis après un éventuel restart pour lire l'état initial chargé.
+        def _emit_insp_outside(entry: dict) -> None:
+            """Émet un appel d'inspection hors boucle (before ou after)."""
+            func    = entry.get('func', '')
+            ids_str = entry.get('ids', '').strip()
+            grp     = entry.get('group', '').strip()
+            store   = entry.get('store', '').strip()
+            if not func:
+                return
+            if _is_no_id_func(func) or (not ids_str and not grp):
+                if store:
+                    w('{} = chipy.{}()\n'.format(store, func))
+                else:
+                    w('chipy.{}()\n'.format(func))
+            else:
+                id_list = (
+                    [t.strip() for t in ids_str.split(',') if t.strip().isdigit()]
+                    if ids_str else _resolve_group_ids(grp)
+                )
+                if id_list:
+                    w('for _id in [{}]:\n'.format(', '.join(id_list)))
+                    if store:
+                        w('    {}_{{_id}} = chipy.{}(_id)\n'.format(store, func))
+                    else:
+                        w('    chipy.{}(_id)\n'.format(func))
+            w('\n')
+
+        for _gbv_key_b, _gbv_func_b, _gbv_flag_b in [
+            ('gbv2_entries', 'RBDY2_GetBodyVector', use_RBDY2),
+            ('gbv3_entries', 'RBDY3_GetBodyVector', use_RBDY3),
+        ]:
+            if not _gbv_flag_b:
+                continue
+            _before_entries = [e for e in p.get(_gbv_key_b, []) if _is_before(e)]
+            if _before_entries:
+                w('# ── {} avant boucle ──────\n'.format(_gbv_func_b))
+                for _eb in _before_entries:
+                    _vb  = _eb.get('vec', 'Coor_')
+                    _sb  = _eb.get('ids', '').strip()
+                    _gb  = _eb.get('group', '').strip()
+                    _ilb = (
+                        [t.strip() for t in _sb.split(',') if t.strip().isdigit()]
+                        if _sb else _resolve_group_ids(_gb)
+                    )
+                    if _ilb:
+                        w('for _id in [{}]:\n'.format(', '.join(_ilb)))
+                        w("    chipy.{}('{}', _id)\n".format(_gbv_func_b, _vb))
+                        w('\n')
+
+        _all_insp_before = (
+            [e for e in p.get('insp2d_entries', []) if _is_before(e)]
+            + [e for e in p.get('insp3d_entries', []) if _is_before(e)]
+            + [e for e in p.get('inspi_entries',  []) if _is_before(e)]
+        )
+        if _all_insp_before:
+            w('# ── Inspection avant boucle ──────\n')
+            for _ebi in _all_insp_before:
+                _emit_insp_outside(_ebi)
 
         # ── 8. Boucle(s) de calcul ────────────────────────────────────────────
         if use_multi:
@@ -602,17 +693,14 @@ class ComputeScriptGenerator:
             w('\n')
 
         # ── GetBodyVector RBDY2 / RBDY3 dans la boucle ───────────────────────
+        # Modes "all" / "every_n" / "at_k" uniquement (pas before ni after)
         for _gbv_key, _gbv_func, _gbv_flag in [
             ('gbv2_entries', 'RBDY2_GetBodyVector', use_RBDY2),
             ('gbv3_entries', 'RBDY3_GetBodyVector', use_RBDY3),
         ]:
             if not _gbv_flag:
                 continue
-            _in_entries = [
-                e for e in p.get(_gbv_key, [])
-                if e.get('step_mode', '') != 'after'
-                and (e.get('step_mode') or e.get('in_loop', True))
-            ]
+            _in_entries = [e for e in p.get(_gbv_key, []) if _is_in_loop(e)]
             if _in_entries:
                 L("chipy.utilities_logMes('{} extraction')".format(_gbv_func))
                 for _e in _in_entries:
@@ -681,20 +769,16 @@ class ComputeScriptGenerator:
             L('chipy.WritePostproFiles()')
             w('\n')
 
-        # ── GetBodyVector hors boucle (step_mode='after') ────────────────────
+        # ── GetBodyVector après boucle (step_mode="after") ───────────────────
         for _gbv_key2, _gbv_func2, _gbv_flag2 in [
             ('gbv2_entries', 'RBDY2_GetBodyVector', use_RBDY2),
             ('gbv3_entries', 'RBDY3_GetBodyVector', use_RBDY3),
         ]:
             if not _gbv_flag2:
                 continue
-            _out_entries = [
-                e for e in p.get(_gbv_key2, [])
-                if e.get('step_mode', '') == 'after'
-                or (not e.get('step_mode') and not e.get('in_loop', True))
-            ]
+            _out_entries = [e for e in p.get(_gbv_key2, []) if _is_after(e)]
             if _out_entries:
-                w('# ── {} hors boucle ──────\n'.format(_gbv_func2))
+                w('# ── {} apres boucle ──────\n'.format(_gbv_func2))
                 for _e2 in _out_entries:
                     _v2  = _e2.get('vec', 'Coor_')
                     _s2  = _e2.get('ids', '').strip()
@@ -708,40 +792,18 @@ class ComputeScriptGenerator:
                         w("    chipy.{}('{}', _id)\n".format(_gbv_func2, _v2))
                         w('\n')
 
-        # ── Inspection hors boucle ────────────────────────────────────────────
+        # ── Inspection après boucle (step_mode="after") ──────────────────────
         _all_insp_out = (
-            [e for e in p.get('insp2d_entries', []) if not _is_in_loop(e)]
-            + [e for e in p.get('insp3d_entries', []) if not _is_in_loop(e)]
-            + [e for e in p.get('inspi_entries',  []) if not _is_in_loop(e)]
+            [e for e in p.get('insp2d_entries', []) if _is_after(e)]
+            + [e for e in p.get('insp3d_entries', []) if _is_after(e)]
+            + [e for e in p.get('inspi_entries',  []) if _is_after(e)]
         )
         if _all_insp_out:
-            w('# ── Inspection hors boucle ──────\n')
+            w('# ── Inspection apres boucle ──────\n')
             for _eo in _all_insp_out:
-                _func_o  = _eo.get('func', '')
-                _ids_o   = _eo.get('ids', '').strip()
-                _grp_o   = _eo.get('group', '').strip()
-                _store_o = _eo.get('store', '').strip()
-                if not _func_o:
-                    continue
-                if _is_no_id_func(_func_o) or (not _ids_o and not _grp_o):
-                    if _store_o:
-                        w('{} = chipy.{}()\n'.format(_store_o, _func_o))
-                    else:
-                        w('chipy.{}()\n'.format(_func_o))
-                else:
-                    _il_o = (
-                        [t.strip() for t in _ids_o.split(',') if t.strip().isdigit()]
-                        if _ids_o else _resolve_group_ids(_grp_o)
-                    )
-                    if _il_o:
-                        w('for _id in [{}]:\n'.format(', '.join(_il_o)))
-                        if _store_o:
-                            w('    {}_{{_id}} = chipy.{}(_id)\n'.format(_store_o, _func_o))
-                        else:
-                            w('    chipy.{}(_id)\n'.format(_func_o))
-                w('\n')
+                _emit_insp_outside(_eo)
 
-        # ── Visibilite apres boucle (step_mode='after') ──────────────────────
+        # ── Visibilite apres boucle (step_mode="after") ───────────────────────
         if _vis_after:
             w('# ── Visibilite apres boucle ──────\n')
             for _ve_after in _vis_after:
