@@ -420,7 +420,7 @@ class ForLoopsMixin:
         if not (0 <= index < len(self.state.for_loops)):
             return False
         for_loop = self.state.for_loops[index]
-
+ 
         if for_loop.target_type == 'avatar':
             for aid in for_loop.generated_refs:
                 res = self._find_avatar_by_id(aid)
@@ -436,7 +436,25 @@ class ForLoopsMixin:
             for elem_idx in sorted(for_loop.generated_refs, reverse=True):
                 if elem_idx < len(self.state.models):
                     self.remove_model(self.state.models[elem_idx].name)
-
+        elif for_loop.target_type == 'granulo':
+            # CORRECTIF : ce cas n'était pas géré du tout — supprimer une
+            # boucle For→granulo laissait les avatars ET les entrées
+            # GranuloGeneration orphelins dans state.granulo_generations.
+            # generated_refs contient ici des avatar_id (comme pour 'avatar').
+            for aid in for_loop.generated_refs:
+                res = self._find_avatar_by_id(aid)
+                if res:
+                    self.remove_avatar(res[0])
+            # Retirer les GranuloGeneration dont TOUS les avatars générés
+            # appartenaient à cette boucle for (créées une par itération
+            # dans _generate_for_granulo, donc identifiables par le fait que
+            # generated_ids ⊆ for_loop.generated_refs original).
+            gen_ids_set = set(for_loop.generated_refs)
+            self.state.granulo_generations = [
+                g for g in self.state.granulo_generations
+                if not (g.generated_ids and set(g.generated_ids) <= gen_ids_set)
+            ]
+ 
         self.state.for_loops.pop(index)
         return True
 
