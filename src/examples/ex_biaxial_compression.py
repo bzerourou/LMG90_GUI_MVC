@@ -57,7 +57,7 @@ def build(controller) -> None:
     # ── Socle fixe ────────────────────────────────────────────────────────
     floor = Avatar(
         avatar_type=AvatarType.SMOOTH_WALL,
-        center=[0.0, -0.05],
+        center=[ half_w, -2*thickness],  # légèrement en dessous de 0 pour éviter les collisions initiales
         material_name="TDURx", model_name="rigid", color="GRAYx",
         origin=AvatarOrigin.MANUAL,
         wall_params={'l': box_width + 0.4, 'h': 0.1, 'nb_polyg': 20},
@@ -73,11 +73,11 @@ def build(controller) -> None:
     # ── Parois latérales mobiles ─────────────────────────────────────────
     compression_velocity = 0.05   # m/s, vers l'intérieur
     left_idx, left_id = _add_vertical_wall(
-        controller, x=-half_w, height=box_height, thickness=thickness,
+        controller, x=-thickness, height=box_height+thickness, thickness=thickness,
         mat_name="TDURx", mod_name="rigid", color="ORANx",
     )
     right_idx, right_id = _add_vertical_wall(
-        controller, x=half_w, height=box_height, thickness=thickness,
+        controller, x=box_width-half_w/4+3*thickness, height=box_height+thickness, thickness=thickness,
         mat_name="TDURx", mod_name="rigid", color="ORANx",
     )
     controller.add_dof_operation(DOFOperation(
@@ -97,7 +97,7 @@ def build(controller) -> None:
 
     # ── Lit de grains entre les parois ──────────────────────────────────────
     config = GranuloGeneration(
-        nb_particles=150,
+        nb_particles=200,
         radius_min=0.04, radius_max=0.06,
         container_type="Box2D",
         container_params={'lx': box_width - 0.2, 'ly': box_height - 0.3},
