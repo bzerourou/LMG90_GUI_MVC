@@ -731,7 +731,10 @@ class AvatarTab(BaseTab):
         if avatar.is_hollow:
             self.hollow_check.setChecked(True)
         if avatar.axis:
-            self.axes_input.setText(f"{avatar.axis['axe1']}, {avatar.axis['axe2']}")
+            axes = [avatar.axis['axe1'], avatar.axis['axe2']]
+            if 'axe3' in avatar.axis:
+                axes.append(avatar.axis['axe3'])
+            self.axes_input.setText(", ".join(str(axis) for axis in axes))
         if avatar.nb_vertices:
             self.nb_vertices_input.setText(str(avatar.nb_vertices))
         if avatar.vertices:
