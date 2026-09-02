@@ -73,21 +73,33 @@ def build(controller) -> None:
     ))
 
     # ── Géométrie de la trémie en V ──────────────────────────────────────
-    top_width, bottom_width, height = 3.0, 0.6, 2.0
+    # IMPORTANT : pylmgc90.depositInBox2D place le dépôt dans le repère
+    # [0, lx] x [0, ly], donc la trémie doit être construite dans ce système,
+    # et non centrée sur x=0 comme si la zone de dépôt était libre.
+    box_lx, box_ly = 2.0, 1.6
+    top_width, bottom_width, height = 1.6, 0.45, 1.2
     half_top, half_bot = top_width / 2.0, bottom_width / 2.0
     thickness = 0.03
+    # Petit décalage des deux pieds de paroi pour éviter que les JONCx
+    # du bas soient exactement alignés sur la même ligne centrale.
+    bottom_offset = thickness * 0.75
+    x_center = box_lx / 2.0
+    left_bottom = [x_center - (half_bot + bottom_offset), 0.0]
+    left_top = [x_center - half_top, height]
+    right_bottom = [x_center + (half_bot + bottom_offset), 0.0]
+    right_top = [x_center + half_top, height]
 
     hopper_indices = []
-    # Paroi gauche : du bas (-half_bot, 0) vers le haut (-half_top, height)
+    # Paroi gauche : de la base au niveau du sol vers le haut, dans le cadre [0, box_lx]
     hopper_indices.append(_add_inclined_wall(
         controller,
-        bottom=[-half_bot, 0.0], top=[-half_top, height],
+        bottom=left_bottom, top=left_top,
         thickness=thickness, mat_name="TDURx", mod_name="rigid", color="GRAYx",
     ))
     # Paroi droite : symétrique
     hopper_indices.append(_add_inclined_wall(
         controller,
-        bottom=[half_bot, 0.0], top=[half_top, height],
+        bottom=right_bottom, top=right_top,
         thickness=thickness, mat_name="TDURx", mod_name="rigid", color="GRAYx",
     ))
 
@@ -105,13 +117,22 @@ def build(controller) -> None:
         parameters={"component": [1, 2, 3], "dofty": "vlocy"},
     ))
 
+    # les décalés en bas 
+    controller.add_dof_operation(DOFOperation(
+        operation_type="translate",
+        target_type="group",
+        target_value="hopper_walls",
+        parameters={"dx":0.0, "dy": -box_lx}
+
+    ))
+
     # ── Dépôt granulométrique au-dessus de la trémie ────────────────────────
     config = GranuloGeneration(
         nb_particles=180,
         radius_min=0.04,
         radius_max=0.07,
         container_type="Box2D",
-        container_params={'lx': 2.0, 'ly': 1.2},
+        container_params={'lx': box_lx, 'ly': box_ly},
         model_name="rigid",
         material_name="TDURx",
         avatar_type="rigidDisk",
