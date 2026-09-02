@@ -80,6 +80,14 @@ def build(controller) -> None:
         parameters={"component": [1, 2, 3], "dofty": "vlocy", "ct": 0.0},
     ))
 
+    # décalés les murs 
+    controller.add_dof_operation(DOFOperation(
+        operation_type="translate",
+        target_type="group",
+        target_value="mur_L",
+        parameters={"dx": -2*lx, "dy": -lx},
+    ))
+
     # ── Dépôt granulométrique tombant dans le coin du L ─────────────────────
     config = GranuloGeneration(
         nb_particles=120,
