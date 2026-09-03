@@ -56,7 +56,7 @@ class MainWindow(
         self._script_log_dialog = None
         
         # Configuration fenêtre
-        self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {self.controller.state.name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
@@ -431,7 +431,7 @@ class MainWindow(
         if ok and name.strip():
             name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name.strip())
             self.controller.new_project(name)
-            self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
@@ -449,7 +449,7 @@ class MainWindow(
         if filepath:
             try:
                 self.controller.load_project(Path(filepath))
-                self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {self.controller.state.name}")
                 self.project_loaded.emit()
                 self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
@@ -564,7 +564,7 @@ class MainWindow(
             try:
                 self.controller.new_project(example.title)
                 example.builder(self.controller)
-                self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {self.controller.state.name}")
                 self._refresh_all()
                 self.statusBar().showMessage(
                     f"✅ Exemple « {example.title} » chargé", 5000
@@ -591,7 +591,7 @@ class MainWindow(
         """Affiche À propos"""
         QMessageBox.information(
             self, "À propos",
-            "LMGC90_GUI v0.5.0\n"
+            "LMGC90_GUI v0.5.1\n"
             "UI pour LMGC90\n"
             "par Zerourou B.\n"
             "bachir.zerourou@yahoo.fr\n"
@@ -649,7 +649,7 @@ class MainWindow(
         """Ouvre un projet récent."""
         try:
             self.controller.load_project(filepath)
-            self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {self.controller.state.name}")
             self.project_loaded.emit()
             self.statusBar().showMessage(f"Projet chargé", 5000)
             
@@ -801,7 +801,7 @@ class MainWindow(
         self.controller.new_project(name)
         from ..core.models import ProjectPreferences
         self.controller.state.preferences = ProjectPreferences()
-        self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {name}")
         self._refresh_all()
         self._update_recent_menu()
         self.statusBar().showMessage("Nouveau projet créé", 3000)
@@ -928,7 +928,7 @@ class MainWindow(
         
         wizard = ProjectSetupWizard(self.controller, self)
         if wizard.exec():
-            self.setWindowTitle(f"LMGC90_GUI v0.5.0 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.1 - {self.controller.state.name}")
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
 
