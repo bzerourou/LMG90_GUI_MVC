@@ -721,6 +721,16 @@ def _render_via_pylmgc90(avatars: List[Avatar], controller) -> Optional[pv.Multi
                 mat_obj = LMGC90Bridge.create_material(mat)
                 mod_obj = LMGC90Bridge.create_model(mod)
                 av_obj  = LMGC90Bridge.create_avatar(av, mod_obj, mat_obj)
+                for op in getattr(state, 'operations', []) or []:
+                    applies = op.operation_type == 'rotate' and (
+                        op.target_type == 'avatar' and op.target_value == av.avatar_id
+                        or op.target_type == 'group'
+                        and av.avatar_id in state.avatar_groups.get(
+                            op.target_value, []
+                        )
+                    )
+                    if applies:
+                        LMGC90Bridge.apply_dof_operation(op, av_obj)
                 bodies_container += av_obj
                 n_ok += 1
             except Exception:
@@ -814,6 +824,35 @@ def build_avatar_mesh(avatar: Avatar) -> Optional[pv.PolyData]:
     except Exception as e:
         print(f"⚠️ Viewer — erreur rendu {avatar.avatar_type.value} : {e}")
         return None
+
+
+def _apply_avatar_rotations(mesh: pv.PolyData, avatar: Avatar, controller) -> pv.PolyData:
+    """Rejoue les rotations DOF sur le mesh paramétrique de l'avatar."""
+    state = getattr(controller, 'state', None)
+    operations = getattr(state, 'operations', []) if state is not None else []
+    for operation in operations or []:
+        targets_avatar = (
+            operation.target_type == 'avatar'
+            and operation.target_value == avatar.avatar_id
+        )
+        targets_group = (
+            operation.target_type == 'group'
+            and avatar.avatar_id in state.avatar_groups.get(
+                operation.target_value, []
+            )
+        ) if state is not None else False
+        if operation.operation_type != 'rotate' or not (targets_avatar or targets_group):
+            continue
+
+        parameters = operation.parameters
+        if parameters.get('description') != 'axis':
+            continue
+        axis = parameters.get('axis')
+        alpha = parameters.get('alpha')
+        if axis is None or alpha is None:
+            continue
+        mesh.rotate_vector(axis, np.degrees(float(alpha)), point=_as3(avatar.center), inplace=True)
+    return mesh
 
 
 def _expand_renderables(renderables) -> List[Tuple[int, Avatar]]:
@@ -1298,34 +1337,50 @@ class Viewer3D(QWidget):
         for op in ops:
             if op.operation_type not in ('imposeDrivenDof', 'imposeInitValue'):
                 continue
-            idx = op.target_value if op.target_type == 'avatar' else None
-            if idx is None or idx >= len(bodies):
-                continue
-            av = bodies[idx]
-            c  = _as3(av.center)
 
-            comp = op.parameters.get('component', 1)
-            # Composante → direction de la flèche
-            if isinstance(comp, list):
-                dirs = [d for d in comp if d != 0]
-                comp = dirs[0] if dirs else 1
-
-            if comp == 1:
-                direction = (1, 0, 0)
-            elif comp == 2:
-                direction = (0, 1, 0)
-            elif comp == 3:
-                direction = (0, 0, 1)
+            if op.target_type == 'avatar':
+                target = op.target_value
+                if isinstance(target, int):
+                    target_avatars = [
+                        bodies[target]
+                    ] if 0 <= target < len(bodies) else []
+                else:
+                    target_avatars = [
+                        av for av in bodies if av.avatar_id == target
+                    ]
+            elif op.target_type == 'group':
+                group_ids = state.avatar_groups.get(op.target_value, [])
+                target_avatars = [
+                    av for av in bodies if av.avatar_id in group_ids
+                ]
             else:
-                direction = (1, 0, 0)
+                target_avatars = []
 
-            scale = max(0.04, (av.radius or 0.1) * 0.8)
-            arrow = _arrow_mesh(c, direction, scale=scale)
-            actor = self.plotter.add_mesh(
-                arrow, color=_DOF_COLOR,
-                opacity=0.9, pickable=False,
-            )
-            self._dof_actors.append(actor)
+            for av in target_avatars:
+                c = _as3(av.center)
+
+                comp = op.parameters.get('component', 1)
+                # Composante → direction de la flèche
+                if isinstance(comp, list):
+                    dirs = [d for d in comp if d != 0]
+                    comp = dirs[0] if dirs else 1
+
+                if comp == 1:
+                    direction = (1, 0, 0)
+                elif comp == 2:
+                    direction = (0, 1, 0)
+                elif comp == 3:
+                    direction = (0, 0, 1)
+                else:
+                    direction = (1, 0, 0)
+
+                scale = max(0.04, (av.radius or 0.1) * 0.8)
+                arrow = _arrow_mesh(c, direction, scale=scale)
+                actor = self.plotter.add_mesh(
+                    arrow, color=_DOF_COLOR,
+                    opacity=0.9, pickable=False,
+                )
+                self._dof_actors.append(actor)
 
         self.plotter.render()
 
@@ -1355,6 +1410,7 @@ class Viewer3D(QWidget):
         mesh = build_avatar_mesh(avatar)
         if mesh is None:
             return
+        mesh = _apply_avatar_rotations(mesh, avatar, self.controller)
 
         color   = _color_for_avatar(avatar, self._color_mode)
         opacity = _opacity_for_avatar(avatar)
