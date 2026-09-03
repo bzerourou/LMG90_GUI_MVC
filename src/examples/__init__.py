@@ -26,6 +26,7 @@ from .ex_hexagon_packing import build as _build_hexagon_packing
 from .ex_cluster_pile import build as _build_cluster_pile
 from .ex_avalanche_slope import build as _build_avalanche_slope
 from .ex_composite_scene import build as _build_composite_scene
+from .ex_wheel_rail_contact import build as _build_wheel_rail_contact
 
 
 EXAMPLES: list[ExampleSpec] = [
@@ -337,6 +338,26 @@ EXAMPLES: list[ExampleSpec] = [
         dimension=2, difficulty="Avancé",
         builder=_build_composite_scene,
         tags=["synthese", "variables", "contact", "avatar"],
+    ),
+        ExampleSpec(
+        id="wheel_rail_contact",
+        title="🚂 Contact roue/rail (ferroviaire)",
+        category="Avancé",
+        description=(
+            "Roue cylindrique rigide (Ø920 mm, norme UIC) roulant sur un rail "
+            "modélisé en plan rigide, avec un tronçon de joint de rail présentant "
+            "un léger défaut d'alignement. Illustre deux lois de contact "
+            "distinctes sur le même couple d'avatars : <b>IQS_CLB</b> (adhérence "
+            "sèche acier/acier, μ≈0.3) pour le roulement continu, et "
+            "<b>RST_CLB</b> (restitution + frottement dégradé) pour l'impact au "
+            "passage du joint. Guidage latéral par DOF, entraînement "
+            "longitudinal à vitesse imposée, suivi du couple sur la roue "
+            "(TORQUE EVOLUTION) et de l'énergie cinétique globale."
+        ),
+        dimension=3,
+        difficulty="Avancé",
+        builder=_build_wheel_rail_contact,
+        tags=["contact", "3d", "ferroviaire", "dof", "postpro"],
     ),
 
 ]
