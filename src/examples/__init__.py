@@ -27,7 +27,7 @@ from .ex_cluster_pile import build as _build_cluster_pile
 from .ex_avalanche_slope import build as _build_avalanche_slope
 from .ex_composite_scene import build as _build_composite_scene
 from .ex_wheel_rail_contact import build as _build_wheel_rail_contact
-
+from .ex_disc_brake import build as _build_disc_brake
 
 EXAMPLES: list[ExampleSpec] = [
     ExampleSpec(
@@ -358,6 +358,25 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Avancé",
         builder=_build_wheel_rail_contact,
         tags=["contact", "3d", "ferroviaire", "dof", "postpro"],
+    ),
+        ExampleSpec(
+        id="disc_brake",
+        title="🚲 Frein à disque de vélo",
+        category="Avancé",
+        description=(
+            "Disque de frein réaliste (Ø160 mm x 1.8 mm) monté sur un moyeu "
+            "fixe, serré par deux plaquettes semi-métalliques de l'étrier "
+            "(fermeture du piston à ~5 mm/s). La roue démarre avec une "
+            "vitesse initiale de roulage (25 km/h, condition initiale via "
+            "imposeInitValue) et c'est le frottement <b>IQS_CLB</b> "
+            "(μ≈0.40) plaquette/disque qui la freine réellement — pas une "
+            "vitesse imposée en continu. Suivi de l'énergie cinétique, de "
+            "l'énergie dissipée par frottement et du couple résistant."
+        ),
+        dimension=3,
+        difficulty="Avancé",
+        builder=_build_disc_brake,
+        tags=["contact", "3d", "frein", "dof", "postpro", "energie"],
     ),
 
 ]
