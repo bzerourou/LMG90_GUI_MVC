@@ -28,6 +28,7 @@ from .ex_avalanche_slope import build as _build_avalanche_slope
 from .ex_composite_scene import build as _build_composite_scene
 from .ex_wheel_rail_contact import build as _build_wheel_rail_contact
 from .ex_disc_brake import build as _build_disc_brake
+from .ex_ball_bearing import build as _build_ball_bearing
 
 EXAMPLES: list[ExampleSpec] = [
     ExampleSpec(
@@ -377,6 +378,25 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Avancé",
         builder=_build_disc_brake,
         tags=["contact", "3d", "frein", "dof", "postpro", "energie"],
+    ),
+        ExampleSpec(
+        id="ball_bearing",
+        title="⚙️ Roulement à billes (coupe 2D)",
+        category="Avancé",
+        description=(
+            "Coupe transversale d'un roulement rainuré à billes type 608 "
+            "(Ø ext. 22 mm, alésage 8 mm, 7 billes) : bague extérieure fixe "
+            "(disque creux xKSID), bague intérieure entraînée en rotation "
+            "pure (~300 tr/min), et billes totalement libres calées dans "
+            "l'entrefer. Aucune vitesse n'est imposée aux billes — c'est le "
+            "frottement <b>IQS_CLB</b> (μ≈0.05, roulement lubrifié) au "
+            "contact des deux pistes qui les entraîne. Suivi du nombre de "
+            "coordination et de l'énergie cinétique."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_ball_bearing,
+        tags=["contact", "roulement", "dof", "postpro"],
     ),
 
 ]
