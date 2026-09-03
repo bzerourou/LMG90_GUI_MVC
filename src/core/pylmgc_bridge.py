@@ -274,13 +274,16 @@ class LMGC90Bridge:
         
         # Avatars 3D
         elif atype == AvatarType.RIGID_SPHERE:
-            return pre.rigidSphere(
+            kwargs = dict(
                 r=avatar.radius,
                 center=center,
                 model=model_obj,
                 material=material_obj,
                 color=color
             )
+            if avatar.is_hollow:
+                kwargs['is_Hollow'] = True
+            return pre.rigidSphere(**kwargs)
     
         elif atype == AvatarType.RIGID_PLAN:
             return pre.rigidPlan(
@@ -294,7 +297,7 @@ class LMGC90Bridge:
             )
         
         elif atype == AvatarType.RIGID_CYLINDER:
-            return pre.rigidCylinder(
+            kwargs = dict(
                 r=avatar.radius,
                 h=avatar.wall_params.get('h', 1.0) if avatar.wall_params else 1.0,
                 center=center,
@@ -302,6 +305,9 @@ class LMGC90Bridge:
                 material=material_obj,
                 color=color
             )
+            if avatar.is_hollow:
+                kwargs['is_Hollow'] = True
+            return pre.rigidCylinder(**kwargs)
         
         elif atype == AvatarType.RIGID_POLYHEDRON:
             if avatar.generation_type == "regular":

@@ -114,7 +114,7 @@ class AvatarTab(BaseTab):
         self.radius_input = self.make_unit_field(default="0.1", unit_key="length")
         form.addRow(self.radius_label, self.radius_input)
         
-        self.hollow_check = QCheckBox("Disque creux (hollow)")
+        self.hollow_check = QCheckBox("Avatar creux (hollow)")
         form.addRow("", self.hollow_check)
         
 
@@ -276,7 +276,8 @@ class AvatarTab(BaseTab):
                 self.wall_nb_label.setText("Nb vertices :")
         elif avatar_type == "rigidSphere" :
             self.radius_label.setVisible(True)
-            self.radius_input.setVisible(True) 
+            self.radius_input.setVisible(True)
+            self.hollow_check.setVisible(True)
         elif avatar_type == "rigidPlan":
             self.axes_label.setVisible(True)
             self.axes_label.setText("Axes (axe1, axe,axe3) :")
@@ -284,7 +285,8 @@ class AvatarTab(BaseTab):
             self.axes_input.setText("2.0, 2.0, 0.05")
         elif avatar_type == "rigidCylinder":
             self.radius_label.setVisible(True)
-            self.radius_input.setVisible(True)  
+            self.radius_input.setVisible(True)
+            self.hollow_check.setVisible(True)
             self.wall_height_label.setVisible(True)
             self.wall_height_input.setVisible(True)  
         elif avatar_type == "rigidPolyhedron":
@@ -635,6 +637,7 @@ class AvatarTab(BaseTab):
                 default=0.1, 
                 field_name="Rayon"
             )
+            avatar.is_hollow = self.hollow_check.isChecked()
 
         elif avatar_type == AvatarType.RIGID_PLAN:
             axes = self.eval_list(
@@ -657,6 +660,7 @@ class AvatarTab(BaseTab):
                     field_name="Hauteur"
                 )
             }
+            avatar.is_hollow = self.hollow_check.isChecked()
         
         elif avatar_type == AvatarType.RIGID_POLYHEDRON:
             avatar.radius = self.eval_float(
@@ -728,8 +732,7 @@ class AvatarTab(BaseTab):
         
         if avatar.radius:
             self.radius_input.setText(str(avatar.radius))
-        if avatar.is_hollow:
-            self.hollow_check.setChecked(True)
+        self.hollow_check.setChecked(avatar.is_hollow)
         if avatar.axis:
             axes = [avatar.axis['axe1'], avatar.axis['axe2']]
             if 'axe3' in avatar.axis:
@@ -739,6 +742,8 @@ class AvatarTab(BaseTab):
             self.nb_vertices_input.setText(str(avatar.nb_vertices))
         if avatar.vertices:
             self.vertices_input.setText(str(avatar.vertices))
+        if avatar.wall_params and 'h' in avatar.wall_params:
+            self.wall_height_input.setText(str(avatar.wall_params['h']))
         
         self.create_btn.setVisible(False)
         self.update_btn.setVisible(True)

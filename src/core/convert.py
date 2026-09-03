@@ -1353,7 +1353,9 @@ class _MockPre:
     # ── Corps rigides 3D ─────────────────────────────────────────────────────
 
     def rigidSphere(self, r=0.1, center=None, model=None, material=None,
-                    color='BLUEx', **kw):
+                    color='BLUEx', is_Hollow=False, **kw):
+        if is_Hollow:
+            kw['is_Hollow'] = True
         return self._make_avatar('rigidSphere', r=float(r),
                                  center=_center(center, dim=3),
                                  model=_name(model), material=_name(material),
@@ -1369,7 +1371,9 @@ class _MockPre:
                                  color=color)
 
     def rigidCylinder(self, r=0.5, h=1., center=None, model=None,
-                      material=None, color='BLUEx', **kw):
+                      material=None, color='BLUEx', is_Hollow=False, **kw):
+        if is_Hollow:
+            kw['is_Hollow'] = True
         return self._make_avatar('rigidCylinder',
                                  r=float(r), h=float(h),
                                  center=_center(center, dim=3),

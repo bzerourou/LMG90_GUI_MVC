@@ -948,6 +948,8 @@ class ScriptGenerator:
                 f.write(f",\n        r={radius_expr}")
             if 'wall_params' in template and 'h' in template['wall_params']:
                 f.write(f",\n        h={template['wall_params']['h']}")
+            if template.get('is_hollow'):
+                f.write(",\n        is_Hollow=True")
             if 'axis' in template:
                 for k, v in template['axis'].items():
                     f.write(f",\n        {k}={v}")
