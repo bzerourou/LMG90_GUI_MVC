@@ -246,7 +246,7 @@ Cliquer sur « + Ajouter une inspection 2D » pour créer une ligne. Chaque lign
 |---|------|
 |IDs (contacteurs)	|Liste d'identifiants chipy séparés par des virgules. Laissé vide pour les fonctions de type GetNb... qui ne prennent pas d'argument.|
 |Groupe	|Nom d'un groupe d'avatars. Résolu en IDs à la génération si les IDs sont vides.|
-|Mode / Timing	|Un des quatre modes de temporisation (Tous les pas, Tous les N pas, Au pas k =, Après boucle).|
+|Mode / Timing	|Un des quatre modes de temporisation (Avant la boucle, Tous les N pas, Au pas k =, Après boucle). _depuis(v0.4.9)_|
 |Var. Python	|Nom de la variable Python dans laquelle stocker le résultat (ex. : vel_disk). Laissé vide si le résultat n'est pas réutilisé.|
 
 **Fonctions disponibles — Contacteurs 2D**

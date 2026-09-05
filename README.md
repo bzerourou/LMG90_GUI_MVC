@@ -7,7 +7,7 @@
 
 **LMGC90_GUI** est une interface graphique moderne en architecture **MVC** (Model-View-Controller) pour le solveur [LMGC90](https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/-/wikis/home).
 
-![](docs/captures/interface2.JPG)
+![](docs/captures/interface3.png)
 
 ## Documentation (fr)
 [Documentation de LMGC90_GUI](docs/fr/overview.md) . [pdf](docs/LMGC90_GUI_Documentation_fr.pdf)

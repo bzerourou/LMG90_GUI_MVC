@@ -35,9 +35,9 @@ L'onglet est divisé en deux zones :
 
 | Type pylmgc90 | Description courte | Paramètres clés |
 |---------------|--------------------|-----------------|
-| `rigidSphere` | Sphère rigide | `r` |
+| `rigidSphere` | Sphère rigide | `r`, `is_hollow` |
 | `rigidPlan` | Plan rigide | `axe1`, `axe2`, `axe3` |
-| `rigidCylinder` | Cylindre rigide | `r`, `h` |
+| `rigidCylinder` | Cylindre rigide | `r`, `h`, `is_hollow` |
 | `rigidPolyhedron` | Polyèdre rigide | `generation_type`, `nb_vertices`, `radius` ou `vertices` + `faces` |
 | `roughWall3D` | Mur rugueux 3D | `lx`, `ly`, `r` |
 | `granuloRoughWall3D` | Mur granulaire 3D | `lx`, `ly`, `rmin`, `rmax` |
@@ -210,6 +210,7 @@ Corps sphérique rigide 3D. Équivalent 3D du `rigidDisk`.
 | Paramètre | Description | Exemple |
 |-----------|-------------|---------|
 | `r` (rayon) | Rayon de la sphère (m). | `0.1` |
+| `is_hollow` | Si coché, crée une Sphère creuse (`is_Hollow=True`).  | case à cocher |
 
 ---
 
@@ -235,6 +236,7 @@ Corps cylindrique rigide 3D.
 |-----------|-------------|---------|
 | `r` (rayon) | Rayon du cylindre (m). | `0.1` |
 | `h` | Hauteur (longueur axiale) du cylindre (m). Défaut : `1.0` si absent. | `0.5` |
+| `is_hollow` | Si coché, crée un cylindre creux (`is_Hollow=True`).  | case à cocher |
 
 ---
 

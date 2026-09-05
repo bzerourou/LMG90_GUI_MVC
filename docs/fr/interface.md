@@ -24,6 +24,11 @@ L'interface est divisée en **Six zones principales** :
 5. **Zone de rendu** (centre bas)
 6. **Barre d'état** (en bas)
 
+Depuis le version 0.4.8, une septième zone est rajoutée, **palette des commandes**, accèssible en bas de la **zone de rendu**, ou avec le raccourci clavier `ctrl+K`.
+
+![Palette des commandes](../captures/palette_commandes.png)
+
+
 ---
 
 ### 1. Menu et Barre d'outils
@@ -95,7 +100,20 @@ La duplication des éléments qui portent le même nom entraîne des erreurs, pe
 | **Préférences** | `Ctrl+,` | Ouvre la boîte de dialogue de configuration de l'application. Voir section [Préférences](#5-préférences). |
 
 ---
+
+##### Exemples 
+
+Apparue dans la version 0.4.6, ce menu contient une seule action qui est **Parcourir les exemples**, elle ouvre une boite de dialogue dans laquelles vous pouvez parcourir plusieurs exemples sous six catégories. La sélection d'un exemple charge les détails de cet exemple sur l'onglet droit. 
+
+![](../captures/biblio_exemples.png)
+
+Afin de charger un exemple, il vous suffit simplement donc de le sélectionner et cliquer sur le bouton **Charger dans un nouveau projet**, dans mon cas je vais charger l'exemple `Corps déformable sur sol rigide`, je porsuie simplement en cliquant encore sur le bouton **Yes**.
+
+![](../captures/exemple_capture.png)
+
+---
   
+
 ##### Calcul
  
 | Action | Raccourci | Description |
@@ -139,8 +157,11 @@ La barre d'outils regroupe les actions les plus fréquentes pour un accès rapid
 | Nouveau projet | Fichier → Nouveau |
 | Ouvrir projet | Fichier → Ouvrir |
 | Sauvegarder projet | Fichier → Sauvegarder |
-| Générer Script Python | Outils → Générer Script Python |
 | Générer DATBOX | Outils → Générer DATBOX _(depuis v0.2.6)_ |
+| Générer Script Python | Outils → Générer Script Python |
+| Exécuter Script | Outil → Générer script Python _(depuis 0.4.2)_ | 
+| Charger Factory | permet de charger les avatars d'une factory _(depuis 0.4.2)_ |
+
  
 ---
 
@@ -221,15 +242,15 @@ Les vues rapides **XY**, **XZ**, **YZ** et **Iso** sont accessibles depuis la ba
 
 Accessible via **Outils → Préférences** ou le raccourci `Ctrl+,`. La boîte de dialogue de préférences regroupe les paramètres de configuration de l'application.
 
-![]../captures/preferences.JPG)
+![](../captures/preferences.JPG)
 
 | Paramètre | Description |
 |-----------|-------------|
-| **Dossier des projets** | Chemin par défaut utilisé lors de l'ouverture et de la sauvegarde des projets. Cliquer sur **Parcourir** pour le modifier. |
-| **Système d'unités** | Choix entre SI (mètre, kilogramme, seconde) et CGS (centimètre, gramme, seconde). _(Non encore implémenté dans cette version.)_ |
+| **Chemins** | Chemin par défaut utilisé lors de l'ouverture et de la sauvegarde des projets. Cliquer sur **Parcourir** pour le modifier. |
+| **Unités** | Choix entre SI (mètre, kilogramme, seconde) et CGS (centimètre, gramme, seconde). _(Non encore implémenté dans cette version.)_ |
 | **Sauvegarde automatique** | Options pour activer la sauvegarde automatique à intervalles réguliers et à la fermeture de l'application. |
 | **Historique des projets récents** | Nombre maximum de projets conservés dans la liste **Fichier → Projets récents**. |
-| **Affichage des avatars** | Active ou désactive l'affichage des avatars dans l'arbre du modèle et dans le tableau de l'onglet Avatar. Désactiver cette option améliore les performances sur les projets comportant un grand nombre d'avatars. 
+| **Performances** | Active ou désactive l'affichage des avatars dans l'arbre du modèle et dans le tableau de l'onglet Avatar. Désactiver cette option améliore les performances sur les projets comportant un grand nombre d'avatars. 
 
 ### Convertir 
 
@@ -264,6 +285,7 @@ Il vous suffit seulement de donner le chemin de votre script puis le nom de votr
 | `F7` | Journal de l'application |
 | `Ctrl+Alt+D` | Onglets par défaut |
 | `Ctrl+1` … `Ctrl+9` | Ouvrir l'onglet correspondant |
+| `Ctrl+K` | Ouvrir la palette des commandes |
  
 ---
 ### 6. Barre d'état

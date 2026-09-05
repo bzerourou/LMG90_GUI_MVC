@@ -22,6 +22,6 @@ Bienvenue dans la documentation officielle de l’interface graphique LMGC90_GUI
 - [Visualisation](visualisation.md)
 - [développeur ](dev.md)
 
-**Exemples prêts à l'emploi** → dossier [examples/](../exemples/)
+**Exemples prêts à l'emploi** → dossier [examples/](../fr/examples.md)
 
 Bonne lecture et bonnes simulations !

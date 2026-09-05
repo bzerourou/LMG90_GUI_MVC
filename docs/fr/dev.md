@@ -1,6 +1,6 @@
 # LMGC90_GUI — Architecture & Guide du Contributeur
 
-> Version 0.4.0 — Interface graphique pour le code de simulation mécanique LMGC90, l'architecture actuelle va être remplacée dans la version 0.5.0.
+> Version 0.4.0 — Interface graphique pour le code de simulation mécanique LMGC90, l'architecture actuelle va être remplacée dans la version 0.5.1.
 
 ---
 

@@ -1,71 +1,71 @@
 # Granulometry
 
-The **Granulometry** tab (`Ctrl+7`) allows you to create, manage, and delete granular distributions directly from the interface, without going through the wizard. It is suited for quick generations from avatars and materials already defined in the project.
+The **Granulometry** tab (`Ctrl+7`) creates, manages and deletes granular distributions directly from the interface, without using the wizard. It is suited to quick generation from avatars and materials already defined in the project.
 
-![Example of a granular deposit of disks and joncs](captures/depot_granulo_disk_jonc.JPG)
-
----
-
-## General Interface
-
-The tab is divided into two areas:
-
-- **List of distributions** (top): a table displaying all the granulometric generations of the project with their container type, number of particles, min/max radii, and associated group. Double-click to edit. Right-click to access the context menu.
-- **Creation / editing form** (bottom): configuration fields for the distribution.
+![Example granular deposit disks and joncs](captures/depot_granulo_disk_jonc.JPG)
 
 ---
 
-## Form Fields
+## General layout
 
-### Model Avatar
+The tab is split into two areas:
+
+- **Distribution list** (top): table of all granulometric generations in the project with container type, particle count, min/max radii and associated group. Double-click to edit. Right-click for the context menu.
+- **Create / edit form** (bottom): distribution configuration fields.
+
+---
+
+## Form fields
+
+### Template avatar
 
 | Field | Description |
 |-------|-------------|
-| **Model avatar** | Selection of an existing rigid avatar in the project (defined in the Avatar tab). All its attributes are copied onto each generated particle: type (`rigidDisk` or `rigidSphere`), material, model, color. |
+| **Template avatar** | Selection of an existing rigid avatar in the project (defined in the Avatar tab). All of its attributes are copied onto each generated particle: type (`rigidDisk` or `rigidSphere`), material, model, colour. |
 
-> The model avatar must be of type `rigidDisk` (2D) or `rigidSphere` (3D). It indirectly defines the material, model, and color of all the generated particles.
+> The template avatar must be of type `rigidDisk` (2D) or `rigidSphere` (3D). It indirectly defines the material, model and colour of every generated particle.
 
 ---
 
-### Particle Distribution
+### Particle distribution
 
 | Field | Description | Range | Default |
-|-------|-------------|-------|--------|
-| **Number of particles** | Number of particles requested from the deposit algorithm. The number actually placed may be lower if the container is saturated. | 10 to 10,000 | `200` |
-| **Minimum radius (rmin)** | Minimum radius of the particles (m). | 0.001 to 10.0 | `0.05 m` |
-| **Maximum radius (rmax)** | Maximum radius of the particles (m). Must be strictly greater than rmin. | 0.001 to 10.0 | `0.15 m` |
+|-------|-------------|-------|---------|
+| **Number of particles** | Number of particles requested from the deposition algorithm. The number actually placed may be lower if the container is saturated. | 10 to 10 000 | `200` |
+| **Minimum radius (rmin)** | Minimum particle radius (m). | 0.001 to 10.0 | `0.05 m` |
+| **Maximum radius (rmax)** | Maximum particle radius (m). Must be strictly greater than rmin. | 0.001 to 10.0 | `0.15 m` |
 
-> **Performance:** beyond ~1,500 avatars, the interface refresh can slow down significantly. For large assemblies, use the **granulometry wizard** (`Ctrl+Shift+G`) or **numpy generation** (Wizards menu).
+> **Performance:** beyond ~1 500 avatars, interface refresh can slow down significantly. For large assemblies, use the **granulometry wizard** (`Ctrl+Shift+G`) or **numpy generation** (Assistants menu).
 
 ---
 
 ### Reproducibility
 
 | Field | Description | Default |
-|-------|-------------|--------|
+|-------|-------------|---------|
 | **Use a seed** | Checkbox. If enabled, radii and positions are generated identically on every run. | unchecked |
-| **Seed value** | Integer from 0 to 999,999. Passed to `pre.granulo_Random(seed=...)`. | `12345` |
+| **Seed value** | Integer from 0 to 999 999. Passed to `pre.granulo_Random(seed=...)`. | `12345` |
 
 ---
 
-### Deposit Container
+### Deposition container
 
-Selection of the container type and its dimensions. 2D containers are available regardless of the project's dimension — adapt according to the chosen model avatar type.
+Select the container type and its dimensions. 2D containers are available regardless of project dimension — adapt according to the chosen template avatar type.
 
-#### 2D Containers
+#### 2D containers
 
-| Container | Parameters | pylmgc90 Function | Description |
+| Container | Parameters | pylmgc90 function | Description |
 |-----------|------------|-------------------|-------------|
-| **Box2D** | `lx` (m), `ly` (m) | `pre.depositInBox2D(radii, lx, ly)` | Rectangular box. Gravitational deposit from the top. |
+| **Box2D** | `lx` (m), `ly` (m) | `pre.depositInBox2D(radii, lx, ly)` | Rectangular box. Gravity deposition from the top. |
 | **Disk2D** | `r` (m) | `pre.depositInDisk2D(radii, r)` | Circular disk. |
 | **Couette2D** | `rint` (m), `rext` (m) | `pre.depositInCouette2D(radii, rint, rext)` | Couette cell — annular space between two cylinders. |
-| **Drum2D** | `r` (m) | `pre.depositInDrum2D(radii, r)` | Rotating circular drum. |
+| **Drum2D** | `r` (m) | `pre.depositInDrum2D(radii, r)` | Circular rotating drum. |
 
-#### 3D Containers
+#### 3D containers
 
-| Container | Parameters | pylmgc90 Function | Description |
+| Container | Parameters | pylmgc90 function | Description |
 |-----------|------------|-------------------|-------------|
-| **Box3D** | `lx`, `ly`, `lz` (m) | `pre.depositInBox3D(radii, lx, ly, lz)` | Rectangular parallelepiped box. |
+| **Box3D** | `lx`, `ly`, `lz` (m) | `pre.depositInBox3D(radii, lx, ly, lz)` | Rectangular box. |
 | **Sphere3D** | `r` (m) | `pre.depositInSphere3D(radii, r)` | 3D sphere. |
 | **Cylinder3D** | `r` (m) | `pre.depositInCylinder3D(radii, r)` | 3D cylinder. |
 
@@ -74,19 +74,20 @@ Selection of the container type and its dimensions. 2D containers are available 
 ### Options
 
 | Field | Description | Default |
-|-------|-------------|--------|
-| **Color** | 5-character LMGC90 color code. Overrides the model avatar's color if filled in. | `BLUEx` |
-| **Store in a group** | If checked, all generated avatars are recorded in a group named in `state.avatar_groups`. | checked |
-| **Group name** | Group identifier. Automatic default: `granulo_{container_type}` (e.g. `granulo_box2d`). | `granulo_box2d` |
+|-------|-------------|---------|
+| **Colour** | LMGC90 colour code (5 characters). Overrides the template avatar colour if set. | `BLUEx` |
+| **Store deposit in a named group** | If checked, all generated avatars are stored in a named group in `state.avatar_groups`. | checked |
+| **Group name** | Group identifier. Default automatic: `depot_{container_type}` (e.g. `granulo_box2d`). | `depot_granulo` |
+| **Create as ParticlePopulation (SoA, compact storage)** | If checked, avatars are stored in numpy arrays under an `.npz` file [see SOA](particle_population.md) | to be checked|
 
 ---
 
-## Generating a Distribution
+## Generating a distribution
 
-Click **✅ Generate the deposit** to launch generation. The algorithm:
+Click **✅ Generate deposit** to start generation. The algorithm:
 
-1. Randomly draws `nb` radii within [rmin, rmax] via `pre.granulo_Random`.
-2. Positions the particles in the chosen container via `pre.depositInXxx`.
+1. Randomly draws `nb` radii in [rmin, rmax] via `pre.granulo_Random`.
+2. Places particles in the chosen container via `pre.depositInXxx`.
 3. Creates a `rigidDisk` or `rigidSphere` avatar for each placed particle.
 4. Saves the configuration in `state.granulo_generations`.
 5. Emits the `granulo_generated` signal to refresh the interface.
@@ -95,128 +96,131 @@ Click **✅ Generate the deposit** to launch generation. The algorithm:
 
 ---
 
-## Managing Distributions
+## Managing distributions
 
-### Editing a Distribution
+### Edit a distribution
 
-Select a distribution in the list and click **✏️ Edit**. The configuration is loaded into the form in **Edit** mode. Modify the parameters and click **💾 Save** to regenerate. The old avatars are deleted and replaced.
+Select a distribution in the list and click **✏️ Edit**. The configuration is loaded into the form in **Edit** mode. Change parameters and click **💾 Save** to regenerate. Old avatars are removed and replaced.
 
-### Deleting a Distribution
+### Delete a distribution
 
-Select it and click **🗑️ Delete**. All avatars generated by this distribution are automatically deleted (indices recorded in `GranuloGeneration.generated_indices`). The `granulo_deleted` signal is emitted.
+Select and click **🗑️ Delete**. All avatars generated by that distribution are removed automatically (indices stored in `GranuloGeneration.generated_indices`). The `granulo_deleted` signal is emitted.
 
 ---
 
-## Configuration Example
+## Configuration example
 
-
-| Field | Example Value |
+| Field | Example value |
 |-------|---------------|
-| Model avatar | `#0` — `rigidDisk` / `TDURx` / `rigid` |
+| Template avatar | `#0` — `rigidDisk` / `TDURx` / `rigid` |
 | Number of particles | `400` |
 | Minimum radius | `0.05 m` |
 | Maximum radius | `0.075 m` |
 | Container | `Box2D` — `lx=4.0 m`, `ly=4.0 m` |
-| Color | `BLUEx` |
+| Colour | `BLUEx` |
 | Group | `granulo_box2d` |
 
-![Rendering of the granular deposit](captures/rendu_depot_granulo_disk_jonc.JPG)
+![Rendered granular deposit](captures/rendu_depot_granulo_disk_jonc.JPG)
 
 ---
 
-## Notes
+## Remarks
 
-**Actual vs. requested count:** the number of particles actually placed (`_nb_remaining`) may be lower than the number requested if the container is too small or the packing density is reached.
+**Actual vs requested count:** the number of particles actually placed (`_nb_remaining`) may be lower than requested if the container is too small or packing density is reached.
 
-**Performance limit:** the tab calls `add_avatar()` for each particle, which emits one signal per avatar. Beyond ~1,500 avatars, the interface slows down. For larger assemblies, use the **granulometry wizard**, which inserts avatars directly into the pylmgc90 containers without an individual signal.
+**Performance limit:** the tab calls `add_avatar()` for each particle, which emits a signal per avatar. Beyond ~1 500 avatars the interface slows down. For larger assemblies, use the **granulometry wizard**, which inserts avatars directly into the pylmgc90 containers without per-particle signals.
 
-**Automatic group:** if no group name is entered, a name is automatically generated in the form `granulo_{container_type}`.
+**Distribution only:** it is possible to create distributions without depositing avatars if the corresponding checkbox is enabled _(since v0.4.0)_.
+
+**Automatic group:** if no group name is entered, a name is generated automatically as `granulo_{container_type}`.
+
+**Create as ParticlePopulation:** this option stores a very large number of avatars in an array structure (SOA) _(since v0.4.8)_.
 
 
-# Granulometry Wizard — pylmgc90
+# Granulometry wizard — pylmgc90
 
-The **granulometric distribution wizard** guides you step by step through the creation of a deposit of rigid particles (2D disks or 3D spheres) via the official pylmgc90 API. It automatically creates or reuses the material and model, configures the radius distribution and the deposit container, then generates all the avatars at once in an optimized way.
+The **Granulometric distribution wizard** guides step by step the creation of a rigid particle deposit (2D disks or 3D spheres) via the official pylmgc90 API. It creates or reuses material and model automatically, configures the radius distribution and deposition container, then generates all avatars in one optimised pass.
 
-> **Access:** menu **Wizards → Granulometry Wizard** · shortcut `Ctrl+Shift+G`
+> **Access:** menu **Assistants → Granulometry wizard** · shortcut `Ctrl+Shift+G`
 
-> **Recommended for:** up to about **8,000 particles**. Beyond that, the interface may slow down. Use numpy generation for very large assemblies.
+> **Recommended for:** up to about **8 000 particles**. Beyond that the interface may slow down. Use numpy generation for very large assemblies.
 
 ---
 
-## Overview of Steps
+## Overview of steps
 
-The wizard consists of **7 active pages** (the Preview page is disabled in the current version).
+The wizard has **7 active pages** (the Preview page is disabled in the current version).
 
 | Page | Title | Description |
 |------|-------|-------------|
-| 0 | Introduction | Presentation of the algorithm |
+| 0 | Introduction | Algorithm overview |
 | 1 | Dimension | 2D (disks) or 3D (spheres) |
 | 2 | Material | Create or reuse a `RIGID` material |
-| 3 | Model | Create or reuse a `Rxx2D` / `Rxx3D` model |
-| 4 | Distribution | Number of particles, radii, seed |
-| 5 | Container | Geometry and dimensions of the deposit |
-| 6 | Summary | Verification before generation |
+| 3 | Model | Create or reuse an `Rxx2D` / `Rxx3D` model |
+| 4 | Distribution | Particle count, radii, seed |
+| 5 | Container | Deposit geometry and dimensions |
+| 6 | Summary | Check before generation |
 
 ---
 
 ## Page 0 — Introduction
 
-Presents the principle of the algorithm in two steps:
+Presents the two-step algorithm:
 
-1. **`pre.granulo_Random(nb, r_min, r_max, seed)`** — randomly generates `nb` radii within [r_min, r_max] following a uniform distribution.
-2. **`pre.depositInXxx(radii, ...)`** — performs a gravitational deposit of the particles in the chosen container, without overlap.
+1. **`pre.granulo_Random(nb, r_min, r_max, seed)`** — randomly generates `nb` radii in [r_min, r_max] with a uniform distribution.
+2. **`pre.depositInXxx(radii, ...)`** — performs gravity deposition of particles in the chosen container, without overlap.
 
 ![](captures/assistant_granulo_page1.JPG)
 
-Click **Next ➡️** to begin.
+Click **Next ➡️** to start.
 
 ---
 
 ## Page 1 — Dimension
 
-| Choice | Particle Type Generated | Available Containers |
-|-------|--------------------------|------------------------|
+| Choice | Generated particle type | Available containers |
+|--------|-------------------------|----------------------|
 | **2D** | `rigidDisk` | Box2D, Disk2D, Couette2D, Drum2D |
 | **3D** | `rigidSphere` | Box3D, Sphere3D, Cylinder3D |
 
-The **2D** value is selected by default.
+**2D** is selected by default.
 
-> The dimension determines the type of avatar created, the list of containers available on page 5, and the model element (`Rxx2D` or `Rxx3D`).
+> Dimension controls the avatar type created, the list of containers on page 5 and the model element (`Rxx2D` or `Rxx3D`).
 
-![Choosing the dimension](captures/assistant_granulo_page2.JPG)
+![Dimension choice](captures/assistant_granulo_page2.JPG)
 
 ---
 
-## Page 2 — Particle Material
+## Page 2 — Particle material
 
 Two modes:
 
-### Mode A — Use an Existing Material _(suggested if materials already exist)_
+### Mode A — Use an existing material _(offered if materials exist)_
 
-Dropdown list of all the materials in the project.
+Dropdown of all project materials.
 
-### Mode B — Create a New Material _(automatically checked if none exist)_
+### Mode B — Create a new material _(checked automatically if none exist)_
 
 | Field | Description | Default |
-|-------|-------------|--------|
+|-------|-------------|---------|
 | **Name** | Identifier, 5 characters maximum. | `TDURx` |
-| **Density** | Density (kg/m³). Range: 100 to 20,000. | `2500 kg/m³` |
+| **Density** | Mass density (kg/m³). Range: 100 to 20 000. | `2500 kg/m³` |
 
-> The type is always `RIGID` — granular particles are rigid bodies.
+> Type is always `RIGID` — granular particles are rigid bodies.
 
-![Creating the material](captures/assistant_granulo_page3.JPG)
+![Material creation](captures/assistant_granulo_page3.JPG)
 
 ---
 
-## Page 3 — Physical Model
+## Page 3 — Physical model
 
 Two modes:
 
-### Mode A — Use an Existing Model
+### Mode A — Use an existing model
 
-Dropdown list of the project's models.
+Dropdown of project models.
 
-### Mode B — Create a New Model
+### Mode B — Create a new model
 
 | Field | Value |
 |-------|--------|
@@ -224,239 +228,240 @@ Dropdown list of the project's models.
 | **Physics** | `MECAx` (automatic) |
 | **Element** | `Rxx2D` (2D) or `Rxx3D` (3D) — adapted automatically |
 
-![Creating the model](captures/assistant_granulo_page4.JPG)
+![Model creation](captures/assistant_granulo_page4.JPG)
 
 ---
 
-## Page 4 — Particle Distribution
+## Page 4 — Particle distribution
 
-### Number of Particles
+### Number of particles
 
 | Field | Description | Range | Default |
-|-------|-------------|-------|--------|
-| **Number requested** | Number of particles to generate. The number actually placed may be lower if the container is saturated. | 10 to 10,000 | `200` |
+|-------|-------------|-------|---------|
+| **Requested number** | Number of particles to generate. The number actually placed may be lower if the container is saturated. | 10 to 10 000 | `200` |
 
-A visual indicator signals the density:
+A visual indicator shows density:
 - **Orange** (< 100): low density
 - **Blue** (100 to 499): medium density
 - **Green** (≥ 500): high density
 
-### Radius Distribution
+### Radius distribution
 
 | Field | Description | Range | Default |
-|-------|-------------|-------|--------|
-| **Minimum radius** | Smallest radius of the particles (m). | 0.001 to 10.0 | `0.05 m` |
+|-------|-------------|-------|---------|
+| **Minimum radius** | Smallest particle radius (m). | 0.001 to 10.0 | `0.05 m` |
 | **Maximum radius** | Largest radius (m). Must be > Rmin. | 0.001 to 10.0 | `0.15 m` |
-| **Rmax/Rmin ratio** | Calculated automatically. Indicates the range of polydispersity. A ratio ≥ 3 produces a very spread-out distribution. | — | `3.00` |
+| **Rmax/Rmin ratio** | Computed automatically. Indicates the extent of polydispersity. A ratio ≥ 3 produces a very spread distribution. | — | `3.00` |
 
-A **real-time histogram** (20 bins, 200 preview radii) visualizes the size distribution before generation.
+A **real-time histogram** (20 bins, 200 preview radii) visualises the size distribution before generation.
 
 ### Reproducibility
 
 | Field | Description | Default |
-|-------|-------------|--------|
+|-------|-------------|---------|
 | **Use a seed** | Checkbox. Makes generation reproducible. | unchecked |
-| **Seed value** | Integer from 0 to 999,999. Passed to `pre.granulo_Random(seed=...)`. | `12345` |
+| **Seed value** | Integer from 0 to 999 999. Passed to `pre.granulo_Random(seed=...)`. | `12345` |
+| **Create as ParticlePopulation (SoA, compact storage)** | If checked, avatars are stored in numpy arrays under an `.npz` file | to be checked |
 
 ![Radius distribution](captures/assistant_granulo_page5.JPG)
 
 ---
 
-## Page 5 — Deposit Container
+## Page 5 — Deposition container
 
-The list of containers automatically adapts to the dimension chosen on page 1.
+The container list adapts automatically to the dimension chosen on page 1.
 
-### 2D Containers
+### 2D containers
 
-#### Box2D — 2D Rectangular Box
+#### Box2D — Rectangular box 2D
 
 | Parameter | Description | Default |
-|-----------|-------------|--------|
-| **Width (lx)** | Horizontal dimension of the box (m). | `4.0 m` |
-| **Height (ly)** | Vertical dimension of the box (m). | `4.0 m` |
+|-----------|-------------|---------|
+| **Width (lx)** | Horizontal box dimension (m). | `4.0 m` |
+| **Height (ly)** | Vertical box dimension (m). | `4.0 m` |
 
-**pylmgc90 Function:** `pre.depositInBox2D(radii, lx, ly)`  
-**Usage:** biaxial compression test, soil column, shear cell.
+**pylmgc90 function:** `pre.depositInBox2D(radii, lx, ly)`  
+**Use:** biaxial compression test, soil column, shear cell.
 
 ---
 
-#### Disk2D — 2D Circular Disk
+#### Disk2D — Circular disk 2D
 
 | Parameter | Description | Default |
-|-----------|-------------|--------|
-| **Radius (r)** | Radius of the container disk (m). | `2.0 m` |
+|-----------|-------------|---------|
+| **Radius (r)** | Container disk radius (m). | `2.0 m` |
 
-**pylmgc90 Function:** `pre.depositInDisk2D(radii, r)`  
-**Usage:** circular silo, 2D drum.
+**pylmgc90 function:** `pre.depositInDisk2D(radii, r)`  
+**Use:** circular silo, 2D drum.
 
 ---
 
-#### Couette2D — 2D Couette Cell
+#### Couette2D — Couette cell 2D
 
 Annular space between an inner cylinder of radius `rint` and an outer cylinder of radius `rext`.
 
 | Parameter | Description | Default |
-|-----------|-------------|--------|
-| **Inner radius (rint)** | Radius of the inner cylinder (m). | `2.0 m` |
-| **Outer radius (rext)** | Radius of the outer cylinder (m). Must be > rint. | `4.0 m` |
+|-----------|-------------|---------|
+| **Inner radius (rint)** | Inner cylinder radius (m). | `2.0 m` |
+| **Outer radius (rext)** | Outer cylinder radius (m). Must be > rint. | `4.0 m` |
 
-**pylmgc90 Function:** `pre.depositInCouette2D(radii, rint, rext)`  
-**Usage:** Couette rheometer, effective viscosity measurement, annular flow.
+**pylmgc90 function:** `pre.depositInCouette2D(radii, rint, rext)`  
+**Use:** Couette rheometer, effective viscosity measurement, annular flow.
 
 ---
 
-#### Drum2D — 2D Rotating Drum
+#### Drum2D — Rotating drum 2D
 
 | Parameter | Description | Default |
-|-----------|-------------|--------|
-| **Radius (r)** | Radius of the drum (m). | `2.0 m` |
+|-----------|-------------|---------|
+| **Radius (r)** | Drum radius (m). | `2.0 m` |
 
-**pylmgc90 Function:** `pre.depositInDrum2D(radii, r)`  
-**Usage:** rotating mixer, ball mill, dryer.
-
----
-
-### 3D Containers
-
-#### Box3D — 3D Rectangular Box
-
-| Parameter | Description |
-|-----------|-------------|
-| **Width (lx)** | Dimension along X (m). |
-| **Depth (ly)** | Dimension along Y (m). |
-| **Height (lz)** | Dimension along Z (m). |
-
-**pylmgc90 Function:** `pre.depositInBox3D(radii, lx, ly, lz)`  
-**Usage:** 3D triaxial test, 3D soil model.
+**pylmgc90 function:** `pre.depositInDrum2D(radii, r)`  
+**Use:** rotary mixer, ball mill, dryer.
 
 ---
 
-#### Sphere3D — 3D Container Sphere
+### 3D containers
+
+#### Box3D — Rectangular box 3D
 
 | Parameter | Description |
 |-----------|-------------|
-| **Radius (r)** | Radius of the container sphere (m). |
+| **Width (lx)** | Dimension in X (m). |
+| **Depth (ly)** | Dimension in Y (m). |
+| **Height (lz)** | Dimension in Z (m). |
 
-**pylmgc90 Function:** `pre.depositInSphere3D(radii, r)`
+**pylmgc90 function:** `pre.depositInBox3D(radii, lx, ly, lz)`  
+**Use:** 3D triaxial test, 3D soil model.
 
 ---
 
-#### Cylinder3D — 3D Container Cylinder
+#### Sphere3D — Container sphere 3D
 
 | Parameter | Description |
 |-----------|-------------|
-| **Radius (r)** | Radius of the cylinder (m). |
+| **Radius (r)** | Container sphere radius (m). |
 
-**pylmgc90 Function:** `pre.depositInCylinder3D(radii, r)`  
-**Usage:** cylindrical column, silo, 3D oedometric test.
+**pylmgc90 function:** `pre.depositInSphere3D(radii, r)`
 
-![Selecting the Box3D container](captures/assistant_granulo_page6.JPG)
+---
+
+#### Cylinder3D — Container cylinder 3D
+
+| Parameter | Description |
+|-----------|-------------|
+| **Radius (r)** | Cylinder radius (m). |
+
+**pylmgc90 function:** `pre.depositInCylinder3D(radii, r)`  
+**Use:** cylindrical column, silo, 3D oedometer test.
+
+![Box3D container selection](captures/assistant_granulo_page6.JPG)
 
 ---
 
 ## Page 6 — Summary
 
-Displays a complete table before generation:
+Shows a complete table before generation:
 
 | Section | Information |
 |---------|-------------|
 | **Dimension** | 2D or 3D |
 | **Material** | Name and density (new) or existing material |
 | **Model** | Name (new) or existing model |
-| **Distribution** | Number of particles, Rmin, Rmax, Rmax/Rmin ratio |
+| **Distribution** | Particle count, Rmin, Rmax, Rmax/Rmin ratio |
 | **Seed** | Value if enabled |
 | **Container** | Type, parameters (lx, ly, r, rint, rext…) |
 
-Click **✅ Generate** to launch. A confirmation message indicates success.
+Click **✅ Generate** to start. A confirmation message indicates success.
 
-> **In case of error:** the project state (name, path, dimension) is fully restored.
+> **On error:** the project state (name, path, dimension) is fully restored.
 
 ![Summary](captures/assistant_granulo_page7.JPG)
 
 ---
 
-## Generation Result
+## Generation result
 
-| Element Created | Description |
-|--------------|-------------|
+| Created element | Description |
+|-----------------|-------------|
 | **Material** | Added to the Material tab (if created). Type `RIGID`. |
 | **Model** | Added to the Model tab (if created). `MECAx` + `Rxx2D` / `Rxx3D`. |
-| **Particle avatars** | One `rigidDisk` (2D) or `rigidSphere` (3D) per placed particle. Color `BLUEx`. Origin `AvatarOrigin.GRANULO`. |
+| **Particle avatars** | One `rigidDisk` (2D) or `rigidSphere` (3D) per placed particle. Colour `BLUEx`. Origin `AvatarOrigin.GRANULO`. |
 | **Automatic group** | Group `granulo_{container}` (e.g. `granulo_box3d`). |
 | **GranuloGeneration** | Configuration saved in `state.granulo_generations` for script reconstruction. |
 
-> **Optimization:** the wizard inserts avatars directly into the pylmgc90 containers (`_bodies_container`, `_pylmgc_bodies`) without emitting a signal per particle — which allows processing several thousand particles without slowing down the interface.
+> **Optimisation:** the wizard inserts avatars directly into the pylmgc90 containers (`_bodies_container`, `_pylmgc_bodies`) without emitting a signal per particle — which allows several thousand particles without slowing the interface.
 ---
 
-## Important Notes
+## Important remarks
 
-**Reproducibility:** two generations with the same parameters produce different results. Setting a seed guarantees the exact identity of the results — essential for parametric studies.
+**Reproducibility:** two generations with the same parameters produce different layouts. Fixing a seed guarantees exact identity of results — essential for parametric studies.
 
-**Rmax/Rmin ratio:** a high ratio (> 3) produces a polydisperse assembly where small particles fill the gaps between large ones, increasing compactness. A ratio close to 1 gives a quasi-monodisperse assembly with a lower maximum compactness.
+**Rmax/Rmin ratio:** a high ratio (> 3) produces a polydisperse packing where small particles fill voids between large ones, increasing compactness. A ratio near 1 gives a quasi-monodisperse packing with lower maximum compactness.
 
-**12,000-particle limit:** beyond this, refreshing the model tree and the tabs can take several seconds. For very large assemblies, use numpy generation.
+**12 000 particle limit:** beyond that, refreshing the model tree and tabs can take several seconds. For very large assemblies, use numpy generation.
 
 
 
-# Numpy Granulometry Generation _(beta)_
+# Numpy granulometry generation _(beta)_
 
-**Numpy granulometry generation** is a fast generation mode suited for very large assemblies (> 5,000 particles). It opens as a simple dialog (`QDialog`) — with no steps, no pages to go through — and uses a **background computation thread** (`GranuloWorker`) so as not to block the interface during the deposit.
+**Numpy granulometry generation** is a fast generation mode suited to very large assemblies (> 5 000 particles). It opens as a simple dialog (`QDialog`) — no steps, no pages to walk through — and uses a **background computation thread** (`GranuloWorker`) so the interface is not blocked during deposition.
 
-> **Access:** menu **Wizards → ⚡ Numpy granulometry generation… (beta)**
+> **Access:** menu **Assistants → ⚡ Numpy granulometry generation… (beta)**
 
-> **Recommended for:** assemblies of **5,000 particles and more**. Below this threshold, the pylmgc90 wizard (`Ctrl+Shift+G`) is preferable since it uses the official pylmgc90 deposit routines directly.
+> **Recommended for:** assemblies of **5 000 particles and more**. Below that threshold, the pylmgc90 wizard (`Ctrl+Shift+G`) is preferred because it uses the official pylmgc90 deposition routines directly.
 
-> **Status:** **beta** feature. The positions generated may differ slightly from those produced by pylmgc90's `pre.depositInBox2D`, since the placement algorithm is different. The result is nonetheless physically consistent (no overlap).
+> **Status:** **beta** feature. Generated positions may differ slightly from those produced by `pre.depositInBox2D` in pylmgc90, because the placement algorithm is distinct. The result is nevertheless physically consistent (no overlap).
 
 ---
 
 ## Access
 
-Click the **Wizards** menu, then **⚡ Numpy granulometry generation… (beta)**. The dialog opens directly — no step-by-step wizard.
+Click menu **Assistants** then **⚡ Numpy granulometry generation… (beta)**. The dialog opens directly — no step-by-step wizard.
 
 ![Numpy granulometry generation dialog](captures/assistant_granulo_numpy.JPG)
 
 ---
 
-## Differences from the pylmgc90 Wizard
+## Differences from the pylmgc90 wizard
 
-| Characteristic | pylmgc90 Wizard (`Ctrl+Shift+G`) | Numpy Generation (beta) |
-|-----------------|--------------------------------------|--------------------------|
+| Characteristic | pylmgc90 wizard (`Ctrl+Shift+G`) | Numpy generation (beta) |
+|----------------|----------------------------------|--------------------------|
 | **Interface** | 7-page wizard | Single dialog |
-| **Placement algorithm** | `pre.depositInXxx` — pylmgc90 physical gravitational deposit | `GranuloGenerator` via numpy — algorithmic placement |
-| **Computation** | Main thread (can block the UI) | Background thread (`GranuloWorker`) — UI not blocked |
+| **Placement algorithm** | `pre.depositInXxx` — physical gravity deposition pylmgc90 | `GranuloGenerator` via numpy — algorithmic placement |
+| **Computation** | Main thread (may block UI) | Background thread (`GranuloWorker`) — UI not blocked |
 | **Progress bar** | No | Yes — real-time progress |
-| **Recommended limit** | ~8,000 particles | > 5,000 particles, no practical limit |
-| **Material / model** | Creation or reuse | Uses existing materials and models |
+| **Recommended limit** | ~8 000 particles | > 5 000 particles, no practical limit |
+| **Material / model** | Create or reuse | Uses existing materials and models |
 | **3D containers** | Box3D, Sphere3D, Cylinder3D | 2D only (Box2D, Disk2D, Couette2D, Drum2D) |
 | **Reproducibility** | Yes (seed) | Yes (seed) |
 
 ---
 
-## Dialog Fields
+## Dialog fields
 
-### Distribution Parameters
+### Distribution parameters
 
 | Field | Description | Range | Default |
-|-------|-------------|-------|--------|
-| **Number of particles** | Number of particles requested from the placement algorithm. | 10 to 100,000+ | `1000` |
-| **Minimum radius (rmin)** | Minimum radius of the particles (m). | 0.001 to 10.0 | `0.05 m` |
-| **Maximum radius (rmax)** | Maximum radius of the particles (m). Must be > rmin. | 0.001 to 10.0 | `0.10 m` |
+|-------|-------------|-------|---------|
+| **Number of particles** | Number of particles requested from the placement algorithm. | 10 to 100 000+ | `1000` |
+| **Minimum radius (rmin)** | Minimum particle radius (m). | 0.001 to 10.0 | `0.05 m` |
+| **Maximum radius (rmax)** | Maximum particle radius (m). Must be > rmin. | 0.001 to 10.0 | `0.10 m` |
 
 ---
 
-### Material and Model
+### Material and model
 
 | Field | Description |
 |-------|-------------|
-| **Material** | Dropdown list of existing materials in the project. Select the material to apply to the particles. |
-| **Model** | Dropdown list of existing models in the project. |
+| **Material** | Dropdown of existing project materials. Select the material to apply to particles. |
+| **Model** | Dropdown of existing project models. |
 
-> Unlike the pylmgc90 wizard, this dialog does not create a new material or a new model — they must already exist in the project.
+> Unlike the pylmgc90 wizard, this dialog does not create a new material or model — they must already exist in the project.
 
 ---
 
-### Deposit Container
+### Deposition container
 
 Only **2D** containers are available in the current version.
 
@@ -472,36 +477,36 @@ Only **2D** containers are available in the current version.
 ### Reproducibility
 
 | Field | Description | Default |
-|-------|-------------|--------|
+|-------|-------------|---------|
 | **Use a seed** | Checkbox. Makes generation reproducible. | unchecked |
-| **Seed value** | Integer from 0 to 999,999. | `12345` |
+| **Seed value** | Integer from 0 to 999 999. | `12345` |
 
 ---
 
 ### Options
 
 | Field | Description | Default |
-|-------|-------------|--------|
-| **Color** | 5-character LMGC90 color code. | `BLUEx` |
-| **Group** | Name of the group in which to store the generated avatars (`state.avatar_groups`). | `granulo_numpy` |
+|-------|-------------|---------|
+| **Colour** | LMGC90 colour code (5 characters). | `BLUEx` |
+| **Group** | Group name in which to store generated avatars (`state.avatar_groups`). | `granulo_numpy` |
 
 ---
 
-## Internal Operation
+## Internal operation
 
-### Computation Thread — `GranuloWorker`
+### Computation thread — `GranuloWorker`
 
-Generation runs in a separate thread (`GranuloWorker`, a subclass of `QThread`) so as not to block the interface.
+Generation runs in a separate thread (`GranuloWorker`, subclass of `QThread`) so the interface is not blocked.
 
-**Signals Emitted by `GranuloWorker`:**
+**Signals emitted by `GranuloWorker`:**
 
-| Signal | Parameters | Trigger |
-|--------|-----------|---------------|
-| `progress_updated` | `(nb_done, nb_total, message)` | At each computation step — updates the progress bar |
-| `data_ready` | `list[{center, radius}]` | Computation finished — sends the data to the main thread |
-| `error_occurred` | `str` | On exception — displays an error message |
+| Signal | Parameters | When |
+|--------|------------|------|
+| `progress_updated` | `(done, total, message)` | At each computation step — updates the progress bar |
+| `data_ready` | `list[{center, radius}]` | Computation finished — sends data to the main thread |
+| `error_occurred` | `str` | On exception — shows an error message |
 
-**Execution Sequence:**
+**Execution sequence:**
 
 ```
 1. GranuloFastDialog.exec()
@@ -514,25 +519,25 @@ Generation runs in a separate thread (`GranuloWorker`, a subclass of `QThread`) 
    ↓
 4. GranuloWorker.data_ready.emit(particles_data)
    ↓
-5. Main thread: creation of the avatars
+5. Main thread: avatar creation
    ↓
 6. GranuloFastDialog.granulo_generated.emit()
    ↓
 7. MainWindow._refresh_all()
 ```
 
-### Data Returned by `GranuloWorker`
+### Data returned by `GranuloWorker`
 
 Each particle is sent to the main thread as a dictionary:
 
 ```python
 {
     'center': [x, y],       # numpy coordinates → Python list
-    'radius': 0.075         # radius as a float
+    'radius': 0.075         # radius as float
 }
 ```
 
-### Placement Algorithm
+### Placement algorithm
 
 `GranuloGenerator.generate()` calls the same pylmgc90 routines as the Granulometry tab:
 
@@ -544,39 +549,39 @@ radii = radii[:nb_remaining]
 return nb_remaining, coor, radii
 ```
 
-The difference from the wizard is that the computation is offloaded to a thread (`QThread`), which prevents the interface from freezing on very large assemblies.
+The difference from the wizard is that computation is offloaded to a thread (`QThread`), which prevents the interface from freezing on very large assemblies.
 
 ---
 
-## Progress and Cancellation
+## Progress and cancellation
 
-During generation, the dialog displays:
+During generation the dialog shows:
 
-- A **progress bar** updated by `progress_updated` (current value / total).
-- A **status message** describing the current step (e.g.: "Computing the granulometric deposit…", "Deposit computed successfully").
-- A **❌ Cancel** button that calls `GranuloWorker.stop()` to interrupt the computation.
+- A **progress bar** updated by `progress_updated` (current / total).
+- A **status message** describing the current step (e.g. “Computing granulometric deposit…”, “Deposit computed successfully”).
+- An **❌ Cancel** button that calls `GranuloWorker.stop()` to interrupt computation.
 
 ---
 
-## Generation Result
+## Generation result
 
-| Element Created | Description |
-|--------------|-------------|
+| Created element | Description |
+|-----------------|-------------|
 | **Particle avatars** | One `rigidDisk` per placed particle. Origin `AvatarOrigin.GRANULO`. |
-| **Group** | Group named in `state.avatar_groups` (default: `granulo_numpy`). |
+| **Group** | Named group in `state.avatar_groups` (default: `granulo_numpy`). |
 | **GranuloGeneration** | Configuration saved in `state.granulo_generations`. |
 | **Signal** | `granulo_generated` emitted → `MainWindow._refresh_all()` |
 
-> Avatars are created in the **main thread** after receiving the `data_ready` signal — creation remains synchronous, but the heavy computation (physical deposit) is asynchronous.
+> Avatars are created on the **main thread** after the `data_ready` signal is received — creation remains synchronous but the heavy computation (physical deposition) is asynchronous.
 
 ---
 
-## Important Notes
+## Important remarks
 
-**Material and model required:** unlike the pylmgc90 wizard, the dialog does not offer to create a material or a model. Create them beforehand in the Material tab (e.g. `TDURx`, `RIGID`, 2500 kg/m³) and in the Model tab (e.g. `rigid`, `MECAx`, `Rxx2D`).
+**Material and model required:** unlike the pylmgc90 wizard, the dialog does not offer to create a material or model. Create them beforehand in the Material tab (e.g. `TDURx`, `RIGID`, 2500 kg/m³) and Model tab (e.g. `rigid`, `MECAx`, `Rxx2D`).
 
-**2D containers only:** the current beta version does not support 3D containers (Box3D, Sphere3D, Cylinder3D). For 3D generation, use the pylmgc90 wizard.
+**2D containers only:** the current beta does not support 3D containers (Box3D, Sphere3D, Cylinder3D). For 3D generation, use the pylmgc90 wizard.
 
-**Identical results on reload:** the generated positions and radii are saved via `GranuloGeneration` in the project. When reloading, the deposit is **recomputed** from the parameters — if no seed was set, the positions will be different. Set a seed to guarantee exact identity between sessions.
+**Identical results on reload:** generated positions and radii are saved via `GranuloGeneration` in the project. On reload, the deposit is **recomputed** from parameters — if no seed was set, positions will differ. Set a seed to guarantee exact identity across sessions.
 
-**Thread and resources:** if the dialog is closed during the computation, the `GranuloWorker` thread continues running in the background until it finishes. Wait for the computation to finish, or click ❌ Cancel before closing.
+**Thread and resources:** if the dialog is closed during computation, the `GranuloWorker` thread continues in the background until completion. Wait for the end of computation or click ❌ Cancel before closing.

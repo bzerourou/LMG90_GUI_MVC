@@ -76,8 +76,9 @@ Sélection du type de conteneur et de ses dimensions. Les conteneurs 2D sont dis
 | Champ | Description | Défaut |
 |-------|-------------|--------|
 | **Couleur** | Code couleur LMGC90 à 5 caractères. Écrase la couleur de l'avatar modèle si renseigné. | `BLUEx` |
-| **Stocker dans un groupe** | Si coché, tous les avatars générés sont enregistrés dans un groupe nommé dans `state.avatar_groups`. | coché |
-| **Nom du groupe** | Identifiant du groupe. Par défaut automatique : `granulo_{type_conteneur}` (ex. `granulo_box2d`). | `granulo_box2d` |
+| **Stocker le depot dans un groupe nommé** | Si coché, tous les avatars générés sont enregistrés dans un groupe nommé dans `state.avatar_groups`. | coché |
+| **Nom du groupe** | Identifiant du groupe. Par défaut automatique : `depot_{type_conteneur}` (ex. `granulo_box2d`). | `depot_granulo` |
+| **Créer comme ParticlePopulation (SoA, stockage compact)** | Si coché, les avatars seront stockés dans des tableaux numpy sous le un fichier `.npz` [voir SOA](../fr/particle_population.md) | à cocher |
 
 ---
 
@@ -130,7 +131,11 @@ Sélectionner et cliquer sur **🗑️ Supprimer**. Tous les avatars générés 
 
 **Limite de performance :** l'onglet appelle `add_avatar()` pour chaque particule, ce qui émet un signal par avatar. Au-delà de ~1 500 avatars, l'interface ralentit. Pour des assemblages plus grands, utiliser l'**assistant granulométrie** qui insère les avatars directement dans les conteneurs pylmgc90 sans signal individuel.
 
+**Distribution uniquement**, il est tout à fait possible de créer des distributions sans dépôt d'avatars si la case à cocher est activée _depuis(v0.4.3)_.
+
 **Groupe automatique :** si aucun nom de groupe n'est saisi, un nom est généré automatiquement sous la forme `granulo_{type_conteneur}`.
+
+**Créer comme ParticlePopulation**, cette option vous permettra de stocker une très grande quantité d'avatars sous une structure de tableau (SOA) _depuis(v0.4.8)_.
 
 
 # Assistant de granulométrie — pylmgc90
@@ -257,6 +262,7 @@ Un **histogramme en temps réel** (20 classes, 200 rayons de prévisualisation) 
 |-------|-------------|--------|
 | **Utiliser une graine** | Case à cocher. Rend la génération reproductible. | décoché |
 | **Valeur de la graine** | Entier de 0 à 999 999. Transmis à `pre.granulo_Random(seed=...)`. | `12345` |
+| **Créer comme ParticlePopulation (SoA, stockage compact)** | Si coché, les avatars seront stockés dans des tableaux numpy sous le un fichier `.npz` | à cocher |
 
 ![Distribution des rayons](../captures/assistant_granulo_page5.JPG)
 
