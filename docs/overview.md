@@ -22,6 +22,6 @@ Welcome to the official documentation for the LMGC90_GUI v0.4.5 graphical interf
 - [Visualization](visualisation.md)
 - [Developer](dev.md)
 
-**Ready-to-use examples** → [examples/](../exemples/) folder
+**Ready-to-use examples** → [examples/](examples.md) folder
 
 Happy reading and happy simulating!
