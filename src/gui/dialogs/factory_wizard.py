@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
-from matplotlib.pylab import Enum
+from enum import Enum
 
 from ...core.particle_factory import (
     FactoryConfig, FactoryType, ZoneShape, ContainerShape,
