@@ -144,10 +144,16 @@ class PostProTab(QWidget):
         self.step_input.setText(str(postpro.step))
         
         if postpro.target_type and postpro.target_value is not None:
+            target_value = postpro.target_value
+            if postpro.target_type == 'avatar' and isinstance(target_value, int):
+                avatars = self.controller.state.avatars
+                if 0 <= target_value < len(avatars):
+                    target_value = avatars[target_value].avatar_id
+
             # Trouver l'index dans le combo
             for i in range(self.target_combo.count()):
                 data = self.target_combo.itemData(i)
-                if data == (postpro.target_type, postpro.target_value):
+                if data == (postpro.target_type, target_value):
                     self.target_combo.setCurrentIndex(i)
                     break
 
