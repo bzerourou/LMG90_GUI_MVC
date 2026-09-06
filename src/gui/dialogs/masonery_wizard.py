@@ -375,7 +375,7 @@ class MasonryWizard(QWizard):
                 ]
 
                 if tf_translate :
-                    for aid in generated_indices :
+                    for aid in generated_ids:
                         params = {'dx': tf_tx, 'dy': tf_ty}
                         if dimension == 3:
                             params['dz'] = tf_tz
@@ -383,8 +383,8 @@ class MasonryWizard(QWizard):
                             DOFOperation(
                                 target_type='avatar',
                                 target_value=aid,
-                                operation='translate',
-                                params=params
+                                operation_type='translate',
+                                parameters=params
                             )
                         )
                 if tf_rotate :
@@ -394,13 +394,13 @@ class MasonryWizard(QWizard):
                         _ctr = [tf_cx, tf_cy, tf_cz]
                     else:
                         _ctr = [tf_cx, tf_cy]
-                    for aid in generated_indices:
+                    for aid in generated_ids:
                         self.controller.add_dof_operation(
                             DOFOperation(
                                 target_type='avatar',
                                 target_value=aid,
-                                operation='rotate',
-                                params={
+                                operation_type='rotate',
+                                parameters={
                                     'description': 'axis',
                                     'center': _ctr, 
                                     'axis': _ax, 
