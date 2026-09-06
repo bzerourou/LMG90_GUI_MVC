@@ -116,7 +116,7 @@ class AvatarsMixin:
             try:
                 self._bodies_container.remove(body)
             except Exception as e:
-                from ...core.app_logger import get_logger
+                from ..core.app_logger import get_logger
                 get_logger('controller').warning(
                     f"Erreur suppression avatar #{index}: {e}"
                 )
