@@ -33,13 +33,37 @@ _BASE_CONTEXT = {
 
 # Types d'avatars supportés par le chemin rapide SoA — mêmes types que
 # LMGC90Bridge.create_avatars_from_population (rigidDisk/rigidSphere).
-_POPULATION_ELIGIBLE_TYPES = {'rigidDisk', 'rigidSphere'}
+_POPULATION_ELIGIBLE_TYPES = {t.value for t in ParticlePopulation.SUPPORTED_TYPES}
 
 # Clé interne du template_config portant le choix explicite de
 # l'utilisateur (case à cocher dans loop_tab.py). Absente ou False ->
 # chemin Avatar classique (AoS) ; True -> chemin ParticlePopulation (SoA)
 # si les autres conditions d'éligibilité sont remplies.
 _SOA_FLAG_KEY = '_use_soa'
+
+# Clés de template_config tolérées EN PLUS du socle commun
+# (avatar_type/center/radius/material_name/model_name/color/_use_soa),
+# par type — deviennent les extra_params UNIFORMES de la population.
+_SOA_ALLOWED_EXTRA_KEYS = {
+    'rigidDisk':         set(),
+    'rigidSphere':       set(),
+    'rigidDiscreteDisk': set(),
+    'rigidCluster':      {'nb_vertices'},                     # → extra_params['nb_disk']
+    'rigidCylinder':     {'wall_params'},                     # → extra_params['h']
+    'rigidPolygon':      {'nb_vertices', 'generation_type'},  # 'regular' uniquement
+    'rigidPolyhedron':   {'nb_vertices', 'generation_type'},  # 'regular' uniquement
+}
+
+# Clés jamais compatibles avec le SoA, quel que soit le type : elles
+# impliquent une géométrie par-particule que le modèle centers/radii ne
+# peut pas représenter (contacteurs manuels, sommets explicites, axes
+# multi-dimensionnels, disques creux individualisés).
+_ALWAYS_INCOMPATIBLE_KEYS = {'contactors', 'vertices', 'is_hollow', 'axis'}
+
+_SOA_BASE_KEYS = {
+    'avatar_type', 'center', 'radius',
+    'material_name', 'model_name', 'color', _SOA_FLAG_KEY,
+}
 
 
 class ForLoopsMixin:
@@ -305,12 +329,22 @@ class ForLoopsMixin:
         if avatar_type not in _POPULATION_ELIGIBLE_TYPES:
             return False
 
-        incompatible_keys = {
-            'contactors', 'vertices', 'wall_params', 'is_hollow',
-            'generation_type', 'axis', 'nb_vertices',
-        }
-        if incompatible_keys & set(tc.keys()):
+        if _ALWAYS_INCOMPATIBLE_KEYS & set(tc.keys()):
             return False
+
+        allowed_extra = _SOA_ALLOWED_EXTRA_KEYS.get(avatar_type, set())
+        extra_keys = set(tc.keys()) - _SOA_BASE_KEYS
+        if not extra_keys <= allowed_extra:
+            return False
+
+        if avatar_type in ('rigidPolygon', 'rigidPolyhedron'):
+            if tc.get('generation_type', 'regular') != 'regular':
+                return False
+            if 'nb_vertices' not in tc:
+                return False
+        elif avatar_type == 'rigidCylinder':
+            if 'wall_params' not in tc or 'h' not in tc.get('wall_params', {}):
+                return False
 
         return True
 
@@ -319,17 +353,12 @@ class ForLoopsMixin:
     ) -> List[int]:
         """
         Chemin rapide : construit une ParticlePopulation en une passe numpy
-        plutôt que N objets Avatar individuels. Suit le même schéma que
-        GranuloMixin.create_granulo_population_from_arrays().
+        plutôt que N objets Avatar individuels.
 
-        Activé uniquement si l'utilisateur l'a explicitement demandé (case
-        à cocher SoA dans loop_tab.py) — voir _for_loop_eligible_for_population.
-
-        Limitation assumée : les avatars produits ne sont plus
-        individuellement modifiables via l'onglet Avatar (comme pour les
-        populations granulo) — cohérent avec le compromis déjà accepté
-        pour la granulométrie massive, et explicité à l'utilisateur dans
-        le tooltip de la case à cocher.
+        Les paramètres géométriques additionnels (nb_disk, h, nb_vertices)
+        sont UNIFORMES pour toute la population : ils sont évalués UNE SEULE
+        FOIS (contexte sans variable de boucle), jamais par itération —
+        contrairement à center/radius qui varient à chaque particule.
         """
         tc       = for_loop.template_config
         loop_var = for_loop.loop_var
@@ -343,6 +372,23 @@ class ForLoopsMixin:
         color         = str(tc.get('color', 'BLUEx'))
         radius_expr   = tc.get('radius', 0.1)
         center_expr   = tc.get('center', '[0, 0]')
+
+        # ── Extra params uniformes — évalués hors boucle (pas de loop_var) ──
+        uniform_ctx = dict(_BASE_CONTEXT)
+        extra_params: Dict[str, Any] = {}
+
+        def _eval_uniform(value):
+            if isinstance(value, str):
+                evaluator.allowed_names = uniform_ctx
+                return evaluator.eval_expression(value)
+            return value
+
+        if avatar_type_str == 'rigidCluster':
+            extra_params['nb_disk'] = int(_eval_uniform(tc['nb_vertices']))
+        elif avatar_type_str == 'rigidCylinder':
+            extra_params['h'] = float(_eval_uniform(tc['wall_params']['h']))
+        elif avatar_type_str in ('rigidPolygon', 'rigidPolyhedron'):
+            extra_params['nb_vertices'] = int(_eval_uniform(tc['nb_vertices']))
 
         centers: List[List[float]] = []
         radii:   List[float]       = []
@@ -364,7 +410,6 @@ class ForLoopsMixin:
             current += step
 
         if not centers:
-            # Boucle vide : rien à générer, pas de population à créer
             for_loop.generated_refs = []
             if not self._is_loading:
                 self.state.for_loops.append(for_loop)
@@ -389,6 +434,7 @@ class ForLoopsMixin:
             centers=centers_arr,
             radii=radii_arr,
             group_name=for_loop.group_name,
+            extra_params=extra_params,
         )
         for_loop.template_config['_population_id'] = population.population_id
 
@@ -408,11 +454,7 @@ class ForLoopsMixin:
                 for_loop.group_name, []
             ).append(population.population_id)
 
-        # generated_refs reste vide pour ce chemin (pas d'Avatar AoS
-        # individuel produit) — ces particules vivent dans
-        # state.particle_populations, pas state.avatars.
         for_loop.generated_refs = []
-
         self.state_changed.emit()
         return []
 

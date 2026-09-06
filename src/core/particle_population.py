@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -58,6 +58,14 @@ class ParticlePopulation:
     radii: np.ndarray = field(repr=False)
 
     group_name: Optional[str] = None
+    extra_params :Dict[str, Any] = field(default_factory=dict)
+
+    SUPPORTED_TYPES = {
+        AvatarType.RIGID_DISK, AvatarType.RIGID_SPHERE,
+        AvatarType.RIGID_DISCRETE, AvatarType.RIGID_CLUSTER,
+        AvatarType.RIGID_CYLINDER, AvatarType.RIGID_POLYGON,
+        AvatarType.RIGID_POLYHEDRON,
+    }
 
     # ── Construction ──────────────────────────────────────────────────────
 
@@ -73,10 +81,17 @@ class ParticlePopulation:
         radii: np.ndarray,
         group_name: Optional[str] = None,
         population_id: Optional[str] = None,
+        extra_params : Optional[Dict[str, Any]] = None,
     ) -> "ParticlePopulation":
         """Point d'entrée validé — préférer à l'appel direct du constructeur."""
         centers = np.asarray(centers, dtype=np.float64)
         radii = np.asarray(radii, dtype=np.float64)
+
+        if avatar_type not in cls.SUPPORTED_TYPES:
+            raise ValueError(
+                f"ParticlePopulation ne supporte pas avatar_type={avatar_type.value!r}. "
+                f"Types supportés : {sorted(t.value for t in cls.SUPPORTED_TYPES)}"
+            )
 
         if centers.ndim != 2:
             raise ValueError(
@@ -97,6 +112,9 @@ class ParticlePopulation:
         if radii.shape[0] > 0 and np.any(radii <= 0):
             raise ValueError("tous les rayons doivent être strictement positifs")
 
+        extra_params = extra_params or {}
+        cls._validate_extra_params(avatar_type, extra_params)
+
         return cls(
             population_id=population_id or new_population_id(),
             avatar_type=avatar_type,
@@ -108,8 +126,28 @@ class ParticlePopulation:
             centers=centers,
             radii=radii,
             group_name=group_name,
+            extra_params=extra_params or {},
         )
 
+    @staticmethod
+    def _validate_extra_params(avatar_type: AvatarType, extra_params: Dict[str, Any]) -> None:
+        """Vérifie que les paramètres uniformes requis sont présents et valides."""
+        if avatar_type == AvatarType.RIGID_CLUSTER:
+            nb_disk = extra_params.get('nb_disk', 3)
+            if not isinstance(nb_disk, int) or nb_disk < 2:
+                raise ValueError("rigidCluster : extra_params['nb_disk'] doit être un entier >= 2")
+        elif avatar_type == AvatarType.RIGID_CYLINDER:
+            h = extra_params.get('h')
+            if h is None or float(h) <= 0:
+                raise ValueError("rigidCylinder : extra_params['h'] (hauteur) requis et > 0")
+        elif avatar_type in (AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON):
+            nb_min = 3 if avatar_type == AvatarType.RIGID_POLYGON else 4
+            nb_vertices = extra_params.get('nb_vertices')
+            if not isinstance(nb_vertices, int) or nb_vertices < nb_min:
+                raise ValueError(
+                    f"{avatar_type.value} : extra_params['nb_vertices'] doit être "
+                    f"un entier >= {nb_min} (génération régulière uniquement en SoA)"
+                )
     # ── Métadonnées ───────────────────────────────────────────────────────
 
     def __len__(self) -> int:
@@ -145,7 +183,7 @@ class ParticlePopulation:
         Ne PAS appeler ceci en boucle sur toute la population — c'est
         justement ce que ParticlePopulation évite.
         """
-        return Avatar(
+        kwargs: Dict[str, Any] = dict(
             avatar_id=self.particle_avatar_id(i),
             avatar_type=self.avatar_type,
             center=self.centers[i].tolist(),
@@ -155,6 +193,19 @@ class ParticlePopulation:
             color=self.color,
             origin=self.origin,
         )
+
+        if self.avatar_type == AvatarType.RIGID_CLUSTER:
+            kwargs['nb_vertices'] = self.extra_params.get('nb_disk', 3)
+        elif self.avatar_type == AvatarType.RIGID_CYLINDER:
+            kwargs['wall_params'] = {'h': self.extra_params.get('h', 1.0)}
+        elif self.avatar_type in (AvatarType.RIGID_POLYGON, AvatarType.RIGID_POLYHEDRON):
+            kwargs['generation_type'] = 'regular'
+            kwargs['nb_vertices'] = self.extra_params.get('nb_vertices', 6)
+
+        return Avatar(
+            **kwargs
+        )
+ 
 
     # ── Statistiques utiles (aperçu UI, validation) ─────────────────────
 
@@ -201,6 +252,7 @@ class ParticlePopulation:
             'group_name': self.group_name,
             'n_particles': len(self),  # redondant avec les arrays, utile pour
                                         # validation/affichage sans charger le npz
+            'extra_params': self.extra_params,
         }
 
     @classmethod
@@ -234,6 +286,7 @@ class ParticlePopulation:
             centers=centers,
             radii=radii,
             group_name=meta.get('group_name'),
+            extra_params=meta.get('extra_params', {}),
         )
 
     def __repr__(self) -> str:

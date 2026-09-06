@@ -459,11 +459,73 @@ class LMGC90Bridge:
         color = population.color
         centers = population.centers
         radii = population.radii
+        extra = population.extra_params or {}
+
+        bodies = []
 
         if atype == AvatarType.RIGID_DISK:
-            factory = pre.rigidDisk
+            for i in range(len(population)):
+                bodies.append(pre.rigidDisk(
+                    r=float(radii[i]),
+                    center=centers[i],   # ndarray 1D — pylmgc90 accepte array-like
+                    model=model_obj,
+                    material=material_obj,
+                    color=color,
+
+                ))
+    
         elif atype == AvatarType.RIGID_SPHERE:
-            factory = pre.rigidSphere
+            for i in range(len(population)):
+                bodies.append(pre.rigidSphere(
+                    r=float(radii[i]),
+                    center=centers[i],   # ndarray 1D — pylmgc90 accepte array-like
+                    model=model_obj,
+                    material=material_obj,
+                    color=color,
+                ))
+        elif atype == AvatarType.RIGID_DISCRETE:
+            for i in range(len(population)):
+                bodies.append(pre.rigidDiscreteDisk(
+                    r=float(radii[i]), center=centers[i],
+                    model=model_obj, material=material_obj, color=color,
+                ))
+
+        elif atype == AvatarType.RIGID_CLUSTER:
+            nb_disk = int(extra.get('nb_disk', 3))
+            for i in range(len(population)):
+                bodies.append(pre.rigidCluster(
+                    r=float(radii[i]), center=centers[i],
+                    model=model_obj, material=material_obj, color=color,
+                    nb_disk=nb_disk,
+                ))
+
+        elif atype == AvatarType.RIGID_CYLINDER:
+            h = float(extra.get('h', 1.0))
+            for i in range(len(population)):
+                bodies.append(pre.rigidCylinder(
+                    r=float(radii[i]), h=h, center=centers[i],
+                    model=model_obj, material=material_obj, color=color,
+                ))
+
+        elif atype == AvatarType.RIGID_POLYGON:
+            nb_vertices = int(extra.get('nb_vertices', 6))
+            for i in range(len(population)):
+                bodies.append(pre.rigidPolygon(
+                    model=model_obj, material=material_obj, center=centers[i],
+                    color=color, generation_type='regular',
+                    nb_vertices=nb_vertices, radius=float(radii[i]),
+                ))
+
+        elif atype == AvatarType.RIGID_POLYHEDRON:
+            nb_vertices = int(extra.get('nb_vertices', 8))
+            for i in range(len(population)):
+                bodies.append(pre.rigidPolyhedron(
+                    nb_vertices=nb_vertices, vertices=None,
+                    radius=float(radii[i]), generation_type='regular',
+                    center=centers[i], model=model_obj, material=material_obj,
+                    color=color, faces=None,
+                ))
+
         else:
             raise ValueError(
                 f"create_avatars_from_population : type non supporté "
@@ -471,15 +533,6 @@ class LMGC90Bridge:
                 f"couverts par ce chemin SoA pour l'instant."
             )
 
-        bodies = []
-        for i in range(len(population)):
-            bodies.append(factory(
-                r=float(radii[i]),
-                center=centers[i],   # ndarray 1D — pylmgc90 accepte array-like
-                model=model_obj,
-                material=material_obj,
-                color=color,
-            ))
         return bodies
 
     @staticmethod
