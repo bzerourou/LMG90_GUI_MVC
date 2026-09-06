@@ -1023,7 +1023,18 @@ class ScriptGenerator:
             }
         params_str = ', '.join(f"{k}={v}" for k, v in params.items())
         if target_type == 'avatar':
-            f.write(f"    bodies[{target_value}].{operation_type}({params_str})\n")
+            id_to_idx = self._id_to_idx()
+            if isinstance(target_value, int):
+                idx = target_value
+            else:
+                idx = id_to_idx.get(target_value)
+
+            if idx is not None and 0 <= idx < len(self.state.avatars):
+                f.write(f"    bodies[{idx}].{operation_type}({params_str})\n")
+            else:
+                f.write(
+                    f"    # ⚠️ DOF ignoré : avatar '{target_value}' introuvable\n"
+                )
         else:
             f.write(f"    for av in group_{str(target_value).replace(' ', '_').replace('-', '_')}:\n")
             f.write(f"        av.{operation_type}({params_str})\n")
