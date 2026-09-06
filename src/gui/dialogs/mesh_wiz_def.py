@@ -575,7 +575,10 @@ class MeshWizard(QWizard):
         from ...utils.safe_eval import SafeEvaluator
 
         _evaluator = SafeEvaluator()
-        avatar_index = len(self.controller.state.avatars) - 1
+        avatars = self.controller.state.avatars
+        if not avatars:
+            raise ValueError("Aucun avatar maillé disponible pour les conditions aux limites.")
+        avatar_id = avatars[-1].avatar_id
 
         for condition in boundary_page.get_dof_conditions():
             dof_type   = condition["dof_type"]
@@ -603,7 +606,7 @@ class MeshWizard(QWizard):
             operation = DOFOperation(
                 operation_type=dof_type,
                 target_type="avatar",
-                target_value=avatar_index,
+                target_value=avatar_id,
                 parameters=params,
             )
 
