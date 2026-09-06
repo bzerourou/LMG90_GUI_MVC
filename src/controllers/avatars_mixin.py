@@ -82,6 +82,10 @@ class AvatarsMixin:
             if aid in avatar_ids:
                 refs.append(f"Groupe '{grp_name}'")
 
+        for i, loop in enumerate(self.state.loops):
+            if loop.model_avatar_id == aid:
+                refs.append(f"Boucle #{i + 1} ({loop.loop_type}) — avatar modèle")
+
         for i, op in enumerate(self.state.operations):          # ✅ corrigé
             if op.target_type == 'avatar' and op.target_value == aid:
                 refs.append(f"Opération DOF #{i + 1} (avatar)")
@@ -104,6 +108,11 @@ class AvatarsMixin:
             return False
 
         avatar_id = self.state.avatars[index].avatar_id
+
+        # Un avatar modèle ne peut pas être supprimé sans invalider la boucle
+        # qui l'utilise et ses avatars générés.
+        if any(loop.model_avatar_id == avatar_id for loop in self.state.loops):
+            return False
 
         # Retirer l'avatar de state
         self.state.avatars.pop(index)
@@ -130,6 +139,29 @@ class AvatarsMixin:
                 self.state.avatar_groups[grp_name] = [
                     aid for aid in group if aid != avatar_id
                 ]
+
+        # Supprimer les références directes devenues invalides. Les groupes
+        # ont déjà été nettoyés ci-dessus, mais les opérations et commandes
+        # peuvent référencer un avatar individuellement.
+        self.state.operations[:] = [
+            op for op in self.state.operations
+            if not (op.target_type == 'avatar' and op.target_value == avatar_id)
+        ]
+        self.state.postpro_commands[:] = [
+            cmd for cmd in self.state.postpro_commands
+            if not (
+                cmd.target_type == 'avatar'
+                and cmd.target_value == avatar_id
+            )
+        ]
+
+        # Retirer l'avatar des résultats mémorisés par les boucles restantes.
+        for loop in self.state.loops:
+            loop.generated_ids[:] = [
+                generated_id
+                for generated_id in loop.generated_ids
+                if generated_id != avatar_id
+            ]
 
         return True
 
