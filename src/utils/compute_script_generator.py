@@ -265,6 +265,7 @@ class ComputeScriptGenerator:
             id_to_idx = {av.avatar_id: i for i, av in enumerate(state.avatars)}
 
             result = []
+            missing = []
             for aid in avatar_ids:
                 if aid in factory_body_map:
                     # Numéro exact depuis FactoryConfig
@@ -272,6 +273,20 @@ class ComputeScriptGenerator:
                 elif aid in id_to_idx:
                     # Position dans state.avatars + 1 (correct pour non-factory)
                     result.append(str(id_to_idx[aid] + 1))
+                else:
+                    missing.append(aid)
+            if missing:
+                from ..core.app_logger import get_logger
+                log = get_logger('compute_script_generator')
+                log.warning(
+                    "Groupe '%s' : %d avatar_id introuvable(s) — ignoré(s) dans le "
+                    "script généré (résolu=%d/%d). IDs manquants : %s",
+                    grp_name, len(missing), len(result), len(avatar_ids),
+                    ', '.join(m[:8] + '…' for m in missing[:10])
+                    + (f' (+{len(missing) - 10} autre(s))' if len(missing) > 10 else ''),
+                )
+                self._unresolved_group_refs = getattr(self, '_unresolved_group_refs', {})
+                self._unresolved_group_refs[grp_name] = list(missing)
             return result
 
         def _normalize_mode(entry: dict) -> str:
