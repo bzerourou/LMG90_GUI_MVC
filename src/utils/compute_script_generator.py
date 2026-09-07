@@ -87,6 +87,8 @@ class ComputeScriptGenerator:
         buf = StringIO()
         w   = buf.write
 
+        self._unresolved_group_refs = {}
+
         # ── Factories ─────────────────────────────────────────────────────────
         # Les indices corps sont lus depuis body_collection.pkl (genere par
         # le script pre.py au moment de bodies.addAvatar), sur le modele
@@ -840,6 +842,22 @@ class ComputeScriptGenerator:
                 w('chipy.hydrFEMx_WriteDisplayFiles(1)\n')
             w('chipy.WritePostproFiles()\n')
             w('\n')
+
+        #-----Avertissement - références de groupes non résolues (avatars introuvables) -----
+        if getattr(self, '_unresolved_group_refs', None):
+            w('\n')
+            w('# ' + '=' * 68 + '\n')
+            w('# ⚠️  ATTENTION — références de groupe incomplètes\n')
+            w('# Certains avatar_id référencés par un groupe étaient introuvables\n')
+            w('# au moment de la génération de ce script (avatar supprimé après\n')
+            w('# coup sans nettoyage du groupe, ou factory non générée).\n')
+            w('# Les extractions/visibilités listées ci-dessous sont donc\n')
+            w('# potentiellement INCOMPLÈTES par rapport à ce que vous attendez :\n')
+            for grp_name, missing_ids in self._unresolved_group_refs.items():
+                w(f"#   - groupe '{grp_name}' : {len(missing_ids)} avatar(s) manquant(s)\n")
+            w('# Vérifiez le journal de l\'application (F7) pour le détail complet,\n')
+            w('# ou nettoyez les groupes concernés puis régénérez ce script.\n')
+            w('# ' + '=' * 68 + '\n')
 
         # ── 10. Finalisation ──────────────────────────────────────────────────
         w('chipy.CloseDisplayFiles()\n')
