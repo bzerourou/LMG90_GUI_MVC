@@ -690,6 +690,40 @@ class GranuloTab(BaseTab):
         self.current_config = None
         gc.collect()
     
+    def _finalize_partial_generation(self) -> int:
+        """
+        Rattache les avatars déjà créés (self.created_indices) à une
+        GranuloGeneration partielle plutôt que de les laisser orphelins.
+        Appelée depuis _on_error() et _cancel_generation() quand une
+        génération par batch est interrompue avant son terme.
+        Retourne le nombre d'avatars conservés (0 si rien à faire).
+        """
+        if not self.created_indices or not self.current_config:
+            return 0
+
+        avatars = self.controller.state.avatars
+        partial_ids = [
+            avatars[idx].avatar_id
+            for idx in self.created_indices
+            if idx < len(avatars)
+        ]
+        if not partial_ids:
+            return 0
+
+        self.current_config.generated_ids = partial_ids
+        self.controller.state.granulo_generations.append(self.current_config)
+
+        if self.current_config.group_name:
+            self.controller.state.avatar_groups.setdefault(
+                self.current_config.group_name, []
+            ).extend(partial_ids)
+
+        self.controller.state_changed.emit()
+        self.granulo_generated.emit()
+        self.refresh(full_refresh=True)
+
+        return len(partial_ids)
+
     def _on_error(self, error_message):
         """Gestion des erreurs"""
         self.creation_timer.stop()
@@ -700,6 +734,14 @@ class GranuloTab(BaseTab):
         
         # S'assurer que le batch_mode est bien désactivé
         self.controller._batch_mode = False
+
+            # ── Ne pas laisser d'avatars orphelins ──────────────────────────────
+        n_kept = self._finalize_partial_generation()
+        if n_kept:
+            error_message += (
+                f"\n\n⚠️ {n_kept} particule(s) déjà créée(s) ont été "
+                f"conservée(s) comme dépôt partiel (visible dans la liste)."
+            )
         
         # Fermer le label de progression
         if hasattr(self, 'progress_label'):
@@ -744,6 +786,8 @@ class GranuloTab(BaseTab):
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.worker.wait()
+
+        n_kept = self._finalize_partial_generation()
         
         # Fermer le label
         if hasattr(self, 'progress_label'):
