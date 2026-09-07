@@ -10,6 +10,10 @@ from ..core.pylmgc_bridge import LMGC90Bridge
 class AvatarsMixin:
 
     def add_avatar(self, avatar: Avatar, create_pylmgc: bool = True) -> int:
+
+        # vérifier les doublons d'ID dans state.avatars
+        if any(a.avatar_id == avatar.avatar_id for a in self.state.avatars):
+            raise ValueError(f"Avatar avec ID '{avatar.avatar_id}' déjà présent")
         model = next((m for m in self.state.models if m.name == avatar.model_name), None)
         if not model:
             raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
