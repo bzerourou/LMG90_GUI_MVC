@@ -273,6 +273,26 @@ class GranuloTab(BaseTab):
     
     def _on_generate_optimized(self):
         """Lance la génération ultra-optimisée"""
+        # ── Garde anti-ré-entrance ───────────────────────────────────────────
+        # Le bouton est désactivé pendant une génération, mais on protège
+        # aussi contre un appel programmatique concurrent (ex: signal reçu
+        # deux fois) qui laisserait fuiter created_indices/current_config
+        # d'une tentative précédente vers celle-ci.
+        if getattr(self, '_generation_running', False):
+            QMessageBox.warning(
+                self, "Génération en cours",
+                "Une génération est déjà en cours. Attendez sa fin ou annulez-la."
+            )
+            return
+
+        # ── Reset défensif — ne JAMAIS repartir avec un état résiduel ────────
+        self.pending_particles     = []
+        self.created_indices       = []
+        self.current_particle_index = 0
+        self.current_config         = None
+        self.controller._batch_mode = False
+
+
         try:
             # Validation commune
             nb = self.eval_int(self.nb_input.text(), default=50, field_name="Nombre de particules")
@@ -349,6 +369,7 @@ class GranuloTab(BaseTab):
 
             self.current_config = config
             self._user_canceled = False
+            self._generation_running = True
 
             if not hasattr(self, "progress_label"):
                 self.progress_label = QLabel(self)
@@ -687,7 +708,9 @@ class GranuloTab(BaseTab):
         # Nettoyer
         self.pending_particles = []
         self.created_indices = []
+        self.current_particle_index = 0
         self.current_config = None
+        self._generation_running = False
         gc.collect()
     
     def _finalize_partial_generation(self) -> int:
@@ -698,13 +721,32 @@ class GranuloTab(BaseTab):
         génération par batch est interrompue avant son terme.
         Retourne le nombre d'avatars conservés (0 si rien à faire).
         """
-        if not self.created_indices or not self.current_config:
-            return 0
 
+        """Retourne le nombre d'avatars conservés (0 si rien à faire)."""
+        if not self.created_indices or self.current_config is None:
+            return 0
+        
+        # Garde anti double-finalisation : si ce config est déjà dans
+        # state.granulo_generations, ne pas le rajouter une seconde fois.
+        if self.current_config in self.controller.state.granulo_generations:
+            return 0
+        
         avatars = self.controller.state.avatars
+
+        # Dédoublonnage défensif tout en préservant l'ordre — created_indices
+        # ne devrait structurellement jamais contenir de doublon (add_avatar
+        # renvoie toujours une position croissante inédite), mais on protège
+        # quand même contre toute régression future du code appelant.
+        seen = set()
+        unique_indices = []
+        for idx in self.created_indices:
+            if idx not in seen:
+                seen.add(idx)
+                unique_indices.append(idx)
+
         partial_ids = [
             avatars[idx].avatar_id
-            for idx in self.created_indices
+            for idx in unique_indices
             if idx < len(avatars)
         ]
         if not partial_ids:
@@ -714,9 +756,13 @@ class GranuloTab(BaseTab):
         self.controller.state.granulo_generations.append(self.current_config)
 
         if self.current_config.group_name:
-            self.controller.state.avatar_groups.setdefault(
+            existing = self.controller.state.avatar_groups.setdefault(
                 self.current_config.group_name, []
-            ).extend(partial_ids)
+            )
+            # Ne pas dupliquer un avatar_id déjà présent dans le groupe
+            # (défensif — même logique que ci-dessus).
+            existing_set = set(existing)
+            existing.extend(aid for aid in partial_ids if aid not in existing_set)
 
         self.controller.state_changed.emit()
         self.granulo_generated.emit()
@@ -768,7 +814,8 @@ class GranuloTab(BaseTab):
         self.pending_particles = []
         self.created_indices = []
         self.current_config = None
-        
+        self._generation_running = False
+
         if self.worker:
             self.worker.wait()
             self.worker.deleteLater()
@@ -803,7 +850,8 @@ class GranuloTab(BaseTab):
         self.pending_particles = []
         self.created_indices = []
         self.current_config = None
-        
+        self._generation_running = False
+
         if self.worker:
             self.worker.deleteLater()
             self.worker = None
