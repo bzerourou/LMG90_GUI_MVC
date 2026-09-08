@@ -267,6 +267,10 @@ class ModelTreeView(QObject):
 
         for i, avatar in visible:
             center_str = ', '.join(f"{x:.2f}" for x in avatar.center)
+            contactors = avatar.contactors or []
+            contactor_text = ', '.join(
+                cont.get('shape', '?') for cont in contactors
+            ) or "aucun contacteur"
             origin_mark = ""
             if avatar.origin == AvatarOrigin.LOOP:
                 origin_mark = " [L]"
@@ -276,9 +280,11 @@ class ModelTreeView(QObject):
                 origin_mark = " [F]"
 
             item = QTreeWidgetItem([
-                f"{avatar.avatar_type.value} — {avatar.color} — ({center_str}){origin_mark}",
+                f"{avatar.avatar_type.value} — {avatar.color}{origin_mark}",
                 "Avatar",
-                str(i)
+                f"#{i} ({center_str}) — "
+                f"{avatar.material_name}/{avatar.model_name} — "
+                f"{len(contactors)} contacteur(s): {contactor_text}"
             ])
             item.setData(0, Qt.ItemDataRole.UserRole, "avatar")
             item.setData(1, Qt.ItemDataRole.UserRole, i)

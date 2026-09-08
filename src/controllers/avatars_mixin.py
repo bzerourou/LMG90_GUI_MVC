@@ -255,3 +255,50 @@ class AvatarsMixin:
 
         self.state_changed.emit()
         return result
+
+    def add_contactor_to_avatar(
+        self, index: int, shape: str, color: str,
+        params: dict | None = None, group: str | None = None,
+    ) -> None:
+        """
+        Ajoute un contacteur SUPPLÉMENTAIRE à un avatar déjà créé, quel que
+        soit son type (rigide simple, emptyAvatar, ou déformable MAILx).
+
+        pylmgc90 expose body.addContactors(...) de façon générique sur tous
+        les types d'avatar natifs — pas besoin de logique différente par type
+        côté GUI, contrairement à la création initiale.
+
+        Met à jour à la fois :
+        - l'objet pylmgc90 vivant (self._pylmgc_bodies[index])
+        - avatar.contactors, seule source de vérité relue par
+            script_generator._write_single_avatar() (avatars manuels ET
+            déformables) et par viewer_3d.py pour l'affichage.
+        """
+        if not (0 <= index < len(self.state.avatars)):
+            raise ValueError(f"Index avatar {index} invalide")
+
+        body = self._pylmgc_bodies[index]
+        if body is None:
+            raise ValueError(
+                "Corps pylmgc90 introuvable pour cet avatar "
+                "(non reconstruit — rechargez le projet ou régénérez-le)."
+            )
+
+        params = params or {}
+        kwargs = {'shape': shape, 'color': color, **params}
+        if group:
+            kwargs['group'] = group
+
+        # 1. Appliquer sur l'objet natif vivant
+        body.addContactors(**kwargs)
+
+        # 2. Persister dans le modèle
+        avatar = self.state.avatars[index]
+        if avatar.contactors is None:
+            avatar.contactors = []
+        entry = {'shape': shape, 'color': color, 'params': dict(params)}
+        if group:
+            entry['group'] = group
+        avatar.contactors.append(entry)
+
+        self.state_changed.emit()
