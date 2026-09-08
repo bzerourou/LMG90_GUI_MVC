@@ -384,7 +384,7 @@ class MasonryWizard(QWizard):
                                 target_type='avatar',
                                 target_value=aid,
                                 operation_type='translate',
-                                parameters=params
+                                parameters=dict(params)
                             )
                         )
                 if tf_rotate :
