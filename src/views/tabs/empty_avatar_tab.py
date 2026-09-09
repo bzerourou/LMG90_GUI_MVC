@@ -17,6 +17,7 @@ from ...core.models import Avatar, AvatarType, AvatarOrigin
 from ...core.validators import ValidationError
 from ...controllers.project_controller import ProjectController
 from ...views.tabs.base_tab import BaseTab
+from ...core.contactor_compat import get_compatible_contactor_shapes
 
 
 class EmptyAvatarTab(BaseTab):
@@ -26,11 +27,7 @@ class EmptyAvatarTab(BaseTab):
     avatar_updated = pyqtSignal()
     avatar_deleted = pyqtSignal()
 
-    
-    shapes_2d = ["DISKx", "xKSID", "JONCx", "POLYG", "PT2Dx"]
-    shapes_3d = ["SPHER",  "PLANx", "CYLND", "DNLYC", "POLYR", "PT3Dx"]
-    mesh_shapes_2d = ["ALpxx", "CLxx" , "DISKL", "PT2TL"  ]  # contacteurs pour corps déformable 2d
-    mesh_shapes_3d = [ "ASpxx", "CSpxx", "PT3Dx"  ]  # contacteurs pour corps déformable 3d
+
     
     def __init__(self, controller: ProjectController):
         super().__init__(controller)
@@ -218,24 +215,32 @@ class EmptyAvatarTab(BaseTab):
             "✅ Ajouter contacteurs au corps" if is_existing else "✅ Créer Avatar Vide"
         )
 
+    def _current_shapes(self) -> list[str]:
+        """
+        Calcule les formes de contacteur valides pour le contexte actuel du
+        formulaire — seule source de vérité, appelée par _add_contactor_row()
+        et _refresh_contactor_shapes(), pour ne jamais diverger entre les deux.
+        """
+        if self.mode_combo.currentIndex() == 1:
+            # Mode "ajouter à un avatar existant" : dériver du type RÉEL de
+            # l'avatar sélectionné, pas d'une supposition côté UI.
+            avatar_idx = self.existing_combo.currentData()
+            if avatar_idx is None:
+                return []
+            avatar = self.controller.get_avatar(avatar_idx)
+            if avatar is None:
+                return []
+            dimension = len(avatar.center)
+            return get_compatible_contactor_shapes(avatar.avatar_type, dimension)
+
+        # Mode création d'un emptyAvatar : toujours un corps rigide (RBDY2/RBDY3)
+        from ...core.models import AvatarType
+        dimension = int(self.dim_combo.currentText())
+        return get_compatible_contactor_shapes(AvatarType.EMPTY_AVATAR, dimension)
+
     def _refresh_contactor_shapes(self):
         """Met à jour les combos de forme dans toutes les lignes de contacteurs."""
-        is_existing = self.mode_combo.currentIndex() == 1
-        dim = int(self.dim_combo.currentText())
-        shapes = self.shapes_2d if dim == 2 else self.shapes_3d
-        if is_existing:
-            avatar_idx = self.existing_combo.currentData()
-            if avatar_idx is not None:
-                avatar = self.controller.get_avatar(avatar_idx)
-                if avatar is not None:
-                    dim = len(avatar.center)
-                    shapes = (
-                        self.mesh_shapes_2d if avatar.avatar_type == AvatarType.MESH_DEFORMABLE
-                        else self.shapes_2d
-                    ) if dim == 2 else (
-                        self.mesh_shapes_3d if avatar.avatar_type == AvatarType.MESH_DEFORMABLE
-                        else self.shapes_3d
-                    )
+        shapes = self._current_shapes()
 
         for i in range(self.contactors_layout.count()):
             widget = self.contactors_layout.itemAt(i).widget()
@@ -252,13 +257,19 @@ class EmptyAvatarTab(BaseTab):
                 row.shape_combo.setCurrentText(current)
             row.shape_combo.blockSignals(False)
 
+        dim = (
+            len(self.controller.get_avatar(self.existing_combo.currentData()).center)
+            if self.mode_combo.currentIndex() == 1 and self.existing_combo.currentData() is not None
+            else int(self.dim_combo.currentText())
+        )
         center_default = "0.0, 0.0" if dim == 2 else "0.0, 0.0, 0.0"
         self.center_input.setText(center_default)
         self.center_label.setText(f"Centre ({'x,y' if dim == 2 else 'x,y,z'}) :")
+
         for i in reversed(range(self.contactors_layout.count())):
-            widget = self.contactors_layout.itemAt(i).widget()
-            if widget:
-                widget.deleteLater()
+            w = self.contactors_layout.itemAt(i).widget()
+            if w:
+                w.deleteLater()
         self._add_contactor_row()
     
     def _add_contactor_row(self):
@@ -267,24 +278,9 @@ class EmptyAvatarTab(BaseTab):
         row.addWidget(QLabel("Forme :"))
         
         shape_combo = QComboBox()
-        dim = int(self.dim_combo.currentText())
-        is_existing = self.mode_combo.currentIndex() == 1
-        shapes = self.shapes_2d if dim == 2 else self.shapes_3d
-        if is_existing:
-            avatar_idx = self.existing_combo.currentData()
-            if avatar_idx is not None:
-                avatar = self.controller.get_avatar(avatar_idx)
-                if avatar is not None:
-                    dim = len(avatar.center)
-                    if avatar.avatar_type == AvatarType.MESH_DEFORMABLE:
-                        shapes = self.mesh_shapes_2d if dim == 2 else self.mesh_shapes_3d
-                    else:
-                        shapes = self.shapes_2d if dim == 2 else self.shapes_3d
-        shape_combo.addItems(shapes)
+        shape_combo.addItems(self._current_shapes())
+        shape_combo.currentTextChanged.connect(lambda: self._on_contactor_type_changed(row))    
 
-        shape_combo.currentTextChanged.connect(
-            lambda: self._on_contactor_type_changed(row)
-        )
         row.addWidget(shape_combo)
         
         row.addWidget(QLabel("Couleur :"))

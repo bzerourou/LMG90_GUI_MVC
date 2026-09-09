@@ -264,18 +264,25 @@ class AvatarsMixin:
         Ajoute un contacteur SUPPLÉMENTAIRE à un avatar déjà créé, quel que
         soit son type (rigide simple, emptyAvatar, ou déformable MAILx).
 
-        pylmgc90 expose body.addContactors(...) de façon générique sur tous
-        les types d'avatar natifs — pas besoin de logique différente par type
-        côté GUI, contrairement à la création initiale.
-
-        Met à jour à la fois :
-        - l'objet pylmgc90 vivant (self._pylmgc_bodies[index])
-        - avatar.contactors, seule source de vérité relue par
-            script_generator._write_single_avatar() (avatars manuels ET
-            déformables) et par viewer_3d.py pour l'affichage.
+        Valide que `shape` est compatible avec le type réel de l'avatar cible
+        et sa dimension (via core.contactor_compat) avant tout appel natif —
+        évite un plantage pylmgc90 opaque ou un contacteur silencieusement
+        incohérent avec le corps.
         """
         if not (0 <= index < len(self.state.avatars)):
             raise ValueError(f"Index avatar {index} invalide")
+
+        avatar = self.state.avatars[index]
+        dimension = len(avatar.center)
+
+        from ..core.contactor_compat import is_shape_compatible, get_compatible_contactor_shapes
+        if not is_shape_compatible(shape, avatar.avatar_type, dimension):
+            valid = ", ".join(get_compatible_contactor_shapes(avatar.avatar_type, dimension))
+            raise ValueError(
+                f"Contacteur '{shape}' incompatible avec l'avatar "
+                f"'{avatar.avatar_type.value}' ({dimension}D). "
+                f"Formes valides : {valid}"
+            )
 
         body = self._pylmgc_bodies[index]
         if body is None:
@@ -293,7 +300,6 @@ class AvatarsMixin:
         body.addContactors(**kwargs)
 
         # 2. Persister dans le modèle
-        avatar = self.state.avatars[index]
         if avatar.contactors is None:
             avatar.contactors = []
         entry = {'shape': shape, 'color': color, 'params': dict(params)}

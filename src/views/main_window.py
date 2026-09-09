@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (
     QMainWindow, QToolBar, QPushButton, QTabWidget, QMessageBox,
     QFileDialog, QApplication, QDialog, QTextEdit, QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QProcess, QProcessEnvironment
-from PyQt6.QtGui import QAction, QKeySequence, QIcon
+from PyQt6.QtCore import Qt, pyqtSignal, QProcess, QProcessEnvironment, QUrl
+from PyQt6.QtGui import QAction, QKeySequence, QIcon, QDesktopServices
 from pathlib import Path
 
 from ..controllers.project_controller import ProjectController
@@ -56,7 +56,7 @@ class MainWindow(
         self._script_log_dialog = None
         
         # Configuration fenêtre
-        self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {self.controller.state.name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
@@ -280,6 +280,29 @@ class MainWindow(
 
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
+        # Sous-menu Documentation (PDF)
+        docs_menu = help_menu.addMenu("📖 Documentation")
+
+        open_docs_folder_action = QAction("📂 Ouvrir le dossier documentation", self)
+        open_docs_folder_action.triggered.connect(self._on_open_docs_folder)
+        docs_menu.addAction(open_docs_folder_action)
+
+        docs_menu.addSeparator()
+
+        # Entrées dynamiques pour chaque PDF trouvé dans docs/
+        docs_dir = self._docs_dir()
+        pdfs = sorted(docs_dir.glob("*.pdf")) if docs_dir.is_dir() else []
+        if pdfs:
+            for pdf in pdfs:
+                action = QAction(f"📄 {pdf.name}", self)
+                action.triggered.connect(
+                    lambda checked=False, p=pdf: self._on_open_doc_pdf(p)
+                )
+                docs_menu.addAction(action)
+        else:
+            empty = QAction("(aucun PDF trouvé)", self)
+            empty.setEnabled(False)
+            docs_menu.addAction(empty)
         aide_action = QAction("Aide en ligne ", self)
         about_action = QAction("À propos", self)
         about_action.triggered.connect(self._on_about)
@@ -439,7 +462,7 @@ class MainWindow(
         if ok and name.strip():
             name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name.strip())
             self.controller.new_project(name)
-            self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
@@ -457,7 +480,7 @@ class MainWindow(
         if filepath:
             try:
                 self.controller.load_project(Path(filepath))
-                self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {self.controller.state.name}")
                 self.project_loaded.emit()
                 self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
@@ -572,7 +595,7 @@ class MainWindow(
             try:
                 self.controller.new_project(example.title)
                 example.builder(self.controller)
-                self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {self.controller.state.name}")
                 self._refresh_all()
                 self.statusBar().showMessage(
                     f"✅ Exemple « {example.title} » chargé", 5000
@@ -599,7 +622,7 @@ class MainWindow(
         """Affiche À propos"""
         QMessageBox.information(
             self, "À propos",
-            "LMGC90_GUI v0.5.4\n"
+            "LMGC90_GUI v0.5.5\n"
             "UI pour LMGC90\n"
             "par Zerourou B.\n"
             "bachir.zerourou@yahoo.fr\n"
@@ -609,6 +632,45 @@ class MainWindow(
     def _on_help(self) :
         import webbrowser
         webbrowser.open("https://github.com/bzerourou/LMG90_GUI_MVC/blob/main/docs/overview.md")
+
+    def _docs_dir(self) -> Path:
+        """Dossier docs/ : à côté de l'exe (install Inno) ou à la racine du projet (dev)."""
+        if getattr(sys, "frozen", False):
+            # PyInstaller onedir → LMGC90_GUI.exe et docs/ dans le même dossier
+            return Path(sys.executable).resolve().parent / "docs"
+        # Développement : src/views/main_window.py → racine projet
+        return Path(__file__).resolve().parents[2] / "docs"
+
+    def _on_open_docs_folder(self):
+        """Ouvre le dossier contenant les PDF de documentation."""
+        docs = self._docs_dir()
+        if not docs.is_dir():
+            QMessageBox.warning(
+                self,
+                "Documentation introuvable",
+                f"Le dossier de documentation n'existe pas :\n{docs}",
+            )
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(docs)))
+
+    def _on_open_doc_pdf(self, pdf_path: Path):
+        """Ouvre un fichier PDF avec le lecteur par défaut du système."""
+        if not pdf_path.is_file():
+            QMessageBox.warning(
+                self,
+                "Fichier introuvable",
+                f"Le document n'existe pas :\n{pdf_path}",
+            )
+            return
+        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf_path)))
+        if not ok:
+            QMessageBox.warning(
+                self,
+                "Ouverture impossible",
+                f"Impossible d'ouvrir :\n{pdf_path}\n\n"
+                "Vérifiez qu'un lecteur PDF est installé.",
+            )
+
 
     def _on_preferences(self):
         """Ouvre le dialogue de préférences"""
@@ -657,7 +719,7 @@ class MainWindow(
         """Ouvre un projet récent."""
         try:
             self.controller.load_project(filepath)
-            self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {self.controller.state.name}")
             self.project_loaded.emit()
             self.statusBar().showMessage(f"Projet chargé", 5000)
             
@@ -809,7 +871,7 @@ class MainWindow(
         self.controller.new_project(name)
         from ..core.models import ProjectPreferences
         self.controller.state.preferences = ProjectPreferences()
-        self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {name}")
         self._refresh_all()
         self._update_recent_menu()
         self.statusBar().showMessage("Nouveau projet créé", 3000)
@@ -936,7 +998,7 @@ class MainWindow(
         
         wizard = ProjectSetupWizard(self.controller, self)
         if wizard.exec():
-            self.setWindowTitle(f"LMGC90_GUI v0.5.4 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.5 - {self.controller.state.name}")
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
 
