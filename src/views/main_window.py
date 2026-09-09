@@ -15,7 +15,7 @@ from ..controllers.project_controller import ProjectController
 from ..core.validators import ValidationError
 from .tabs import (
     MaterialTab, ModelTab, AvatarTab, EmptyAvatarTab, AvatarLibraryTab, LoopTab,
-    GranuloTab, DOFTab, ContactTab, VisibilityTab, PostProTab, ComputeTab, ViewerTab
+    GranuloTab, MasonryTab, DOFTab, ContactTab, VisibilityTab, PostProTab, ComputeTab, ViewerTab
 )
 
 from ..core.models import UnitSystem
@@ -248,6 +248,7 @@ class MainWindow(
             ('library', '📚 Bibliothèque'),
             ('loop', '🔁 Boucles'),
             ('granulo', '🎲 Granulométrie'),
+            ('masonry', '🧱 Maçonnerie'),
             ('dof', '🔒 DOF'),
             ('contact', '⚡ Contact'),
             ('visibility', '👁️ Visibilité'),
@@ -324,6 +325,7 @@ class MainWindow(
         self.avatar_library_tab = AvatarLibraryTab(self.controller)
         self.loop_tab = LoopTab(self.controller)
         self.granulo_tab = GranuloTab(self.controller)
+        self.masonry_tab = MasonryTab(self.controller)
         self.dof_tab = DOFTab(self.controller)
         self.contact_tab = ContactTab(self.controller)
         self.visibility_tab = VisibilityTab(self.controller)
@@ -341,12 +343,13 @@ class MainWindow(
             'library': ('Bibliothèque', self.avatar_library_tab, '📚'),
             'loop': ('Boucles', self.loop_tab, '🔁'),
             'granulo': ('Granulométrie', self.granulo_tab, '🎲'),
+            'masonry': ('Maçonnerie', self.masonry_tab, '🧱'),
             'dof': ('DOF', self.dof_tab, '🔒'),
             'contact': ('Contact', self.contact_tab, '⚡'),
             'visibility': ('Visibilité', self.visibility_tab, '👁️'),
             'postpro': ('Post-Pro', self.postpro_tab, '📊'),
             'compute': ('Calcul', self.compute_tab, '⚙️'),
-            'viewer': ('Visualisation 3D', self.viewer_tab, '🎨')
+            'viewer': ('Visualisation 3D', self.viewer_tab, '🎨'),
         }
         
         # Onglets ouverts par défaut
@@ -384,6 +387,11 @@ class MainWindow(
         #granulo
         self.granulo_tab.granulo_generated.connect(self._refresh_all)
         self.granulo_tab.granulo_deleted.connect(self._refresh_all)
+        #masonry
+        self.masonry_tab.masonry_created.connect(self._refresh_all)
+        self.masonry_tab.masonry_updated.connect(self._refresh_all)
+        self.masonry_tab.masonry_deleted.connect(self._refresh_all)
+
         #dof
         self.dof_tab.operation_applied.connect(self._refresh_all)   
         self.dof_tab.operation_deleted.connect(self._refresh_all)

@@ -19,9 +19,10 @@ from .postpro_tab import PostProTab
 from .compute_tab import ComputeTab
 from .viewer_tab import ViewerTab
 from ...gui.dialogs.factory_wizard import FactoryTab
+from .masonry_tab import MasonryTab
 
 __all__ = [
     'MaterialTab', 'ModelTab', 'AvatarTab', 'EmptyAvatarTab', 'AvatarLibraryTab',
     'LoopTab', 'GranuloTab', 'DOFTab', 'ContactTab',
-    'VisibilityTab', 'PostProTab', 'ComputeTab', 'ViewerTab', 'FactoryTab'
+    'VisibilityTab', 'PostProTab', 'ComputeTab', 'ViewerTab', 'FactoryTab', 'MasonryTab'
 ]
