@@ -139,7 +139,7 @@ class GranuloMixin:
         bodies = LMGC90Bridge.create_avatars_from_population(population, mod_obj, mat_obj)
         for body in bodies:
             self._bodies_container.addAvatar(body)
-            self._pylmgc_bodies.append(body)
+            #self._pylmgc_bodies.append(body)
         self._pylmgc_population_bodies[population.population_id] = bodies
 
         if not self._is_loading:
