@@ -808,9 +808,13 @@ class MasonryTab(BaseTab):
             (id_to_idx[aid] for aid in avatar_ids if aid in id_to_idx),
             reverse=True,
         )
-        for idx in indices:
-            self.controller.remove_avatar(idx)
+        failed = [idx for idx in indices if not self.controller.remove_avatar(idx)]
         self.controller.state.avatar_groups.pop(group_name, None)
+        if failed:
+            QMessageBox.warning(
+                self, "Suppression incomplète",
+                f"⚠️ Certaines briques n'ont pas pu être supprimées : {len(failed)}"
+            )
 
     # =========================================================================
     # Actions CRUD
@@ -1065,6 +1069,9 @@ class MasonryTab(BaseTab):
         self.help_label.setStyleSheet("color: #666; font-size: 9pt; padding: 5px;")
 
     def _clear_form(self):
+        if self.current_edit_group is not None : 
+            self._on_cancel_edit()
+            return
         self.brick_name_input.setText("std")
         self.lx_input.setText("0.20")
         self.ly_input.setText("0.065")
