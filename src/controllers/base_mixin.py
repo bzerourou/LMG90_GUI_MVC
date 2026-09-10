@@ -125,6 +125,25 @@ class BaseMixin:
             self._models_container.addModel(mod_obj)
             self._pylmgc_models[mod.name] = mod_obj
 
+        # Les avatars produits par les générateurs sont persistés dans
+        # state.avatars pour l'affichage, mais seront recréés depuis leurs
+        # configurations ci-dessous. Les conserver provoquerait des doublons.
+        generated_ids = {
+            avatar.avatar_id
+            for avatar in self.state.avatars
+            if avatar.origin in (AvatarOrigin.LOOP, AvatarOrigin.GRANULO)
+        }
+        if generated_ids:
+            self.state.avatars[:] = [
+                avatar for avatar in self.state.avatars
+                if avatar.avatar_id not in generated_ids
+            ]
+            for group_name, avatar_ids in self.state.avatar_groups.items():
+                self.state.avatar_groups[group_name] = [
+                    avatar_id for avatar_id in avatar_ids
+                    if avatar_id not in generated_ids
+                ]
+
         # 3. Avatars MANUAL
         regeneration_errors = []
         manual_avatars = [av for av in self.state.avatars if av.origin == AvatarOrigin.MANUAL]
@@ -174,7 +193,10 @@ class BaseMixin:
         # 6. Régénération granulo
         for i, granulo in enumerate(self.state.granulo_generations):
             try:
-                self.generate_granulo(granulo)
+                # Une population SoA persistée est reconstruite à l'étape
+                # 6bis ; la régénérer ici créerait une seconde population.
+                if not granulo.use_particle_population:
+                    self.generate_granulo(granulo)
             except Exception as e:
                 regeneration_errors.append(f"Granulo {i + 1}: {e}")
         # 6bis. Régénération des populations SoA (ParticlePopulation)
