@@ -1,6 +1,6 @@
 """AvatarsMixin — CRUD avatars + duplication."""
 import copy as _copy
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict
 
 from ..core.models import Avatar, AvatarOrigin, new_avatar_id
 from ..core.validators import AvatarValidator
@@ -58,15 +58,26 @@ class AvatarsMixin:
             raise ValueError(f"Matériau '{avatar.material_name}' introuvable")
         if not mod_obj:
             raise ValueError(f"Modèle '{avatar.model_name}' introuvable")
-        old_body = self._pylmgc_bodies[index]
-        if old_body is not None:
-            self._bodies_container.remove(old_body)
+        
+        body = self._resolve_pylmgc_body(index, require_present=False)
+        if body is not None:
+            try:
+                self._bodies_container.remove(body)
+            except Exception as e:
+                from ..core.app_logger import get_logger
+                get_logger('controller').warning(
+                    "update_avatar: échec remove body #%s: %s", index, e
+                )
+
         body_obj = LMGC90Bridge.create_avatar(avatar, mod_obj, mat_obj)
         if body_obj is not None:
             self._bodies_container.addAvatar(body_obj)
+        # Garantit l'alignement index ↔ liste même si _pylmgc_bodies était trop court
+        while len(self._pylmgc_bodies) < len(self.state.avatars):
+            self._pylmgc_bodies.append(None)
         self._pylmgc_bodies[index] = body_obj
         self.state.avatars[index] = avatar
-        if not self._batch_mode :
+        if not self._batch_mode:
             self.state_changed.emit()
 
     def get_avatar(self, index: int) -> Optional[Avatar]:
@@ -214,12 +225,7 @@ class AvatarsMixin:
         self.state_changed.emit()
         return new_indices
 
-    def duplicate_group(
-        self,
-        group_name: str,
-        n_copies: int,
-        offset: list,
-        new_group_prefix: str = None,
+    def duplicate_group(self, group_name: str, n_copies: int,offset: list, new_group_prefix: str = None,
     ) -> Dict[str, list]:
         if group_name not in self.state.avatar_groups:
             raise KeyError(f"Groupe '{group_name}' introuvable.")
@@ -288,13 +294,8 @@ class AvatarsMixin:
                 f"'{avatar.avatar_type.value}' ({dimension}D). "
                 f"Formes valides : {valid}"
             )
-
-        body = self._pylmgc_bodies[index]
-        if body is None:
-            raise ValueError(
-                "Corps pylmgc90 introuvable pour cet avatar "
-                "(non reconstruit — rechargez le projet ou régénérez-le)."
-            )
+        # Résolution sûre : index ↔ body AoS uniquement
+        body = self._resolve_pylmgc_body(index, require_present=True)
 
         params = params or {}
         kwargs = {'shape': shape, 'color': color, **params}
@@ -312,4 +313,51 @@ class AvatarsMixin:
             entry['group'] = group
         avatar.contactors.append(entry)
 
-        self.state_changed.emit()
+        if not self._batch_mode:
+            self.state_changed.emit()
+
+    def _resolve_pylmgc_body(
+        self, index: int, *, require_present: bool = True
+    ) -> Any:
+        """
+        Retourne le body pylmgc90 lié à state.avatars[index].
+
+        Invariant AoS : len(_pylmgc_bodies) == len(state.avatars).
+        Les bodies SoA (ParticlePopulation) ne doivent JAMAIS être dans
+        _pylmgc_bodies — uniquement dans _pylmgc_population_bodies.
+
+        Lève ValueError si l'index est hors bornes, si les listes sont
+        désynchronisées, ou si le body est absent (require_present=True).
+        """
+        n_avatars = len(self.state.avatars)
+        n_bodies = len(self._pylmgc_bodies)
+
+        if not (0 <= index < n_avatars):
+            raise ValueError(f"Index avatar {index} invalide (0..{n_avatars - 1})")
+
+        if n_bodies != n_avatars:
+            from ..core.app_logger import get_logger
+            get_logger('controller').error(
+                "Désynchronisation AoS : len(_pylmgc_bodies)=%d != len(state.avatars)=%d. "
+                "Des bodies SoA ont peut-être été ajoutés par erreur dans _pylmgc_bodies.",
+                n_bodies,
+                n_avatars,
+            )
+            raise ValueError(
+                "Listes avatars / bodies pylmgc désynchronisées "
+                f"({n_bodies} bodies pour {n_avatars} avatars). "
+                "Rechargez le projet ou régénérez les corps. "
+                "Si un dépôt ParticlePopulation (SoA) vient d'être créé, "
+                "vérifiez qu'il n'écrit plus dans _pylmgc_bodies."
+            )
+
+        body = self._pylmgc_bodies[index]
+        if body is None and require_present:
+            avatar = self.state.avatars[index]
+            raise ValueError(
+                f"Corps pylmgc90 introuvable pour l'avatar "
+                f"'{avatar.avatar_id[:8]}…' (index {index}, "
+                f"type={avatar.avatar_type.value}). "
+                "Non reconstruit — rechargez le projet ou régénérez-le."
+            )
+        return body
