@@ -66,6 +66,8 @@ class AvatarsMixin:
             self._bodies_container.addAvatar(body_obj)
         self._pylmgc_bodies[index] = body_obj
         self.state.avatars[index] = avatar
+        if not self._batch_mode :
+            self.state_changed.emit()
 
     def get_avatar(self, index: int) -> Optional[Avatar]:
         if 0 <= index < len(self.state.avatars):
@@ -166,6 +168,9 @@ class AvatarsMixin:
                 for generated_id in loop.generated_ids
                 if generated_id != avatar_id
             ]
+
+        if not self._batch_mode :
+            self.state_changed.emit()
 
         return True
 
