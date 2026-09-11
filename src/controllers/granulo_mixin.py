@@ -60,22 +60,80 @@ class GranuloMixin:
             self.state.avatar_groups.setdefault(config.group_name, []).extend(
                 config.generated_ids
             )
+        if not self._batch_mode : 
+            self.state_changed.emit()
+
 
         return generated_indices
 
     def remove_granulo(self, index: int) -> bool:
+        """
+        Supprime un dépôt granulométrique de façon atomique.
+
+        - Chemin SoA : délègue à remove_particle_population (déjà batché).
+        - Chemin AoS : collecte tous les indices, suppression du plus grand
+          index au plus petit (évite le décalage d'indices), _batch_mode
+          pendant toute la boucle, un seul state_changed à la fin.
+        """
         if not (0 <= index < len(self.state.granulo_generations)):
             return False
+        
         granulo = self.state.granulo_generations[index]
+
         if granulo.use_particle_population and granulo.population_id:
             self.remove_particle_population(granulo.population_id)
+            # remove_particle_population a déjà émis state_changed            
             self.state.granulo_generations.pop(index)
             return True
-        for aid in granulo.generated_ids:
-            res = self._find_avatar_by_id(aid)
-            if res:
-                self.remove_avatar(res[0])
-        self.state.granulo_generations.pop(index)
+        ids_to_remove = list(granulo.generatedids or [])
+        id_set = set(ids_to_remove)
+
+        indices = [
+            i for i, av in enumerate(self.state.avatars)
+            if av.avatar_id in id_set
+        ]
+        indices.sort(reverse=True)
+
+        prev_batch = self._batch_mode
+        self._batch_mode = True
+        errors: List[str] = []
+        try:
+            for idx in indices:
+                try:
+                    ok = self.remove_avatar(idx)
+                    if not ok:
+                        errors.append(
+                            f"avatar index {idx} non supprimé "
+                            "(référencé comme modèle de boucle ?)"
+                        )
+                except Exception as e:
+                    errors.append(f"avatar index {idx}: {e}")
+
+            # Nettoyage du groupe nommé du dépôt (au-delà du nettoyage
+            # unitaire déjà fait dans remove_avatar)
+            if granulo.group_name and granulo.group_name in self.state.avatar_groups:
+                remaining = [
+                    aid for aid in self.state.avatar_groups[granulo.group_name]
+                    if aid not in id_set
+                ]
+                if remaining:
+                    self.state.avatar_groups[granulo.group_name] = remaining
+                else:
+                    del self.state.avatar_groups[granulo.group_name]
+
+            self.state.granulo_generations.pop(index)
+        finally:
+            self._batch_mode = prev_batch
+
+        if errors:
+            from ..core.app_logger import get_logger
+            get_logger('controller').warning(
+                "remove_granulo partiel (%d erreur(s)): %s",
+                len(errors),
+                "; ".join(errors),
+            )
+
+        self.state_changed.emit()
         return True
 
     def get_granulo(self, index: int) -> Optional[GranuloGeneration]:
@@ -109,6 +167,8 @@ class GranuloMixin:
             self.state.avatar_groups.setdefault(config.group_name, []).extend(
                 config.generated_ids
             )
+        self.state_changed.emit()
+        
     def create_granulo_population_from_arrays(
         self,
         config: GranuloGeneration,
@@ -131,12 +191,14 @@ class GranuloMixin:
 
         mat_obj = self._pylmgc_materials.get(config.material_name)
         mod_obj = self._pylmgc_models.get(config.model_name)
+
         if not mat_obj:
             raise ValueError(f"Matériau '{config.material_name}' introuvable")
         if not mod_obj:
             raise ValueError(f"Modèle '{config.model_name}' introuvable")
         from ..core.pylmgc_bridge import LMGC90Bridge
         bodies = LMGC90Bridge.create_avatars_from_population(population, mod_obj, mat_obj)
+
         for body in bodies:
             self._bodies_container.addAvatar(body)
         self._pylmgc_population_bodies[population.population_id] = bodies
@@ -193,4 +255,5 @@ class GranuloMixin:
                 del self.state.populations_groups[grp_name]
 
         self.state_changed.emit()
+        
         return True
