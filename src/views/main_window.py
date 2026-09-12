@@ -444,6 +444,7 @@ class MainWindow(
         self.controller.state_changed.connect(self.model_tab.refresh)
         self.controller.state_changed.connect(self.avatar_library_tab.refresh)
         self.controller.state_changed.connect(self._refresh_all)
+        self.controller.state_changed.connect(self.masonry_tab.refresh)
         self.model_tab.dimension_changed.connect( self.avatar_library_tab.refresh)
 
 
@@ -1423,7 +1424,7 @@ class MainWindow(
         for tab in [self.material_tab, self.model_tab, self.avatar_tab,
                     self.empty_avatar_tab, self.loop_tab, self.dof_tab
                     , self.contact_tab, self.visibility_tab, self.granulo_tab,
-                    self.postpro_tab]:
+                    self.postpro_tab, self.masonry_tab]:
             if hasattr(tab, 'refresh'):
                 if tab is self.granulo_tab:
                     tab.refresh(full_refresh=True)
