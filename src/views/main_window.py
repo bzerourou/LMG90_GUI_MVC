@@ -56,7 +56,7 @@ class MainWindow(
         self._script_log_dialog = None
         
         # Configuration fenêtre
-        self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {self.controller.state.name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {self.controller.state.name}")
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon("lmgc90_gui.ico"))
         
@@ -152,10 +152,10 @@ class MainWindow(
 
         assistants_menu.addSeparator()
 
-        masonry_wizard_action = QAction("🧱 Assistant de maçonnerie...", self)
-        masonry_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
-        masonry_wizard_action.triggered.connect(self._on_masonry_wizard)
-        assistants_menu.addAction(masonry_wizard_action)
+        #masonry_wizard_action = QAction("🧱 Assistant de maçonnerie...", self)
+        #masonry_wizard_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        #masonry_wizard_action.triggered.connect(self._on_masonry_wizard)
+        #assistants_menu.addAction(masonry_wizard_action)
 
         assistants_menu.addSeparator()
 
@@ -248,7 +248,7 @@ class MainWindow(
             ('library', '📚 Bibliothèque'),
             ('loop', '🔁 Boucles'),
             ('granulo', '🎲 Granulométrie'),
-            ('masonry', '🧱 Maçonnerie'),
+            #('masonry', '🧱 Maçonnerie'),
             ('dof', '🔒 DOF'),
             ('contact', '⚡ Contact'),
             ('visibility', '👁️ Visibilité'),
@@ -348,7 +348,7 @@ class MainWindow(
         self.avatar_library_tab = AvatarLibraryTab(self.controller)
         self.loop_tab = LoopTab(self.controller)
         self.granulo_tab = GranuloTab(self.controller)
-        self.masonry_tab = MasonryTab(self.controller)
+        #self.masonry_tab = MasonryTab(self.controller)
         self.dof_tab = DOFTab(self.controller)
         self.contact_tab = ContactTab(self.controller)
         self.visibility_tab = VisibilityTab(self.controller)
@@ -366,7 +366,7 @@ class MainWindow(
             'library': ('Bibliothèque', self.avatar_library_tab, '📚'),
             'loop': ('Boucles', self.loop_tab, '🔁'),
             'granulo': ('Granulométrie', self.granulo_tab, '🎲'),
-            'masonry': ('Maçonnerie', self.masonry_tab, '🧱'),
+            #('masonry', '🧱 Maçonnerie'),
             'dof': ('DOF', self.dof_tab, '🔒'),
             'contact': ('Contact', self.contact_tab, '⚡'),
             'visibility': ('Visibilité', self.visibility_tab, '👁️'),
@@ -411,9 +411,9 @@ class MainWindow(
         self.granulo_tab.granulo_generated.connect(self._refresh_all)
         self.granulo_tab.granulo_deleted.connect(self._refresh_all)
         #masonry
-        self.masonry_tab.masonry_created.connect(self._refresh_all)
-        self.masonry_tab.masonry_updated.connect(self._refresh_all)
-        self.masonry_tab.masonry_deleted.connect(self._refresh_all)
+        #self.masonry_tab.masonry_created.connect(self._refresh_all)
+        #self.masonry_tab.masonry_updated.connect(self._refresh_all)
+        #self.masonry_tab.masonry_deleted.connect(self._refresh_all)
 
         #dof
         self.dof_tab.operation_applied.connect(self._refresh_all)   
@@ -444,7 +444,7 @@ class MainWindow(
         self.controller.state_changed.connect(self.model_tab.refresh)
         self.controller.state_changed.connect(self.avatar_library_tab.refresh)
         self.controller.state_changed.connect(self._refresh_all)
-        self.controller.state_changed.connect(self.masonry_tab.refresh)
+        #self.controller.state_changed.connect(self.masonry_tab.refresh)
         self.model_tab.dimension_changed.connect( self.avatar_library_tab.refresh)
 
 
@@ -463,7 +463,7 @@ class MainWindow(
         if ok and name.strip():
             name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name.strip())
             self.controller.new_project(name)
-            self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {name}")
             self._refresh_all()
             self.statusBar().showMessage("Nouveau projet créé", 3000)
         
@@ -481,7 +481,7 @@ class MainWindow(
         if filepath:
             try:
                 self.controller.load_project(Path(filepath))
-                self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {self.controller.state.name}")
                 self.project_loaded.emit()
                 self._add_to_recent(Path(filepath))
                 if hasattr(self.controller.state, 'load_warnings'):
@@ -596,7 +596,7 @@ class MainWindow(
             try:
                 self.controller.new_project(example.title)
                 example.builder(self.controller)
-                self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {self.controller.state.name}")
+                self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {self.controller.state.name}")
                 self._refresh_all()
                 self.statusBar().showMessage(
                     f"✅ Exemple « {example.title} » chargé", 5000
@@ -623,7 +623,7 @@ class MainWindow(
         """Affiche À propos"""
         QMessageBox.information(
             self, "À propos",
-            "LMGC90_GUI v0.5.6\n"
+            "LMGC90_GUI v0.5.7\n"
             "UI pour LMGC90\n"
             "par Zerourou B.\n"
             "bachir.zerourou@yahoo.fr\n"
@@ -720,7 +720,7 @@ class MainWindow(
         """Ouvre un projet récent."""
         try:
             self.controller.load_project(filepath)
-            self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {self.controller.state.name}")
             self.project_loaded.emit()
             self.statusBar().showMessage(f"Projet chargé", 5000)
             
@@ -872,7 +872,7 @@ class MainWindow(
         self.controller.new_project(name)
         from ..core.models import ProjectPreferences
         self.controller.state.preferences = ProjectPreferences()
-        self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {name}")
+        self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {name}")
         self._refresh_all()
         self._update_recent_menu()
         self.statusBar().showMessage("Nouveau projet créé", 3000)
@@ -999,7 +999,7 @@ class MainWindow(
         
         wizard = ProjectSetupWizard(self.controller, self)
         if wizard.exec():
-            self.setWindowTitle(f"LMGC90_GUI v0.5.6 - {self.controller.state.name}")
+            self.setWindowTitle(f"LMGC90_GUI v0.5.7 - {self.controller.state.name}")
             self._refresh_all()
             self.statusBar().showMessage("✅ Projet créé via l'assistant", 5000)
 
@@ -1424,7 +1424,8 @@ class MainWindow(
         for tab in [self.material_tab, self.model_tab, self.avatar_tab,
                     self.empty_avatar_tab, self.loop_tab, self.dof_tab
                     , self.contact_tab, self.visibility_tab, self.granulo_tab,
-                    self.postpro_tab, self.masonry_tab]:
+                    self.postpro_tab, #self.masonry_tab
+                    ]:
             if hasattr(tab, 'refresh'):
                 if tab is self.granulo_tab:
                     tab.refresh(full_refresh=True)

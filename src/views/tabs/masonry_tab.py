@@ -73,6 +73,7 @@ class MasonryTab(BaseTab):
         self.current_edit_group: str | None = None
         self._setup_ui()
         self._connect_signals()
+        self.refresh()
 
     # =========================================================================
     # Interface

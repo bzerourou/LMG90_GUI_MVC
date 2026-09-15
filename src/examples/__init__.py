@@ -29,6 +29,7 @@ from .ex_composite_scene import build as _build_composite_scene
 from .ex_wheel_rail_contact import build as _build_wheel_rail_contact
 from .ex_disc_brake import build as _build_disc_brake
 from .ex_ball_bearing import build as _build_ball_bearing
+from .ex_roll_crusher_plant import build as _build_roll_crusher_plant
 
 EXAMPLES: list[ExampleSpec] = [
     ExampleSpec(
@@ -397,6 +398,22 @@ EXAMPLES: list[ExampleSpec] = [
         difficulty="Avancé",
         builder=_build_ball_bearing,
         tags=["contact", "roulement", "dof", "postpro"],
+    ),
+    ExampleSpec(
+        id="roll_crusher_plant",
+        title="🏭 Usine de broyage à cylindres",
+        category="Avancé",
+        description=(
+            "<b>Exemple vitrine.</b> Trémie d'alimentation + deux cylindres "
+            "acier contrarotatifs + charge granulométrique (220 grains). "
+            "Illustre : variables dynamiques, roughWall inclinés, DOF de "
+            "rotation entraînée, multi-matériaux, multi-lois de contact, "
+            "visibilité croisée, post-pro couple & énergie."
+        ),
+        dimension=2,
+        difficulty="Avancé",
+        builder=_build_roll_crusher_plant,
+        tags=["synthese", "granulo", "dof", "contact", "factory", "postpro", "variables"],
     ),
 
 ]
